@@ -9,6 +9,7 @@
 import type { CommandDeps, CategorizedCommand } from './types.ts';
 import { replyText } from './types.ts';
 import { getScopePeer } from '../shared/index.ts';
+import { clearFollowUp } from '../features/followup-store.ts';
 
 /** /new（别名 /reset /clear）— 开始新会话 */
 export function newCommand({ manager, config }: CommandDeps): CategorizedCommand {
@@ -21,6 +22,8 @@ export function newCommand({ manager, config }: CommandDeps): CategorizedCommand
       const { scope, peerId } = getScopePeer(ctx.message);
       // 先回执再回收集：remove 要等 agent dispose，慢的时候用户会以为没反应
       await replyText(ctx, config, '已开启新会话 ✓');
+      // 新会话之后不该再把用户的下一条当成「刚才那段对话的延续」
+      clearFollowUp(scope, peerId);
       void manager.remove(scope, peerId);
     },
   };

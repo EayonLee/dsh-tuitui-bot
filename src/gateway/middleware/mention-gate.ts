@@ -109,6 +109,7 @@ export function mentionGate(options: MentionGateOptions = {}): Middleware {
         implicit: false,
         shouldAnswer: alwaysAnswerC2C,
         reason: alwaysAnswerC2C ? 'passthrough' : 'no_mention',
+        policy: 'always',
       };
       await applyDecision(ctx, decision, next);
       return;

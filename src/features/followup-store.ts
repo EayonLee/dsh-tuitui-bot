@@ -54,6 +54,11 @@ export function isLikelyFollowUp(
   return entry.senderId === '' || entry.senderId === senderId;
 }
 
+/** 清掉某个会话的追问标记（/new 重置后调用，避免把旧对话当成延续） */
+export function clearFollowUp(scope: string, peerId: string): void {
+  store.delete(keyOf(scope, peerId));
+}
+
 /** 清空（测试用） */
 export function clearFollowUps(): void {
   store.clear();

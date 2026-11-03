@@ -23,6 +23,8 @@ export declare function markBotReply(scope: string, peerId: string, senderId: st
  *   2. 发送者是当时对话的同一个人（换人说话不算延续，避免抢答别人的问题）。
  */
 export declare function isLikelyFollowUp(scope: string, peerId: string, senderId: string, windowMs: number, now?: number): boolean;
+/** 清掉某个会话的追问标记（/new 重置后调用，避免把旧对话当成延续） */
+export declare function clearFollowUp(scope: string, peerId: string): void;
 /** 清空（测试用） */
 export declare function clearFollowUps(): void;
 //# sourceMappingURL=followup-store.d.ts.map

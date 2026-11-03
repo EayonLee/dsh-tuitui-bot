@@ -254,8 +254,14 @@ function ListRow({ label, help, value, placeholder, onChange }: {
   label: string; help?: string; value: string[]; placeholder?: string;
   onChange: (next: string[]) => void;
 }): ReactNode {
-  const [text, setText] = useState(value.join(', '));
-  useEffect(() => { setText(value.join(', ')); }, [JSON.stringify(value)]);
+  const joined = value.join(', ');
+  const [text, setText] = useState(joined);
+  // 外部值变化时回写输入框；但用户正在输入（如刚敲了逗号）时不能被自己的回显吃掉
+  useEffect(() => {
+    const fromText = text.split(/[,\n]/).map((part) => part.trim()).filter((part) => part !== '').join(', ');
+    if (fromText === joined) return;
+    setText(joined);
+  }, [joined]);
   return createElement('div', { className: 'imqb2-field' },
     createElement('div', { className: 'imqb2-head' },
       createElement('span', { className: 'imqb2-label' }, label),
