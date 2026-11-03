@@ -332,6 +332,8 @@ class TuituiStreamSession implements StreamSessionLike {
   private lastFlushAt = 0;
   private flushing: Promise<void> | null = null;
   private closed = false;
+  /** 无 msgid 降级模式下已经发出去的内容，用来只发增量、避免重复整段 */
+  private degradedSent = '';
 
   public constructor(owner: TuituiSenderImpl, target: ReplyTarget, throttleMs: number) {
     this.owner = owner;
@@ -344,8 +346,16 @@ class TuituiStreamSession implements StreamSessionLike {
     this.pending = content;
     const now = Date.now();
     if (this.msgId === undefined) {
-      // 首帧立即发送（用户等待感知最关键）
-      this.msgId = await this.owner.sendStreamSeed(this.target, content);
+      if (this.degradedSent === '') {
+        // 首帧立即发送（用户等待感知最关键）
+        this.msgId = await this.owner.sendStreamSeed(this.target, content);
+        this.lastFlushAt = now;
+        if (this.msgId === undefined) this.degradedSent = content;
+        return;
+      }
+      // 已确定拿不到 msgid：后续帧按增量发，不要每帧重复整段
+      if (now - this.lastFlushAt < this.throttleMs) return;
+      await this.flushDegraded();
       this.lastFlushAt = now;
       return;
     }
@@ -360,10 +370,28 @@ class TuituiStreamSession implements StreamSessionLike {
     if (this.closed) return;
     this.closed = true;
     if (this.msgId === undefined) {
-      if (this.pending) await this.owner.sendStreamSeed(this.target, this.pending);
+      await this.flushDegraded();
       return;
     }
     await this.flush();
+  }
+
+  /**
+   * 无 msgid 的降级发送：只发「还没发过的增量」。
+   *
+   * 之前这里直接发 pending，而 update() 已经用 pending 发过（msgid 缺失时每帧
+   * 都要重建消息），于是用户看到最后一段内容重复一遍。改成按前缀做增量：
+   * 内容不是上一版的延续（新 attempt 重置）时才发整段。
+   */
+  private async flushDegraded(): Promise<void> {
+    const content = this.pending;
+    if (!content || content === this.degradedSent) return;
+    const delta = content.startsWith(this.degradedSent)
+      ? content.slice(this.degradedSent.length)
+      : content;
+    if (!delta) return;
+    this.degradedSent = content;
+    await this.owner.sendStreamSeed(this.target, delta);
   }
 
   private async flush(): Promise<void> {

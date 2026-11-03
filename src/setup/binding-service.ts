@@ -102,6 +102,13 @@ export async function verifyTuituiCredentials(
  */
 export class BindingService {
   private phase: BindPhase;
+  /**
+   * 最近一个「稳定」相位（非 validating）。
+   *
+   * verifyOnly 结束后要回到校验前的相位；如果直接取 this.phase，并发点两次
+   * 「校验」时第二次进入已处于 validating，恢复后就永久卡在 validating 了。
+   */
+  private stablePhase: BindPhase;
   private readonly listeners = new Set<() => void>();
   private readonly presenters: BindPresenter[] = [];
   private readonly verifyFn: VerifyFn;
@@ -114,6 +121,7 @@ export class BindingService {
   constructor(options: BindingServiceOptions) {
     this.logger = options.logger;
     this.phase = options.initial ?? { kind: 'unconfigured' };
+    this.stablePhase = this.phase;
     this.verifyFn = options.verify ?? ((credentials) => verifyTuituiCredentials(credentials, options.config, options.logger));
     this.persistFn = options.persist ?? ((credentials) => {
       const persisted = persistCredentialsToProfile(credentials, getProfileDir() ?? undefined, options.logger);
@@ -183,7 +191,8 @@ export class BindingService {
   async verifyOnly(credentials: SetupCredentials): Promise<VerifyOutcome> {
     if (this.disposed) return { ok: false, error: '绑定流程已终止' };
     const generation = ++this.runId;
-    const restore = this.phase;
+    // 恢复目标取稳定相位：并发校验时 this.phase 可能已经是 validating
+    const restore = this.phase.kind === 'validating' ? this.stablePhase : this.phase;
     this.setPhase({ kind: 'validating' });
 
     let outcome: VerifyOutcome;
@@ -231,6 +240,7 @@ export class BindingService {
 
   private setPhase(phase: BindPhase): void {
     this.phase = phase;
+    if (phase.kind !== 'validating') this.stablePhase = phase;
     for (const presenter of this.presenters) presenter.onPhase?.(phase);
     for (const listener of this.listeners) listener();
   }

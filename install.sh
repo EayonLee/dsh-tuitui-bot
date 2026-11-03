@@ -6,15 +6,17 @@
 # 无需 dsh 源码，无需 workspace 链接。
 #
 # 用法：
-#   sh install.sh                                            # 安装默认包最新版本
-#   sh install.sh --version 0.1.0                            # 指定版本
+#   sh install.sh                                            # 从 GitHub 安装（默认）
+#   sh install.sh --pkg @qihoo/dsh-tuitui-bot                # 从 npm 装（发布后可用）
 #   sh install.sh --pkg @myorg/my-plugin                     # 指定包名
-#   sh install.sh --pkg github:EayonLee/dsh-tuitui-bot       # 直接从 GitHub 装
+#   sh install.sh --version 0.1.0                            # 指定版本（npm 源）
 #   sh install.sh --registry https://registry.npmmirror.com  # 指定 npm registry
 set -eu
 
 # ── 默认值 ──
-PACKAGE="@qihoo/dsh-tuitui-bot"
+# 默认走 GitHub 源：本包尚未发布到 npm 公共 registry，直接给包名会 404。
+# 发布后可改回 @qihoo/dsh-tuitui-bot（或用 --pkg 覆盖）。
+PACKAGE="github:EayonLee/dsh-tuitui-bot"
 VERSION=""
 REGISTRY=""
 PROFILE="tuitui"
@@ -42,7 +44,7 @@ while [ $# -gt 0 ]; do
       echo "用法: sh install.sh [选项]"
       echo
       echo "选项:"
-      echo "  --pkg <name>        指定 npm 包名或 git 源 (默认: @qihoo/dsh-tuitui-bot)"
+      echo "  --pkg <name>        指定 npm 包名或 git 源 (默认: github:EayonLee/dsh-tuitui-bot)"
       echo "  --version <ver>     指定包版本 (默认: latest)"
       echo "  --registry <url>    指定 npm registry"
       echo "  --profile <name>    指定 dsh profile 名 (默认: tuitui)"

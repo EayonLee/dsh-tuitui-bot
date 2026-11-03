@@ -60,7 +60,8 @@ export function isMessageEvent(event: string): boolean {
 function normalizeMessage(body: TuituiEventMessage, options: NormalizeOptions): InboundMessage {
   const data: TuituiMessageData = (body.data ?? {}) as TuituiMessageData;
   const kind = body.event === 'group_chat' ? 'group' : 'c2c';
-  const groupId = data.group_id ?? body.group_id;
+  // 用 firstString 而不是 ??: 推推可能给空串，空串既不回落事件体、又会把 groupId 丢掉
+  const groupId = firstString(data.group_id, body.group_id);
   const messageId = firstString(data.msgid, body.cid) ?? `${body.event}:${body.timestamp ?? ''}`;
   const groupName = firstString(data.group_name, body.group_name);
 
@@ -258,15 +259,21 @@ function mediaFileId(raw: unknown): string | undefined {
  * 媒体归一化：
  * 1) 先取 `_tuitui_media` 影子字段（SDK 归一化后的 mime 信息，最准）
  * 2) 再用原始 images / voice / video / file 补齐（影子缺失时兜底）
- * 3) 按 url 去重
+ * 3) 按 url / fileId 去重：影子字段与原始字段常描述同一个文件，
+ *    只按其中一个键判重会让同一张图出现两条附件。
  */
 function normalizeAttachments(data: TuituiMessageData): InboundAttachment[] {
   const result: InboundAttachment[] = [];
   const seen = new Set<string>();
   const push = (attachment: InboundAttachment): void => {
-    const key = attachment.fileId ?? attachment.url ?? attachment.filename ?? '';
-    if (key && seen.has(key)) return;
-    if (key) seen.add(key);
+    const keys = [attachment.fileId, attachment.url, attachment.filename]
+      .filter((value): value is string => typeof value === 'string' && value !== '');
+    if (keys.length === 0) {
+      result.push(attachment);
+      return;
+    }
+    if (keys.some((key) => seen.has(key))) return;
+    for (const key of keys) seen.add(key);
     result.push(attachment);
   };
 

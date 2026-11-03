@@ -70,6 +70,13 @@ export declare function verifyTuituiCredentials(credentials: SetupCredentials, c
  */
 export declare class BindingService {
     private phase;
+    /**
+     * 最近一个「稳定」相位（非 validating）。
+     *
+     * verifyOnly 结束后要回到校验前的相位；如果直接取 this.phase，并发点两次
+     * 「校验」时第二次进入已处于 validating，恢复后就永久卡在 validating 了。
+     */
+    private stablePhase;
     private readonly listeners;
     private readonly presenters;
     private readonly verifyFn;
