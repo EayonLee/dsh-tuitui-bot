@@ -88,6 +88,26 @@ describe('accessPolicy', () => {
       .toBe(false);
   });
 
+  it('blocklist 模式：黑名单外全放行，黑名单内拒绝', async () => {
+    const policy = accessPolicy({
+      group: { mode: 'blocklist', deny: ['g-bad'] },
+    });
+
+    expect((await runMiddleware(policy, makeCtx(makeMessage({ groupId: 'g-ok' })))).reachedNext)
+      .toBe(true);
+    expect((await runMiddleware(policy, makeCtx(makeMessage({ groupId: 'g-bad' })))).reachedNext)
+      .toBe(false);
+  });
+
+  it('黑名单优先于白名单：同时在两份名单里仍然拒绝', async () => {
+    const policy = accessPolicy({
+      c2c: { mode: 'allowlist', allow: ['alice'], deny: ['alice'] },
+    });
+
+    expect((await runMiddleware(policy, makeCtx(makeMessage({ kind: 'c2c', senderAccount: 'alice' })))).reachedNext)
+      .toBe(false);
+  });
+
   it('被拦下时回调 onBlock 并带上原因', async () => {
     const reasons: string[] = [];
     const policy = accessPolicy({

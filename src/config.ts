@@ -6,20 +6,38 @@
  */
 import Schema from '@deepseek-ai/schemastery';
 
+/** 单个作用域的访问模式：开放 / 仅白名单 / 仅排除黑名单 / 全拒 */
+export type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
+
 export interface AccessControlConfig {
   /** 单聊访问模式 */
-  c2cMode: 'open' | 'allowlist' | 'disabled';
+  c2cMode: AccessMode;
   /** 单聊白名单（域账号或 uid） */
   c2cAllow: string[];
+  /** 单聊黑名单（域账号或 uid，优先级高于任何模式） */
+  c2cBlock: string[];
   /** 群聊访问模式 */
-  groupMode: 'open' | 'allowlist' | 'disabled';
+  groupMode: AccessMode;
   /** 群聊白名单（group_id） */
   groupAllow: string[];
+  /** 群聊黑名单（group_id） */
+  groupBlock: string[];
   /** 团队帖子访问模式 */
-  postMode: 'open' | 'allowlist' | 'disabled';
+  postMode: AccessMode;
   /** 团队帖子白名单（channel_id 或 team_id） */
   postAllow: string[];
+  /** 团队帖子黑名单（channel_id 或 team_id） */
+  postBlock: string[];
 }
+
+/**
+ * 群聊/帖子的触发方式：
+ *   - require：必须 @ 机器人才回应（默认）
+ *   - always：每条消息都回应（适合小群/专用群）
+ *   - smart：不 @ 也回应，但只回「与机器人相关」的消息——引用了机器人、
+ *     文本里出现机器人别名、或刚聊过的人继续追问（窗口见 smartFollowUpMs）
+ */
+export type MentionPolicy = 'require' | 'always' | 'smart';
 
 export interface MediaConfig {
   /** 是否启用富媒体理解（图片/文件下载 + 工具分析） */
@@ -81,10 +99,16 @@ export interface ImTuituiConfig {
   preset?: string;
   /** Agent 工作目录（缺省 ~/.dsh-tuitui/workspace，不随宿主进程 cwd） */
   cwd?: string;
-  /** 群聊是否需要 @bot 触发 */
+  /** 群聊是否需要 @bot 触发（mentionPolicy 未设置时用它推导） */
   requireMention: boolean;
   /** 团队帖子是否需要 @bot 触发 */
   requireMentionInPost: boolean;
+  /** 群聊/帖子的触发方式，未设置时由上面两个布尔推导 */
+  mentionPolicy?: MentionPolicy;
+  /** smart 模式：文本中出现这些名字即视为在叫机器人 */
+  botAliases: string[];
+  /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
+  smartFollowUpMs: number;
   /** 群聊额外 system prompt */
   groupPrompt?: string;
   /** 私聊额外 system prompt */
@@ -130,12 +154,15 @@ export interface ImTuituiConfig {
 }
 
 export const AccessControlSchema: Schema<AccessControlConfig> = Schema.object({
-  c2cMode: Schema.union(['open', 'allowlist', 'disabled']).default('open').description('单聊访问模式（默认开放）'),
+  c2cMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('open').description('单聊访问模式（默认开放）'),
   c2cAllow: Schema.array(Schema.string()).default([]).description('单聊白名单（域账号或 UID）'),
-  groupMode: Schema.union(['open', 'allowlist', 'disabled']).default('open').description('群聊访问模式（默认开放：群自带进群门槛 + @bot 触发）'),
+  c2cBlock: Schema.array(Schema.string()).default([]).description('单聊黑名单（优先级最高）'),
+  groupMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('open').description('群聊访问模式（默认开放：群自带进群门槛 + @bot 触发）'),
   groupAllow: Schema.array(Schema.string()).default([]).description('群聊白名单（group_id）'),
-  postMode: Schema.union(['open', 'allowlist', 'disabled']).default('open').description('团队帖子访问模式（默认开放）'),
+  groupBlock: Schema.array(Schema.string()).default([]).description('群聊黑名单（group_id，优先级最高）'),
+  postMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('open').description('团队帖子访问模式（默认开放）'),
   postAllow: Schema.array(Schema.string()).default([]).description('团队帖子白名单（channel_id 或 team_id）'),
+  postBlock: Schema.array(Schema.string()).default([]).description('团队帖子黑名单（channel_id 或 team_id，优先级最高）'),
 });
 
 export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
@@ -147,6 +174,9 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   cwd: Schema.string().description('Agent working directory (default ~/.dsh-tuitui/workspace)'),
   requireMention: Schema.boolean().default(true).description('群聊是否需要@bot触发'),
   requireMentionInPost: Schema.boolean().default(true).description('团队帖子是否需要@bot触发'),
+  mentionPolicy: Schema.union(['require', 'always', 'smart']).description('群聊/帖子触发方式：require=仅@ / always=全部 / smart=仅相关消息'),
+  botAliases: Schema.array(Schema.string()).default([]).description('smart 模式：出现这些名字即视为在叫机器人'),
+  smartFollowUpMs: Schema.number().default(120000).description('smart 模式：追问延续窗口(ms)'),
   groupPrompt: Schema.string().description('群聊额外system prompt'),
   directPrompt: Schema.string().description('私聊额外system prompt'),
   postPrompt: Schema.string().description('团队帖子额外system prompt'),
@@ -161,10 +191,13 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   access: AccessControlSchema.default({
     c2cMode: 'open',
     c2cAllow: [],
+    c2cBlock: [],
     groupMode: 'open',
     groupAllow: [],
+    groupBlock: [],
     postMode: 'open',
     postAllow: [],
+    postBlock: [],
   }).description('访问控制'),
   showToolResults: Schema.boolean().default(false).description('是否展示工具调用成功结果（错误始终展示）'),
   debug: Schema.boolean().default(false),

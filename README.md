@@ -81,7 +81,7 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 ### 4. 在推推里聊
 
 - 私聊机器人：直接发消息
-- 群聊：把机器人拉进群，`@机器人 你的问题`（`requireMention` 默认 `true`）
+- 群聊：把机器人拉进群，`@机器人 你的问题`（`mentionPolicy` 默认 `require`；改成 `smart` 后不 @ 也会回，但只回引用机器人/叫到名字/刚聊过的人追问的消息；改成 `always` 则全部回）
 - 团队频道：在频道里发帖并 `@机器人`（或回复机器人的帖子）
 
 ## 配置
@@ -98,8 +98,11 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 | `provider` / `model` | string | - | 覆盖 LLM 路由；留空继承宿主默认，可 `/model` 切换 |
 | `preset` | string | - | Agent preset id（新会话生效） |
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent 工作目录 |
-| `requireMention` | boolean | `true` | 群聊是否必须 @bot |
+| `requireMention` | boolean | `true` | 群聊是否必须 @bot（`mentionPolicy` 未设置时用它推导） |
 | `requireMentionInPost` | boolean | `true` | 团队帖子是否必须 @bot |
+| `mentionPolicy` | `require` | `require` / `always` / `smart` | 触发方式：仅 @ / 全部 / 智能（只回相关消息） |
+| `botAliases` | `[]` | smart 模式：出现这些名字即视为在叫机器人 |
+| `smartFollowUpMs` | `120000` | smart 模式：机器人回复后同一个人追问的延续窗口 |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
 | `debug` | boolean | `false` | 调试日志（含原始事件体） |
@@ -121,12 +124,12 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 
 | 配置 | 默认值 | 说明 |
 | --- | --- | --- |
-| `access.c2cMode` | `open` | `open` / `allowlist` / `disabled` |
-| `access.c2cAllow` | `[]` | 单聊白名单（域账号或 UID） |
-| `access.groupMode` | `open` | 群聊模式 |
-| `access.groupAllow` | `[]` | 群白名单（group_id） |
-| `access.postMode` | `open` | 团队帖子模式 |
-| `access.postAllow` | `[]` | 帖子白名单（channel_id 或 team_id） |
+| `access.c2cMode` | `open` | `open` / `allowlist` / `blocklist` / `disabled` |
+| `access.c2cAllow` / `c2cBlock` | `[]` | 单聊白名单 / **黑名单**（域账号或 UID，黑名单优先） |
+| `access.groupMode` | `open` | 群聊模式（同上四档） |
+| `access.groupAllow` / `groupBlock` | `[]` | 群白名单 / **黑名单**（group_id） |
+| `access.postMode` | `open` | 团队帖子模式（同上四档） |
+| `access.postAllow` / `postBlock` | `[]` | 帖子白名单 / **黑名单**（channel_id 或 team_id） |
 
 > `allowlist` 模式下名单为空 = **拒绝所有人**（fail-closed）。
 

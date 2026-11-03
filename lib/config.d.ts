@@ -5,20 +5,36 @@
  * agent 步骤上报、服务端地址覆盖）。
  */
 import Schema from '@deepseek-ai/schemastery';
+/** 单个作用域的访问模式：开放 / 仅白名单 / 仅排除黑名单 / 全拒 */
+export type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
 export interface AccessControlConfig {
     /** 单聊访问模式 */
-    c2cMode: 'open' | 'allowlist' | 'disabled';
+    c2cMode: AccessMode;
     /** 单聊白名单（域账号或 uid） */
     c2cAllow: string[];
+    /** 单聊黑名单（域账号或 uid，优先级高于任何模式） */
+    c2cBlock: string[];
     /** 群聊访问模式 */
-    groupMode: 'open' | 'allowlist' | 'disabled';
+    groupMode: AccessMode;
     /** 群聊白名单（group_id） */
     groupAllow: string[];
+    /** 群聊黑名单（group_id） */
+    groupBlock: string[];
     /** 团队帖子访问模式 */
-    postMode: 'open' | 'allowlist' | 'disabled';
+    postMode: AccessMode;
     /** 团队帖子白名单（channel_id 或 team_id） */
     postAllow: string[];
+    /** 团队帖子黑名单（channel_id 或 team_id） */
+    postBlock: string[];
 }
+/**
+ * 群聊/帖子的触发方式：
+ *   - require：必须 @ 机器人才回应（默认）
+ *   - always：每条消息都回应（适合小群/专用群）
+ *   - smart：不 @ 也回应，但只回「与机器人相关」的消息——引用了机器人、
+ *     文本里出现机器人别名、或刚聊过的人继续追问（窗口见 smartFollowUpMs）
+ */
+export type MentionPolicy = 'require' | 'always' | 'smart';
 export interface MediaConfig {
     /** 是否启用富媒体理解（图片/文件下载 + 工具分析） */
     enabled: boolean;
@@ -74,10 +90,16 @@ export interface ImTuituiConfig {
     preset?: string;
     /** Agent 工作目录（缺省 ~/.dsh-tuitui/workspace，不随宿主进程 cwd） */
     cwd?: string;
-    /** 群聊是否需要 @bot 触发 */
+    /** 群聊是否需要 @bot 触发（mentionPolicy 未设置时用它推导） */
     requireMention: boolean;
     /** 团队帖子是否需要 @bot 触发 */
     requireMentionInPost: boolean;
+    /** 群聊/帖子的触发方式，未设置时由上面两个布尔推导 */
+    mentionPolicy?: MentionPolicy;
+    /** smart 模式：文本中出现这些名字即视为在叫机器人 */
+    botAliases: string[];
+    /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
+    smartFollowUpMs: number;
     /** 群聊额外 system prompt */
     groupPrompt?: string;
     /** 私聊额外 system prompt */

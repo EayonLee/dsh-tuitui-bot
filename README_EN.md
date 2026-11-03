@@ -81,7 +81,10 @@ All options live in [`src/config.ts`](./src/config.ts). In a profile, override t
 | `provider` / `model` | string | - | Override the LLM route; empty inherits the host default |
 | `preset` | string | - | Agent preset id (applies to new sessions) |
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent working directory |
-| `requireMention` | boolean | `true` | Require @bot in groups |
+| `requireMention` | boolean | `true` | Require @bot in groups (fallback when `mentionPolicy` is unset) |
+| `mentionPolicy` | `require` | `require` / `always` / `smart` | Reply only when @'d / always / only to relevant messages |
+| `botAliases` | `[]` | smart: names that count as addressing the bot |
+| `smartFollowUpMs` | `120000` | smart: follow-up window after the bot replied |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
 | `textChunkLimit` | number | `4000` | Max characters per message |

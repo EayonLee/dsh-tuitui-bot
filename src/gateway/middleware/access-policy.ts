@@ -18,8 +18,8 @@ export type AccessMatcher = '*' | string | RegExp | ((ctx: MiddlewareContext) =>
 
 /** 单个作用域的访问策略 */
 export interface ScopePolicy {
-  /** open=全放行；allowlist=仅名单；disabled=全拒绝 */
-  mode?: 'open' | 'allowlist' | 'disabled';
+  /** open=全放行；allowlist=仅名单；blocklist=除黑名单外全放行；disabled=全拒绝 */
+  mode?: 'open' | 'allowlist' | 'blocklist' | 'disabled';
   /** mode=allowlist 时判定放行的规则 */
   allow?: AccessMatcher[];
   /** 拒绝规则，最先评估 */
@@ -79,7 +79,9 @@ function evaluateScope(
   if (mode === 'disabled') {
     return { allowed: false, reason: 'scope disabled by policy' };
   }
-  if (mode === 'open') {
+  // blocklist 语义 = 默认放行（黑名单已在最前面判过），这里与 open 同义，
+  // 单列分支只为让「用户明确选了黑名单模式」在日志/调试里可辨认。
+  if (mode === 'open' || mode === 'blocklist') {
     return { allowed: true, reason: '' };
   }
 

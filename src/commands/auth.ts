@@ -12,7 +12,7 @@ import type { Logger } from '../types.ts';
 /** 鉴权配置投影（结构化，便于单测） */
 export interface CommandAuthConfigLike {
   access: {
-    c2cMode: 'open' | 'allowlist' | 'disabled';
+    c2cMode: 'open' | 'allowlist' | 'blocklist' | 'disabled';
     c2cAllow: readonly string[];
   };
 }

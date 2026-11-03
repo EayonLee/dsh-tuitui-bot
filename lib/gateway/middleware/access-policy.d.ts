@@ -16,8 +16,8 @@ import type { Logger, Middleware, MiddlewareContext } from '../../types.ts';
 export type AccessMatcher = '*' | string | RegExp | ((ctx: MiddlewareContext) => boolean);
 /** 单个作用域的访问策略 */
 export interface ScopePolicy {
-    /** open=全放行；allowlist=仅名单；disabled=全拒绝 */
-    mode?: 'open' | 'allowlist' | 'disabled';
+    /** open=全放行；allowlist=仅名单；blocklist=除黑名单外全放行；disabled=全拒绝 */
+    mode?: 'open' | 'allowlist' | 'blocklist' | 'disabled';
     /** mode=allowlist 时判定放行的规则 */
     allow?: AccessMatcher[];
     /** 拒绝规则，最先评估 */

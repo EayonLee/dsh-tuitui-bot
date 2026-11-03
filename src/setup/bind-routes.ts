@@ -89,7 +89,7 @@ export interface BindRoutesOptions {
 }
 
 /** 访问模式三值（与 config.ts 的 AccessControlConfig 一致） */
-const AccessModeSchema = Schema.union(['open', 'allowlist', 'disabled']);
+const AccessModeSchema = Schema.union(['open', 'allowlist', 'blocklist', 'disabled']);
 
 function booleanSchema(value: unknown, name: string): boolean {
   if (typeof value !== 'boolean') throw new TypeError(`${name} 必须是布尔值`);
@@ -117,9 +117,32 @@ function accessModeSchema(name: string): (value: unknown) => unknown {
     try {
       return AccessModeSchema(value as never);
     } catch {
-      throw new TypeError(`${name} 必须是 open / allowlist / disabled`);
+      throw new TypeError(`${name} 必须是 open / allowlist / blocklist / disabled`);
     }
   };
+}
+
+/** 名单类字段：字符串数组，逐项 trim、去空、去重，限制条数与单条长度 */
+function stringListSchema(value: unknown, name: string): unknown {
+  if (!Array.isArray(value)) throw new TypeError(`${name} 必须是字符串数组`);
+  if (value.length > 500) throw new TypeError(`${name} 条数过多（最多 500）`);
+  const result: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') throw new TypeError(`${name} 的每一项都必须是字符串`);
+    const trimmed = item.trim();
+    if (trimmed === '') continue;
+    if (trimmed.length > 200) throw new TypeError(`${name} 单项过长（最多 200 字符）`);
+    if (!result.includes(trimmed)) result.push(trimmed);
+  }
+  return result;
+}
+
+/** smart 竞态判定用的三个值 */
+function mentionPolicySchema(value: unknown): unknown {
+  if (value !== 'require' && value !== 'always' && value !== 'smart') {
+    throw new TypeError('mentionPolicy 必须是 require / always / smart');
+  }
+  return value;
 }
 
 /**
@@ -136,6 +159,10 @@ const EDITABLE_CONFIG_KEYS = [
   'sessionIdleTimeout', 'maxQueue', 'processingTimeoutMs', 'askTimeoutMs', 'historyLimit',
   'showToolResults', 'debug',
   'access.c2cMode', 'access.groupMode', 'access.postMode',
+  'access.c2cAllow', 'access.c2cBlock',
+  'access.groupAllow', 'access.groupBlock',
+  'access.postAllow', 'access.postBlock',
+  'mentionPolicy', 'botAliases', 'smartFollowUpMs',
   'interactive.enabled', 'agentSteps.enabled',
 ] as const;
 
@@ -161,6 +188,15 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'access.c2cMode': accessModeSchema('access.c2cMode'),
   'access.groupMode': accessModeSchema('access.groupMode'),
   'access.postMode': accessModeSchema('access.postMode'),
+  'access.c2cAllow': (v) => stringListSchema(v, 'access.c2cAllow'),
+  'access.c2cBlock': (v) => stringListSchema(v, 'access.c2cBlock'),
+  'access.groupAllow': (v) => stringListSchema(v, 'access.groupAllow'),
+  'access.groupBlock': (v) => stringListSchema(v, 'access.groupBlock'),
+  'access.postAllow': (v) => stringListSchema(v, 'access.postAllow'),
+  'access.postBlock': (v) => stringListSchema(v, 'access.postBlock'),
+  mentionPolicy: (v) => mentionPolicySchema(v),
+  botAliases: (v) => stringListSchema(v, 'botAliases'),
+  smartFollowUpMs: numberSchema('smartFollowUpMs', 5000, 60 * 60 * 1000),
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
 };

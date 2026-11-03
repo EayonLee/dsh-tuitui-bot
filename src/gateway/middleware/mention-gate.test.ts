@@ -31,6 +31,46 @@ describe('mentionGate', () => {
     expect((ctx.state.mention as MentionDecision).shouldAnswer).toBe(true);
   });
 
+  it('policy=always 时未 @ 也放行', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(mentionGate({ policy: 'always' }), ctx);
+
+    expect(reachedNext).toBe(true);
+    expect((ctx.state.mention as MentionDecision).policy).toBe('always');
+  });
+
+  it('policy=smart 且探针命中时放行', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: () => true }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+    expect((ctx.state.mention as MentionDecision).policy).toBe('smart');
+  });
+
+  it('policy=smart 但探针未命中时跳过', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: () => false }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(false);
+    expect(ctx.skipped).toBe('mention');
+  });
+
+  it('policy=smart 时 @ 了机器人仍然放行（不依赖探针）', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: true }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: () => false }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+  });
+
   it('单聊永远放行', async () => {
     const ctx = makeCtx(makeMessage({ kind: 'c2c', atMe: false }));
     const { reachedNext } = await runMiddleware(mentionGate(), ctx);

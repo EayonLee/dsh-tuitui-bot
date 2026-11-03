@@ -86,7 +86,7 @@ export interface ApprovalChannelSenderLike {
 /** 配置投影（审批按钮校验 allowlist + 卡片主题） */
 export interface ApprovalChannelConfigLike {
   access: {
-    c2cMode: 'open' | 'allowlist' | 'disabled';
+    c2cMode: 'open' | 'allowlist' | 'blocklist' | 'disabled';
     c2cAllow: readonly string[];
   };
   /** 交互卡片投影；缺省视为启用（关闭时退化为文本 + 编号应答） */

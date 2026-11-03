@@ -7,10 +7,11 @@
  * （未 @ 的消息也要进上下文），命令匹配必须早于并发串行（命令不排队）。
  */
 import type { ImTuituiConfig } from '../config.ts';
-import type { Logger } from '../types.ts';
+import type { Logger, MiddlewareContext } from '../types.ts';
 import type { SessionManager } from '../session/index.ts';
 import type { CommandEntry } from '../commands/index.ts';
 import { getHistoryStore, historyGroupKey } from '../features/history-store.ts';
+import { isLikelyFollowUp } from '../features/followup-store.ts';
 import { getScopePeer } from '../shared/index.ts';
 import {
   MiddlewareKernel,
@@ -38,6 +39,31 @@ export interface MiddlewareSetupOptions {
   commands: CommandEntry[];
 }
 
+/**
+ * smart 模式的「相关消息」判定。
+ *
+ * 三条确定性规则（不额外调用模型，避免每条群消息都烧 token）：
+ *   1. 引用/回复了机器人：由 quote-ref 写下的 state 里带出（宿主 atMe 已覆盖直接 @）；
+ *   2. 文本里出现机器人别名（config.botAliases，例如「憨包」）；
+ *   3. 追问窗口：机器人刚在该会话回过这个人，且本条仍是他发的（smartFollowUpMs）。
+ */
+function smartReplyProbe(ctx: MiddlewareContext, config: ImTuituiConfig): boolean {
+  const message = ctx.message;
+
+  // 规则 2：别名命中（忽略大小写，避免「Bot」「bot」两种写法）
+  const aliases = config.botAliases.filter((alias) => alias.trim() !== '');
+  if (aliases.length > 0) {
+    const text = (message.content ?? '').toLowerCase();
+    if (text !== '' && aliases.some((alias) => text.includes(alias.trim().toLowerCase()))) {
+      return true;
+    }
+  }
+
+  // 规则 3：追问窗口（同一个人、刚聊过）
+  const { scope, peerId } = getScopePeer(message);
+  return isLikelyFollowUp(scope, peerId, message.senderId, config.smartFollowUpMs);
+}
+
 /** 组装中间件链（顺序与上游逐条对应，见函数体注释编号） */
 export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKernel {
   const { config, manager, logger, commands } = options;
@@ -52,9 +78,9 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
 
   // 3. 访问控制（空名单 = 拒绝所有人，fail-closed）
   kernel.use(accessPolicy({
-    c2c: { mode: config.access.c2cMode, allow: config.access.c2cAllow },
-    group: { mode: config.access.groupMode, allow: config.access.groupAllow },
-    post: { mode: config.access.postMode, allow: config.access.postAllow },
+    c2c: { mode: config.access.c2cMode, allow: config.access.c2cAllow, deny: config.access.c2cBlock },
+    group: { mode: config.access.groupMode, allow: config.access.groupAllow, deny: config.access.groupBlock },
+    post: { mode: config.access.postMode, allow: config.access.postAllow, deny: config.access.postBlock },
     onBlock: (_ctx, reason) => {
       if (config.debug) logger.debug(`Access blocked: ${reason}`);
     },
@@ -76,10 +102,12 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
     },
   }));
 
-  // 5. 群聊/帖子 @bot 门控
+  // 5. 群聊/帖子触发门控（require=仅@ / always=全部 / smart=仅相关）
   kernel.use(mentionGate({
     requireMentionInGroup: config.requireMention,
     requireMentionInPost: config.requireMentionInPost,
+    ...(config.mentionPolicy !== undefined ? { policy: config.mentionPolicy } : {}),
+    isSmartReply: (ctx) => smartReplyProbe(ctx, config),
   }));
 
   // 6. 内容清洗（去 @marker、表情标签、多余空白）

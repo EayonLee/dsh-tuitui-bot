@@ -22,13 +22,22 @@ export interface MentionDecision {
   shouldAnswer: boolean;
   /** shouldAnswer=false 时的原因 */
   reason: 'no_mention' | 'other_mention' | 'passthrough';
+  /** 实际生效的触发策略（便于日志与测试断言） */
+  policy?: 'require' | 'always' | 'smart';
 }
 
 export interface MentionGateOptions {
-  /** 群聊是否必须 @，默认 true */
+  /** 群聊是否必须 @，默认 true（policy 未给时的兜底推导） */
   requireMentionInGroup?: boolean;
   /** 团队帖子是否必须 @，默认 true */
   requireMentionInPost?: boolean;
+  /**
+   * 触发策略（优先于上面两个布尔）：
+   *   require=仅 @ 才回；always=全部回；smart=不 @ 也回，但只回相关消息
+   */
+  policy?: 'require' | 'always' | 'smart';
+  /** smart 模式的相关性探针（引用机器人 / 命中别名 / 追问窗口） */
+  isSmartReply?: (ctx: MiddlewareContext) => boolean;
   /** 单聊一律视为对机器人说，默认 true */
   alwaysAnswerC2C?: boolean;
   /** 隐式 @ 探针（如回复了机器人的消息） */
@@ -57,11 +66,13 @@ export function mentionGate(options: MentionGateOptions = {}): Middleware {
     requireMentionInPost = true,
     alwaysAnswerC2C = true,
     isImplicitMention,
+    isSmartReply,
     onSkip,
     ignoreOtherMentions = false,
     passthrough = false,
     resolveConfig,
   } = options;
+  const fixedPolicy = options.policy;
   const log = options.logger;
 
   /** 跳过（或仅标注）的统一出口，避免两条分支各写一遍 passthrough 逻辑 */
@@ -109,15 +120,22 @@ export function mentionGate(options: MentionGateOptions = {}): Middleware {
       : (dynamic?.requireMentionInPost ?? requireMentionInPost);
     const ignoreOthers = dynamic?.ignoreOtherMentions ?? ignoreOtherMentions;
 
+    // 策略优先级：显式 policy > 布尔开关推导（requireMention=false 等价于 always）
+    const policy: 'require' | 'always' | 'smart' = fixedPolicy ?? (requireMention ? 'require' : 'always');
+
     const wasMentioned = msg.atMe === true;
     const implicit = isImplicitMention?.(ctx) ?? false;
+    const smartHit = policy === 'smart' ? (isSmartReply?.(ctx) ?? false) : false;
 
-    let shouldAnswer = !requireMention || wasMentioned || implicit;
+    let shouldAnswer: boolean;
+    if (policy === 'always') shouldAnswer = true;
+    else if (policy === 'smart') shouldAnswer = wasMentioned || implicit || smartHit;
+    else shouldAnswer = wasMentioned || implicit;
     let reason: MentionDecision['reason'] = shouldAnswer ? 'passthrough' : 'no_mention';
 
     // @ 了别人却没 @ 本机器人 → 明确判定为「不是对我说的」。
     // 只在 requireMention 生效时才有意义（否则用户要求全量响应）。
-    if (ignoreOthers && requireMention && !wasMentioned && !implicit) {
+    if (ignoreOthers && policy !== 'always' && !wasMentioned && !implicit && !smartHit) {
       const others = msg.at ?? [];
       if (others.length > 0) {
         shouldAnswer = false;
@@ -125,7 +143,10 @@ export function mentionGate(options: MentionGateOptions = {}): Middleware {
       }
     }
 
-    const decision: MentionDecision = { wasMentioned, implicit, shouldAnswer, reason };
+    const decision: MentionDecision = { wasMentioned, implicit, shouldAnswer, reason, policy };
+    if (policy === 'smart' && smartHit) {
+      log?.debug('[mention-gate] smart 命中：非 @ 但判定为对机器人说的消息');
+    }
     await applyDecision(ctx, decision, next);
   };
 }

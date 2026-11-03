@@ -21,12 +21,21 @@ export interface MentionDecision {
     shouldAnswer: boolean;
     /** shouldAnswer=false 时的原因 */
     reason: 'no_mention' | 'other_mention' | 'passthrough';
+    /** 实际生效的触发策略（便于日志与测试断言） */
+    policy?: 'require' | 'always' | 'smart';
 }
 export interface MentionGateOptions {
-    /** 群聊是否必须 @，默认 true */
+    /** 群聊是否必须 @，默认 true（policy 未给时的兜底推导） */
     requireMentionInGroup?: boolean;
     /** 团队帖子是否必须 @，默认 true */
     requireMentionInPost?: boolean;
+    /**
+     * 触发策略（优先于上面两个布尔）：
+     *   require=仅 @ 才回；always=全部回；smart=不 @ 也回，但只回相关消息
+     */
+    policy?: 'require' | 'always' | 'smart';
+    /** smart 模式的相关性探针（引用机器人 / 命中别名 / 追问窗口） */
+    isSmartReply?: (ctx: MiddlewareContext) => boolean;
     /** 单聊一律视为对机器人说，默认 true */
     alwaysAnswerC2C?: boolean;
     /** 隐式 @ 探针（如回复了机器人的消息） */

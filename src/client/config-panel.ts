@@ -22,7 +22,7 @@ import { createElement, useCallback, useEffect, useState, type CSSProperties, ty
 import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
 
 /** 访问模式三值（与 src/config.ts 的 AccessControlConfig 一致） */
-type AccessMode = 'open' | 'allowlist' | 'disabled';
+type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
 
 /** GET 回显 / POST 提交的扁平配置（appSecret 已剔除） */
 interface ConfigWire {
@@ -40,6 +40,15 @@ interface ConfigWire {
   'access.c2cMode'?: AccessMode;
   'access.groupMode'?: AccessMode;
   'access.postMode'?: AccessMode;
+  'access.c2cAllow'?: string[];
+  'access.c2cBlock'?: string[];
+  'access.groupAllow'?: string[];
+  'access.groupBlock'?: string[];
+  'access.postAllow'?: string[];
+  'access.postBlock'?: string[];
+  mentionPolicy?: 'require' | 'always' | 'smart';
+  botAliases?: string[];
+  smartFollowUpMs?: number;
   'interactive.enabled'?: boolean;
   'agentSteps.enabled'?: boolean;
 }
@@ -240,6 +249,48 @@ function NumberRow({ label, help, value, min, max, step, onChange }: {
   );
 }
 
+/** 名单行（逗号/换行分隔，内部维护文本态避免每次输入都抖动数组） */
+function ListRow({ label, help, value, placeholder, onChange }: {
+  label: string; help?: string; value: string[]; placeholder?: string;
+  onChange: (next: string[]) => void;
+}): ReactNode {
+  const [text, setText] = useState(value.join(', '));
+  useEffect(() => { setText(value.join(', ')); }, [JSON.stringify(value)]);
+  return createElement('div', { className: 'imqb2-field' },
+    createElement('div', { className: 'imqb2-head' },
+      createElement('span', { className: 'imqb2-label' }, label),
+    ),
+    createElement('input', {
+      className: 'imqb2-input', value: text, placeholder, spellCheck: false,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        const raw = event.currentTarget.value;
+        setText(raw);
+        onChange(raw.split(/[,\n]/).map((part) => part.trim()).filter((part) => part !== ''));
+      },
+    }),
+    help === undefined ? null : createElement('p', { className: 'imqb2-hint' }, help),
+  );
+}
+
+/** 触发策略分段行（require / always / smart） */
+function PolicyRow({ label, help, value, onChange }: {
+  label: string; help?: string; value: 'require' | 'always' | 'smart';
+  onChange: (next: 'require' | 'always' | 'smart') => void;
+}): ReactNode {
+  return createElement('div', { className: 'imqb2-field' },
+    createElement('div', { className: 'imqb2-head' },
+      createElement('span', { className: 'imqb2-label' }, label),
+      createElement(Segmented, {
+        value: value as never,
+        options: POLICY_OPTIONS as never,
+        onChange: (next) => { onChange(next as unknown as 'require' | 'always' | 'smart'); },
+        label,
+      }),
+    ),
+    help === undefined ? null : createElement('p', { className: 'imqb2-hint' }, help),
+  );
+}
+
 /** 访问模式分段选择行 */
 
 function SegmentedRow({ label, help, value, options, onChange }: {
@@ -258,7 +309,15 @@ function SegmentedRow({ label, help, value, options, onChange }: {
 const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
   { value: 'open', label: '所有人' },
   { value: 'allowlist', label: '白名单' },
+  { value: 'blocklist', label: '黑名单' },
   { value: 'disabled', label: '禁用' },
+];
+
+/** 触发方式三档 */
+const POLICY_OPTIONS: ReadonlyArray<{ value: 'require' | 'always' | 'smart'; label: string }> = [
+  { value: 'require', label: '仅 @' },
+  { value: 'always', label: '全部' },
+  { value: 'smart', label: '智能' },
 ];
 
 /** 深比较（表单值与初始回显值的 dirty 判断） */
@@ -349,29 +408,66 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     createElement('div', { className: 'imqb2-group-title' }, '服务范围'),
     createElement(SegmentedRow, {
       label: '单聊', value: form['access.c2cMode'] ?? 'open', options: MODE_OPTIONS,
-      help: '白名单与黑名单在 profile 的 access 配置里维护',
+      help: '白名单只在「白名单」模式生效；黑名单始终优先',
       onChange: (v) => { patch('access.c2cMode', v); },
+    }),
+    createElement(ListRow, {
+      label: '单聊白名单', value: form['access.c2cAllow'] ?? [], placeholder: '域账号或 uid，逗号分隔',
+      onChange: (v) => { patch('access.c2cAllow', v); },
+    }),
+    createElement(ListRow, {
+      label: '单聊黑名单', value: form['access.c2cBlock'] ?? [], placeholder: '域账号或 uid，逗号分隔',
+      help: '被列入的人发消息一律不处理（优先级高于白名单）',
+      onChange: (v) => { patch('access.c2cBlock', v); },
     }),
     createElement(SegmentedRow, {
       label: '群聊', value: form['access.groupMode'] ?? 'open', options: MODE_OPTIONS,
       onChange: (v) => { patch('access.groupMode', v); },
     }),
+    createElement(ListRow, {
+      label: '群聊白名单', value: form['access.groupAllow'] ?? [], placeholder: 'group_id，逗号分隔',
+      onChange: (v) => { patch('access.groupAllow', v); },
+    }),
+    createElement(ListRow, {
+      label: '群聊黑名单', value: form['access.groupBlock'] ?? [], placeholder: 'group_id，逗号分隔',
+      onChange: (v) => { patch('access.groupBlock', v); },
+    }),
     createElement(SegmentedRow, {
       label: '团队频道帖子', value: form['access.postMode'] ?? 'open', options: MODE_OPTIONS,
-      help: '团队频道里机器人只回复 @机器人的帖子',
+      help: '按 channel_id 或 team_id 匹配',
       onChange: (v) => { patch('access.postMode', v); },
+    }),
+    createElement(ListRow, {
+      label: '帖子白名单', value: form['access.postAllow'] ?? [], placeholder: 'channel_id 或 team_id，逗号分隔',
+      onChange: (v) => { patch('access.postAllow', v); },
+    }),
+    createElement(ListRow, {
+      label: '帖子黑名单', value: form['access.postBlock'] ?? [], placeholder: 'channel_id 或 team_id，逗号分隔',
+      onChange: (v) => { patch('access.postBlock', v); },
     }),
 
     createElement('div', { className: 'imqb2-group-title' }, '基础设置'),
-    createElement(SwitchRow, {
-      label: '群聊仅回复 @机器人的消息', checked: form.requireMention ?? true,
-      help: '开启后，机器人仅可回复 @机器人的群聊消息',
-      onChange: (v) => { patch('requireMention', v); },
+    createElement(PolicyRow, {
+      label: '群聊/帖子触发方式',
+      value: form.mentionPolicy ?? ((form.requireMention ?? true) ? 'require' : 'always'),
+      help: '仅 @：必须 @ 才回；全部：每条都回；智能：不 @ 也回，但只回与机器人相关的消息',
+      onChange: (v) => { patch('mentionPolicy', v); },
     }),
-    createElement(SwitchRow, {
-      label: '团队帖子仅回复 @机器人的帖子', checked: form.requireMentionInPost ?? true,
-      onChange: (v) => { patch('requireMentionInPost', v); },
-    }),
+    (form.mentionPolicy ?? ((form.requireMention ?? true) ? 'require' : 'always')) === 'smart'
+      ? createElement(ListRow, {
+          label: '机器人别名', value: form.botAliases ?? [], placeholder: '如 憨包, 小秘（逗号分隔）',
+          help: '智能模式下，消息里出现这些名字就当作在叫机器人',
+          onChange: (v) => { patch('botAliases', v); },
+        })
+      : null,
+    (form.mentionPolicy ?? ((form.requireMention ?? true) ? 'require' : 'always')) === 'smart'
+      ? createElement(NumberRow, {
+          label: '追问延续窗口（秒）',
+          value: Math.round((form.smartFollowUpMs ?? 120000) / 1000), min: 10, max: 3600, step: 10,
+          help: '机器人回复后这段时间内，同一个人继续说话也算在跟机器人聊',
+          onChange: (v) => { patch('smartFollowUpMs', v * 1000); },
+        })
+      : null,
     createElement(SwitchRow, {
       label: '流式输出', checked: form.streaming ?? true,
       help: '回复内容由 msgid 原地编辑分段实时推送',

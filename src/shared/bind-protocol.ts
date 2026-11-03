@@ -73,9 +73,18 @@ export interface ConfigPatchWire {
   historyLimit?: number;
   showToolResults?: boolean;
   debug?: boolean;
-  'access.c2cMode'?: 'open' | 'allowlist' | 'disabled';
-  'access.groupMode'?: 'open' | 'allowlist' | 'disabled';
-  'access.postMode'?: 'open' | 'allowlist' | 'disabled';
+  'access.c2cMode'?: 'open' | 'allowlist' | 'blocklist' | 'disabled';
+  'access.groupMode'?: 'open' | 'allowlist' | 'blocklist' | 'disabled';
+  'access.postMode'?: 'open' | 'allowlist' | 'blocklist' | 'disabled';
+  'access.c2cAllow'?: string[];
+  'access.c2cBlock'?: string[];
+  'access.groupAllow'?: string[];
+  'access.groupBlock'?: string[];
+  'access.postAllow'?: string[];
+  'access.postBlock'?: string[];
+  mentionPolicy?: 'require' | 'always' | 'smart';
+  botAliases?: string[];
+  smartFollowUpMs?: number;
   'interactive.enabled'?: boolean;
   'agentSteps.enabled'?: boolean;
 }

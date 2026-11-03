@@ -16,6 +16,7 @@ import { chunkMarkdownText } from './chunker.ts';
 import { OutboundBuffer, type OutboundSenderLike } from './outbound-buffer.ts';
 import { ReplyLimiter } from './reply-limiter.ts';
 import { formatToolResult, type ToolsRegistryLike, type ToolResultData } from './tool-presenter.ts';
+import { markBotReply } from '../features/followup-store.ts';
 import type { DeliverablesDelivererLike } from './deliverables.ts';
 import {
   parseEvent,
@@ -119,6 +120,8 @@ class OutboundRouter {
         this.onChunk(session.header.id, record, event);
         break;
       case 'assistant/message':
+        // 记一笔「机器人刚在这个会话说过话」，供 smart 模式的追问判定使用
+        markBotReply(record.scope, record.peerId, record.senderId);
         this.onMessage(session.header.id, record, event);
         break;
       case 'tool/call':
@@ -158,6 +161,7 @@ class OutboundRouter {
 
     const record = this.manager.findBySessionId(agentId);
     if (record === undefined) return;
+    markBotReply(record.scope, record.peerId, record.senderId);
     this.appendChunk(agentId, record, delta);
   }
 
