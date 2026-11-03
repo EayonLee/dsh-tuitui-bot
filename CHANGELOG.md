@@ -1,6 +1,6 @@
 # Changelog
 
-本项目（`@qihoo/dsh-tuitui-bot`）是 `@tencent-connect/dsh-qqbot` 的推推移植版，版本号独立演进。
+本项目（`@eayonlee/dsh-tuitui-bot`）是 `@tencent-connect/dsh-qqbot` 的推推移植版，版本号独立演进。
 
 ## 0.1.0
 

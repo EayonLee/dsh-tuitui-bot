@@ -11,7 +11,7 @@
 import type { BindPhase } from './binding-service.ts';
 
 /** 插件包名（向导里提示文档位置时使用） */
-const PACKAGE_NAME = '@qihoo/dsh-tuitui-bot';
+const PACKAGE_NAME = '@eayonlee/dsh-tuitui-bot';
 
 /** 呈现策略接口：绑定向导与相位变化的通知接收方 */
 export interface BindPresenter {

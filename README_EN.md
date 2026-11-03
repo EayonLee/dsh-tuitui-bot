@@ -45,9 +45,9 @@ swapped for the Tuitui SDK ([`@qihoo/tuitui-bot-sdk`](https://www.npmjs.com/pack
 
 ```bash
 # 1. install the bundle into a profile
-sh install.sh                                              # one-shot script
+sh install.sh                                              # one-shot script (npm, falls back to GitHub)
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot     # npm (recommended)
 dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot   # straight from GitHub (lib/ is committed)
-dsh plugin --profile tuitui add @qihoo/dsh-tuitui-bot      # npm (after release)
 # (or from a local checkout / tarball)
 dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
 

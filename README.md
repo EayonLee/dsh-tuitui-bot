@@ -49,19 +49,18 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 ### 2. 安装插件
 
 ```bash
-# 一键安装脚本（自动建 profile、装包、提示配置）
-# 默认从 GitHub 装：npm 上还没发布，给包名会 404
+# 一键安装脚本（自动建 profile、装包、提示配置；npm 装不上会自动回落 GitHub）
 sh install.sh
 
-# 从 GitHub 直接安装（仓库内已提交构建产物 lib/，无需本地构建）
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+# 从 npm 安装（推荐）
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
 
-# 从 npm 安装（尚未发布，等 registry 上有了再用）
-dsh plugin --profile tuitui add @qihoo/dsh-tuitui-bot
+# 从 GitHub 安装（等价；npm 不可达时用，仓库已提交构建产物 lib/，无需本地构建）
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
 
 # 或从本地源码 / tarball 安装
 dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
-npm pack && dsh plugin --profile tuitui add ./qihoo-dsh-tuitui-bot-0.1.0.tgz
+npm pack && dsh plugin --profile tuitui add ./eayonlee-dsh-tuitui-bot-0.1.0.tgz
 ```
 
 ### 3. 配置凭据并启动

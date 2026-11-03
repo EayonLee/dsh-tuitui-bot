@@ -1,6 +1,6 @@
 # dsh-tuitui-bot bundle patch
 #
-# 当本包通过 `dsh plugin --profile <name> add @qihoo/dsh-tuitui-bot` 安装后，
+# 当本包通过 `dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot` 安装后，
 # dsh 启动时自动加载此 patch。
 #
 # 环境变量：
@@ -15,7 +15,7 @@
 # ── 插入 im-tuitui 插件行 ──
 - insert:
     - id: im-tuitui
-      name: '@qihoo/dsh-tuitui-bot'
+      name: '@eayonlee/dsh-tuitui-bot'
       config:
         appId: __FROM_ENV__
         appSecret: __FROM_ENV__

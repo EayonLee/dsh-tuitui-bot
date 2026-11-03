@@ -227,7 +227,7 @@ W4 依赖 W2 的 `MiddlewareContext` 形态（见 §3）。**只依赖 §3 契�
 1. `npx tsc --noEmit` 0 error；`npm run build` 产出 `lib/index.js` + `lib/client.js`。
 2. `npx vitest run` 全绿（纯逻辑模块单测）。
 3. `node scripts/smoke-live.mjs`：用真实凭据验证 `property.info()` + WS 连接 + 一次真实收发（群 `鱼塘`）。
-4. `npx dsh --profile tuitui --dump-config` 能看到 `# == @qihoo/dsh-tuitui-bot` 层。
+4. `npx dsh --profile tuitui --dump-config` 能看到 `# == @eayonlee/dsh-tuitui-bot` 层。
 5. README（中/英）、CHANGELOG、locale 齐全。
 ---
 

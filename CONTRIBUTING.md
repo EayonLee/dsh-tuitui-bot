@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你愿意改进 `@qihoo/dsh-tuitui-bot`。这份文档说明本地怎么跑、代码怎么分层、提交与 PR 的规矩，
+感谢你愿意改进 `@eayonlee/dsh-tuitui-bot`。这份文档说明本地怎么跑、代码怎么分层、提交与 PR 的规矩，
 照着做能省掉来回沟通的时间。
 
 English speakers: contributions are welcome — feel free to open issues/PRs in English, the rules below still apply.

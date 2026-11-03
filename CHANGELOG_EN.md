@@ -1,6 +1,6 @@
 # Changelog
 
-This project (`@qihoo/dsh-tuitui-bot`) is a Tuitui port of `@tencent-connect/dsh-qqbot`; versions evolve independently.
+This project (`@eayonlee/dsh-tuitui-bot`) is a Tuitui port of `@tencent-connect/dsh-qqbot`; versions evolve independently.
 
 ## 0.1.0
 

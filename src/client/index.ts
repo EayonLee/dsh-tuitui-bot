@@ -29,7 +29,7 @@ const TAB_KIND = 'tuitui-bind';
 /** 席位注册 key（Tab 类型 id，席位按其分发；只需全局唯一，与包名解耦） */
 const TAB_ID = 'im-tuitui/bind';
 /** 本插件包名（插件详情页按其匹配来源包，只在对应详情页渲染操作按钮） */
-const PACKAGE_NAME = '@qihoo/dsh-tuitui-bot';
+const PACKAGE_NAME = '@eayonlee/dsh-tuitui-bot';
 /** 主面板 id（layout.selectPanel 导航目标；keyed main 席位按其分发） */
 const IM_MAIN_PANEL_ID = 'im-tuitui';
 

@@ -38,7 +38,7 @@ class PatchFormatError extends Error {}
 const ENTRY_ID = 'im-tuitui';
 
 /** 插件包名（打印手动配置指引时给出，避免用户在多插件 profile 里填错层） */
-const PACKAGE_NAME = '@qihoo/dsh-tuitui-bot';
+const PACKAGE_NAME = '@eayonlee/dsh-tuitui-bot';
 
 /** 乐观并发重试次数（外部进程在读写窗口内改动的兜底；同进程写者被同步执行天然串行） */
 const WRITE_ATTEMPTS = 3;

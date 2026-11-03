@@ -1,22 +1,22 @@
 #!/bin/sh
-# @qihoo/dsh-tuitui-bot 一键安装
+# @eayonlee/dsh-tuitui-bot 一键安装
 #
 # 走 dsh CLI 的 profile 插件机制：`add` 自动初始化 profile（首层
 # dsh-base），pnpm 安装后按 dsh.bundle.patch 元数据把本包追加为 bundle 层。
 # 无需 dsh 源码，无需 workspace 链接。
 #
 # 用法：
-#   sh install.sh                                            # 从 GitHub 安装（默认）
-#   sh install.sh --pkg @qihoo/dsh-tuitui-bot                # 从 npm 装（发布后可用）
+#   sh install.sh                                            # 从 npm 装，失败回落 GitHub
+#   sh install.sh --pkg github:EayonLee/dsh-tuitui-bot       # 直接从 GitHub 装
 #   sh install.sh --pkg @myorg/my-plugin                     # 指定包名
 #   sh install.sh --version 0.1.0                            # 指定版本（npm 源）
 #   sh install.sh --registry https://registry.npmmirror.com  # 指定 npm registry
 set -eu
 
 # ── 默认值 ──
-# 默认走 GitHub 源：本包尚未发布到 npm 公共 registry，直接给包名会 404。
-# 发布后可改回 @qihoo/dsh-tuitui-bot（或用 --pkg 覆盖）。
-PACKAGE="github:EayonLee/dsh-tuitui-bot"
+# 先试 npm，装不上再回落 GitHub 源（仓库内已提交 lib/，两种源内容等价）。
+PACKAGE="@eayonlee/dsh-tuitui-bot"
+FALLBACK="github:EayonLee/dsh-tuitui-bot"
 VERSION=""
 REGISTRY=""
 PROFILE="tuitui"
@@ -44,7 +44,7 @@ while [ $# -gt 0 ]; do
       echo "用法: sh install.sh [选项]"
       echo
       echo "选项:"
-      echo "  --pkg <name>        指定 npm 包名或 git 源 (默认: github:EayonLee/dsh-tuitui-bot)"
+      echo "  --pkg <name>        指定 npm 包名或 git 源 (默认: @eayonlee/dsh-tuitui-bot，失败回落 GitHub)"
       echo "  --version <ver>     指定包版本 (默认: latest)"
       echo "  --registry <url>    指定 npm registry"
       echo "  --profile <name>    指定 dsh profile 名 (默认: tuitui)"
@@ -93,7 +93,12 @@ echo "  Profile:  ${PROFILE}"
 [ -n "$REGISTRY" ] && echo "  Registry: ${REGISTRY}"
 echo
 
-dsh plugin --profile "$PROFILE" add "$INSTALL_SPEC" $REGISTRY_ARG
+# npm 上拿不到（未发布/离线/镜像缺包）时自动改用 GitHub 源，别让用户卡在 404
+if ! dsh plugin --profile "$PROFILE" add "$INSTALL_SPEC" $REGISTRY_ARG; then
+  echo
+  echo "从 npm 安装失败，改用 GitHub 源重试：$FALLBACK"
+  dsh plugin --profile "$PROFILE" add "$FALLBACK"
+fi
 
 echo
 echo "=================================================="
