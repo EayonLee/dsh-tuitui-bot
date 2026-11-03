@@ -1,10 +1,9 @@
 /**
  * 智能插话判定 — 让模型自己决定要不要开口
  *
- * 旧实现（别名/追问窗口的硬规则）本质是「出现名字就回」，僵且吵。
- * 这里换成真正的判断：把最近的群聊记录 + 最新一条消息交给模型，
- * 让它在「群里其他人正在聊天」的语境里判断这条是不是冲自己来的、
- * 自己插嘴是否有价值。判定失败/超时一律不插嘴——宁可漏答，不能刷屏。
+ * 把最近的群聊记录 + 最新一条消息交给模型，由它按自己的处境决定要不要开口：
+ * 感兴趣、不同意、无聊、手上有信息、被人叫到、觉得该拍板——都算理由。
+ * 判定失败/超时一律不插嘴：宁可漏一句，也不瞎抢话。
  *
  * 成本控制：同一会话 cooldownMs 内只判一次。
  */
@@ -33,10 +32,6 @@ export interface SmartJudgeOptions {
   llm: LlmRuntimeLike | undefined;
   /** 本次判定使用的模型路线 */
   route: { provider: string; model: string } | undefined;
-  /** 机器人名字（用于提示词，让它知道「自己」是谁） */
-  botName?: string;
-  /** 用户给机器人起过的称呼（作为线索，不作为硬规则） */
-  aliases?: readonly string[];
   /** 最近的对话（按时间正序，不含本条） */
   history: readonly JudgeLine[];
   /** 最新一条待判断的消息 */
@@ -79,21 +74,12 @@ function activePrompt(options: SmartJudgeOptions): string {
 
 /** 把对话压成提示词正文 */
 function renderPrompt(options: SmartJudgeOptions): string {
-  const names = [options.botName === undefined ? '' : options.botName, ...(options.aliases === undefined ? [] : options.aliases)]
-    .map((name) => name.trim())
-    .filter((name) => name !== '');
-  const selfLine = names.length === 0
-    ? '你就是群里的这个机器人。'
-    : '你就是「' + names[0] + '」，别人可能这样叫你：' + names.join('、') + '。';
-
   const history = options.history
     .slice(-20)
     .map((line) => (line.self === true ? '[你]' : line.sender) + ': ' + line.text)
     .join('\n');
 
   return [
-    selfLine,
-    '',
     '【最近对话】',
     history === '' ? '（无）' : history,
     '',

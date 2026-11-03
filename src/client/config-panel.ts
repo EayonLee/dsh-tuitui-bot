@@ -51,7 +51,7 @@ interface ConfigWire {
   'access.postAllow'?: string[];
   'access.postBlock'?: string[];
   mentionPolicy?: MentionPolicy;
-  botAliases?: string[];
+  'sendFile.restrictPaths'?: boolean;
   smartFollowUpMs?: number;
   'smartJudge.enabled'?: boolean;
   'smartJudge.prompt'?: string;
@@ -154,7 +154,9 @@ const PANEL_CSS: readonly string[] = [
   '  color: var(--dsw-alias-label-primary);',
   '}',
   '.imqb2-input:focus { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }',
-  '.imqb2-input--number { width: 108px; text-align: right; font-variant-numeric: tabular-nums; }',
+  '.imqb2-number { display: inline-flex; align-items: center; gap: 6px; }',
+  '.imqb2-input--number { width: 96px; text-align: right; font-variant-numeric: tabular-nums; }',
+  '.imqb2-number-unit { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }',
   '.imqb2-textarea {',
   '  box-sizing: border-box; width: 100%; min-height: 220px; padding: 10px 12px;',
   '  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md, 8px);',
@@ -358,19 +360,21 @@ function NumberRow({ label, sub, help, value, min, max, step, suffix, onChange }
   min?: number; max?: number; step?: number; suffix?: string;
   onChange: (next: number) => void;
 }): ReactNode {
-  return createElement(Row, { label, sub, help, inline: suffix === undefined },
-    createElement('input', {
-      type: 'number',
-      className: 'imqb2-input imqb2-input--number',
-      value: Number.isFinite(value) ? String(value) : '',
-      min, max, step,
-      onChange: (event: ChangeEvent<HTMLInputElement>) => {
-        const raw = event.currentTarget.value;
-        const next = Number(raw);
-        if (raw !== '' && Number.isFinite(next)) onChange(next);
-      },
-    }),
-    suffix === undefined ? null : createElement('span', { className: 'imqb2-help' }, suffix),
+  return createElement(Row, { label, sub, help, inline: true },
+    createElement('div', { className: 'imqb2-number' },
+      createElement('input', {
+        type: 'number',
+        className: 'imqb2-input imqb2-input--number',
+        value: Number.isFinite(value) ? String(value) : '',
+        min, max, step,
+        onChange: (event: ChangeEvent<HTMLInputElement>) => {
+          const raw = event.currentTarget.value;
+          const next = Number(raw);
+          if (raw !== '' && Number.isFinite(next)) onChange(next);
+        },
+      }),
+      suffix === undefined ? null : createElement('span', { className: 'imqb2-number-unit' }, suffix),
+    ),
   );
 }
 
@@ -557,7 +561,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   const dirty = (Object.keys(form) as Array<keyof ConfigWire>)
     .some((key) => key !== 'workspaceOptions' && !shallowEqual(form[key], initial[key]));
 
-  const policy: MentionPolicy = form.mentionPolicy ?? ((form.requireMention ?? true) ? 'require' : 'always');
+  const policy: MentionPolicy = form.mentionPolicy ?? 'smart';
   const cwd = form.cwd ?? '';
   const workspaceOptions = form.workspaceOptions ?? [];
   const selectOptions = [
@@ -626,10 +630,10 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       ),
 
       createElement(ScopeCard, {
-        title: '团队频道帖子', desc: '按 channel_id 或 team_id 匹配', mode: form['access.postMode'] ?? 'open', options: MODE_OPTIONS,
+        title: '团队频道帖子', desc: '按 channel_id 或 team_id 匹配', mode: form['access.postMode'] ?? 'disabled', options: MODE_OPTIONS,
         onMode: (v) => { patch('access.postMode', v as AccessMode); },
       },
-        (form['access.postMode'] ?? 'open') === 'allowlist'
+        (form['access.postMode'] ?? 'disabled') === 'allowlist'
           ? createElement(TagsRow, {
               label: '名单', value: form['access.postAllow'] ?? [],
               placeholder: 'channel_id 或 team_id，回车添加',
@@ -638,7 +642,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
                 : undefined,
               onChange: (v) => { patch('access.postAllow', v); },
             })
-          : (form['access.postMode'] ?? 'open') === 'blocklist'
+          : (form['access.postMode'] ?? 'disabled') === 'blocklist'
             ? createElement(TagsRow, {
                 label: '屏蔽', value: form['access.postBlock'] ?? [],
                 placeholder: 'channel_id 或 team_id，回车添加',
@@ -646,7 +650,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
                 onChange: (v) => { patch('access.postBlock', v); },
               })
             : createElement('p', { className: 'imqb2-help', style: { padding: '4px 0 8px' } },
-                (form['access.postMode'] ?? 'open') === 'disabled'
+                (form['access.postMode'] ?? 'disabled') === 'disabled'
                   ? '帖子完全关闭：频道里发帖不会回应。'
                   : '所有频道的帖子都会处理。'),
       ),
@@ -665,14 +669,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             : '群里每条消息都会回应——只建议专用小群使用。',
         onChange: (v) => { patch('mentionPolicy', v as MentionPolicy); },
       }),
-      policy === 'smart'
-        ? createElement(TagsRow, {
-            label: '称呼', value: form.botAliases ?? [],
-            placeholder: '如 憨包、小秘，回车添加',
-            help: '这些名字会被当作「在叫机器人」的信号交给判断逻辑，不是硬规则。',
-            onChange: (v) => { patch('botAliases', v); },
-          })
-        : null,
       policy === 'smart'
         ? createElement(NumberRow, {
             label: '追问延续', value: Math.round((form.smartFollowUpMs ?? 120000) / 1000),
@@ -712,7 +708,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             onChange: (v) => { patch('smartJudge.cooldownMs', v * 1000); },
           }),
           createElement(NumberRow, {
-            label: '判断时看几条', value: form['smartJudge.maxHistory'] ?? 12,
+            label: '判断时看几条', value: form['smartJudge.maxHistory'] ?? 50,
             min: 0, max: 50, step: 1, suffix: '条',
             help: '交给模型的历史消息条数。太少判断不准，太多费 token。',
             onChange: (v) => { patch('smartJudge.maxHistory', v); },
@@ -725,7 +721,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       desc: '机器人每次回话时能看到多少群消息，以及会话在内存里保留多久。',
     },
       createElement(NumberRow, {
-        label: '群聊上下文条数', value: form.historyLimit ?? 10, min: 0, max: 1000, step: 1, suffix: '条',
+        label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
         help: '被叫到时附带最近 N 条群消息；0 表示不带。私聊靠会话自身记忆，不受影响。',
         onChange: (v) => { patch('historyLimit', v); },
       }),
@@ -758,7 +754,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('interactive.enabled', v); },
       }),
       createElement(SwitchRow, {
-        label: '中间步骤上报', checked: form['agentSteps.enabled'] ?? true,
+        label: '中间步骤上报', checked: form['agentSteps.enabled'] ?? false,
         help: '把模型与工具调用步骤实时展示在推推客户端。',
         onChange: (v) => { patch('agentSteps.enabled', v); },
       }),
@@ -777,6 +773,11 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         label: '显示工具调用结果', checked: form.showToolResults ?? false,
         help: '把 agent 调用工具的结果也发到聊天里，排查问题时有用。',
         onChange: (v) => { patch('showToolResults', v); },
+      }),
+      createElement(SwitchRow, {
+        label: '限制可发送的文件', checked: form['sendFile.restrictPaths'] ?? false,
+        help: '默认放开：想让 agent 发哪的文件都行。打开后只允许媒体目录、工作区和额外根目录，防误发敏感文件。',
+        onChange: (v) => { patch('sendFile.restrictPaths', v); },
       }),
       createElement(SwitchRow, {
         label: '调试日志', checked: form.debug ?? false,

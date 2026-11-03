@@ -77,7 +77,6 @@ export interface ConfigPatchWire {
     'access.postAllow'?: string[];
     'access.postBlock'?: string[];
     mentionPolicy?: 'require' | 'always' | 'smart';
-    botAliases?: string[];
     smartFollowUpMs?: number;
     'interactive.enabled'?: boolean;
     'agentSteps.enabled'?: boolean;

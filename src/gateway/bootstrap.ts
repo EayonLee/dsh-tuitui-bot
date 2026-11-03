@@ -150,7 +150,6 @@ export async function bootstrapGateway(
         const { scope, peerId } = getScopePeer(mctx.message);
         return manager.getEffectiveModel(scope, peerId);
       },
-      botName: config.botAliases[0] ?? '机器人',
       settings: config.smartJudge,
     },
   });

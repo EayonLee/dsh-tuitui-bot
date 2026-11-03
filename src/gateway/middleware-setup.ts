@@ -39,7 +39,6 @@ export interface SmartJudgeDeps {
   /** 按消息解析生效的模型路线 */
   resolveRoute: (ctx: MiddlewareContext) => { provider: string; model: string } | undefined;
   /** 机器人名字（提示词里用） */
-  botName: string;
   /** 判定参数（来自 config.smartJudge） */
   settings: {
     enabled: boolean;
@@ -63,27 +62,14 @@ export interface MiddlewareSetupOptions {
 }
 
 /**
- * smart 模式下的确定性规则（模型不可用时的降级路径）。
+ * smart 模式下的确定性兜底（模型不可用时的降级路径）。
  *
- * 注意：这些规则不再决定「要不要回」，只是模型判定不可用时的最低保障：
- *   1. 文本里出现机器人别名（config.botAliases，例如「憨包」）；
- *   2. 追问窗口：机器人刚在该会话回过这个人（smartFollowUpMs）。
+ * 只保留一条最低保障：机器人刚在这个会话回过这个人，那这句大概率是接着聊
+ * （smartFollowUpMs 窗口）。没有任何「出现某个词就回」的规则——那套跟人格设定冲突。
  */
 function smartRuleFallback(ctx: MiddlewareContext, config: ImTuituiConfig): boolean {
-  const message = ctx.message;
-
-  // 规则 2：别名命中（忽略大小写，避免「Bot」「bot」两种写法）
-  const aliases = config.botAliases.filter((alias) => alias.trim() !== '');
-  if (aliases.length > 0) {
-    const text = (message.content ?? '').toLowerCase();
-    if (text !== '' && aliases.some((alias) => text.includes(alias.trim().toLowerCase()))) {
-      return true;
-    }
-  }
-
-  // 规则 2：追问窗口（同一个人、刚聊过）
-  const { scope, peerId } = getScopePeer(message);
-  return isLikelyFollowUp(scope, peerId, message.senderId, config.smartFollowUpMs);
+  const { scope, peerId } = getScopePeer(ctx.message);
+  return isLikelyFollowUp(scope, peerId, ctx.message.senderId, config.smartFollowUpMs);
 }
 
 /** 群聊/帖子的历史键（与 historyBuffer 的 groupKey 同源） */
@@ -128,8 +114,6 @@ async function smartReplyProbe(
   const verdict = await judgeShouldJoin({
     llm: deps.llm as { stream: (options: never) => AsyncIterable<never> } | undefined,
     route,
-    botName: deps.botName,
-    aliases: config.botAliases,
     history,
     message: {
       sender: message.senderName === undefined || message.senderName === '' ? message.senderId : message.senderName,

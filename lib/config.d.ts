@@ -97,7 +97,6 @@ export interface ImTuituiConfig {
     /** 群聊/帖子的触发方式，未设置时由上面两个布尔推导 */
     mentionPolicy?: MentionPolicy;
     /** smart 模式：文本中出现这些名字即视为在叫机器人 */
-    botAliases: string[];
     /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
     smartFollowUpMs: number;
     /** smart 模式：把上下文交给模型判断是否插嘴的参数 */

@@ -107,7 +107,6 @@ export interface ImTuituiConfig {
   /** 群聊/帖子的触发方式，未设置时由上面两个布尔推导 */
   mentionPolicy?: MentionPolicy;
   /** smart 模式：文本中出现这些名字即视为在叫机器人 */
-  botAliases: string[];
   /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
   smartFollowUpMs: number;
   /** smart 模式：把上下文交给模型判断是否插嘴的参数 */
@@ -176,7 +175,7 @@ export const AccessControlSchema: Schema<AccessControlConfig> = Schema.object({
   groupMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('open').description('群聊访问模式（默认开放：群自带进群门槛 + @bot 触发）'),
   groupAllow: Schema.array(Schema.string()).default([]).description('群聊白名单（group_id）'),
   groupBlock: Schema.array(Schema.string()).default([]).description('群聊黑名单（group_id，优先级最高）'),
-  postMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('open').description('团队帖子访问模式（默认开放）'),
+  postMode: Schema.union(['open', 'allowlist', 'blocklist', 'disabled']).default('disabled').description('团队帖子访问模式（默认禁用：团队频道里不工作）'),
   postAllow: Schema.array(Schema.string()).default([]).description('团队帖子白名单（channel_id 或 team_id）'),
   postBlock: Schema.array(Schema.string()).default([]).description('团队帖子黑名单（channel_id 或 team_id，优先级最高）'),
 });
@@ -190,12 +189,12 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   cwd: Schema.string().description('Agent working directory (default ~/.dsh-tuitui/workspace)'),
   requireMention: Schema.boolean().default(true).description('群聊是否需要@bot触发'),
   requireMentionInPost: Schema.boolean().default(true).description('团队帖子是否需要@bot触发'),
-  mentionPolicy: Schema.union(['require', 'always', 'smart']).description('群聊/帖子触发方式：require=仅@ / always=全部 / smart=仅相关消息'),
-  botAliases: Schema.array(Schema.string()).default([]).description('smart 模式：出现这些名字即视为在叫机器人'),
+  mentionPolicy: Schema.union(['require', 'always', 'smart']).default('smart').description('群聊/帖子触发方式：require=仅@ / always=全部 / smart=按人格与上下文自主判断（默认）'),
+
   smartFollowUpMs: Schema.number().default(120000).description('smart 模式：追问延续窗口(ms)'),
   smartJudge: Schema.object({
     enabled: Schema.boolean().default(true).description('智能模式用模型判断是否插嘴；关掉退回确定性规则'),
-    maxHistory: Schema.number().default(12).description('判定时携带的群聊历史条数'),
+    maxHistory: Schema.number().default(50).description('判定时携带的群聊历史条数'),
     maxTokens: Schema.number().default(120).description('判定输出上限 token'),
     timeoutMs: Schema.number().default(8000).description('判定超时(ms)，超时视为不插嘴'),
     cooldownMs: Schema.number().default(20000).description('同一会话两次判定的最小间隔(ms)'),
@@ -211,7 +210,7 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   maxQueue: Schema.number().default(20).description('并发队列最大长度'),
   processingTimeoutMs: Schema.number().default(30 * 60 * 1000).description('处理超时(ms)，超时中断当前 LLM 调用'),
   askTimeoutMs: Schema.number().default(5 * 60 * 1000).description('待答问题超时(ms)，超时自动拒绝并提示'),
-  historyLimit: Schema.number().default(10).description('群历史缓冲条数'),
+  historyLimit: Schema.number().default(50).description('群历史缓冲条数'),
   access: AccessControlSchema.default({
     c2cMode: 'open',
     c2cAllow: [],
@@ -219,7 +218,7 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     groupMode: 'open',
     groupAllow: [],
     groupBlock: [],
-    postMode: 'open',
+    postMode: 'disabled',
     postAllow: [],
     postBlock: [],
   }).description('访问控制'),
@@ -248,21 +247,21 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     timeoutMs: 120000,
   }).description('视觉理解配置'),
   sendFile: Schema.object({
-    restrictPaths: Schema.boolean().default(true).description('是否启用路径白名单（默认 true，仅允许 media + cwd + extraRoots）'),
+    restrictPaths: Schema.boolean().default(false).description('是否限制可发送的文件路径（默认 false：想发什么发什么；打开后仅允许 media + cwd + extraRoots）'),
     extraRoots: Schema.array(Schema.string()).default([]).description('额外允许访问的根目录'),
     sendPresentedFiles: Schema.boolean().default(true).description('是否将 present 声明的交付文件发送到当前会话'),
     maxFiles: Schema.number().default(4).description('单轮最多投递的交付文件数'),
-  }).default({ restrictPaths: true, extraRoots: [], sendPresentedFiles: true, maxFiles: 4 }).description('附件发送配置'),
+  }).default({ restrictPaths: false, extraRoots: [], sendPresentedFiles: true, maxFiles: 4 }).description('附件发送配置'),
   interactive: Schema.object({
     enabled: Schema.boolean().default(true).description('是否使用推推原生交互卡片（问答/审批）'),
     headBgColor: Schema.string().default('#1F6FEB').description('卡片头部背景色'),
     headTextColor: Schema.string().default('#FFFFFF').description('卡片头部文字颜色'),
   }).default({ enabled: true, headBgColor: '#1F6FEB', headTextColor: '#FFFFFF' }).description('交互卡片配置'),
   agentSteps: Schema.object({
-    enabled: Schema.boolean().default(true).description('是否上报模型/工具调用中间步骤（推推客户端原生展示）'),
+    enabled: Schema.boolean().default(false).description('是否上报模型/工具调用中间步骤（默认关闭）'),
     includeToolPayload: Schema.boolean().default(false).description('是否上报完整工具参数与结果'),
     maxResultChars: Schema.number().default(800).description('工具结果截断字符数'),
-  }).default({ enabled: true, includeToolPayload: false, maxResultChars: 800 }).description('Agent 步骤上报配置'),
+  }).default({ enabled: false, includeToolPayload: false, maxResultChars: 800 }).description('Agent 步骤上报配置'),
   apiBaseUrl: Schema.string().description('推推 OpenAPI 地址（私有化部署覆盖）'),
   websocketBaseUrl: Schema.string().description('推推 WebSocket 地址（私有化部署覆盖）'),
 });

@@ -24,6 +24,9 @@ First release: an implementation of a dsh bot channel plugin for 360 Tuitui IM.
 
 - **Smart interjection (`src/features/smart-judge.ts`)**: in `smart` mode a model reads the group context and decides whether to speak; the judging prompt is fully editable in Settings (default: `src/shared/smart-prompt.ts`), with per-conversation cooldown, timeout, and a fail-closed fallback
 - **Settings page rework (`src/client/config-panel.ts`)**: section cards plus a two-column field grid that collapses on narrow screens; allow/deny lists and aliases are chip inputs (Enter commits, Backspace removes, × deletes one); workspace is a server-fed dropdown; smart mode reveals the prompt editor; model selection removed
+- **Defaults changed**: trigger mode defaults to `smart`; group context and judgement history default to 50; step reporting off; team posts disabled; file sending unrestricted by default
+- **"Aliases" setting removed**: name matching fought the persona; judgement is now the model plus the persona prompt
+- **Judging prompt rewritten**: no more "when in doubt stay quiet" checklist — it now describes situations and motives (interest, mood, boredom, having something to say) so the bot decides for itself
 - **Brand icon**: plugin icon and the settings/sidebar/binding icons now use the official Tuitui logo (inlined base64, self-contained bundle)
 
 ### Runtime model notes

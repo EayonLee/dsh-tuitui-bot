@@ -31,8 +31,6 @@ function throwingLlm() {
 
 const base = {
   route: { provider: 'p', model: 'm' },
-  botName: '憨包',
-  aliases: ['憨包'],
   history: [{ sender: '张三', text: '今天天气不错' }],
   message: { sender: '李四', text: '憨包，帮我看下这个报错' },
 } as const;

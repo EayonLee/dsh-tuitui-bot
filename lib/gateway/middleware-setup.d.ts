@@ -21,7 +21,6 @@ export interface SmartJudgeDeps {
         model: string;
     } | undefined;
     /** 机器人名字（提示词里用） */
-    botName: string;
     /** 判定参数（来自 config.smartJudge） */
     settings: {
         enabled: boolean;

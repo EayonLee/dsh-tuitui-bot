@@ -27,7 +27,6 @@ function makeConfig(overrides: Record<string, unknown> = {}): ImTuituiConfig {
     historyLimit: 10,
     requireMention: true,
     requireMentionInPost: true,
-    botAliases: [],
     smartFollowUpMs: 120_000,
     streaming: false,
     maxQueue: 4,
@@ -109,13 +108,11 @@ describe('中间件链编排（集成）', () => {
     expect((ctx.state.mention as MentionDecision).wasMentioned).toBe(true);
   });
 
-  it('smart 模式：命中机器人别名时未 @ 也放行', async () => {
-    const config = makeConfig({ mentionPolicy: 'smart', botAliases: ['憨包'] });
+  it('smart 模式：模型没判要说话时沉默（不再有「出现某个词就回」的规则）', async () => {
+    const config = makeConfig({ mentionPolicy: 'smart' });
     const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, content: '憨包 今天几号', atMe: false }));
-    const skipped = await runChain(config, ctx);
 
-    expect(skipped).toBeUndefined();
-    expect((ctx.state.mention as MentionDecision).policy).toBe('smart');
+    expect(await runChain(config, ctx)).toBe('mention');
   });
 
   it('smart 模式：机器人刚回过同一个人，追问放行', async () => {

@@ -165,10 +165,11 @@ const EDITABLE_CONFIG_KEYS = [
   'access.c2cAllow', 'access.c2cBlock',
   'access.groupAllow', 'access.groupBlock',
   'access.postAllow', 'access.postBlock',
-  'mentionPolicy', 'botAliases', 'smartFollowUpMs',
+  'mentionPolicy', 'smartFollowUpMs',
   'smartJudge.enabled', 'smartJudge.prompt', 'smartJudge.maxHistory',
   'smartJudge.cooldownMs', 'smartJudge.timeoutMs',
   'interactive.enabled', 'agentSteps.enabled',
+  'sendFile.restrictPaths',
 ] as const;
 
 type EditableConfigKey = (typeof EDITABLE_CONFIG_KEYS)[number];
@@ -200,7 +201,6 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'access.postAllow': (v) => stringListSchema(v, 'access.postAllow'),
   'access.postBlock': (v) => stringListSchema(v, 'access.postBlock'),
   mentionPolicy: (v) => mentionPolicySchema(v),
-  botAliases: (v) => stringListSchema(v, 'botAliases'),
   smartFollowUpMs: numberSchema('smartFollowUpMs', 5000, 60 * 60 * 1000),
   'smartJudge.enabled': (v) => booleanSchema(v, 'smartJudge.enabled'),
   'smartJudge.prompt': (v) => promptSchema(v, 'smartJudge.prompt'),
@@ -209,6 +209,7 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'smartJudge.timeoutMs': numberSchema('smartJudge.timeoutMs', 1000, 120000),
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
+  'sendFile.restrictPaths': (v) => booleanSchema(v, 'sendFile.restrictPaths'),
 };
 
 /**

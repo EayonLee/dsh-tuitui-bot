@@ -80,7 +80,7 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 ### 4. 在推推里聊
 
 - 私聊机器人：直接发消息
-- 群聊：把机器人拉进群，`@机器人 你的问题`。三档触发方式（`mentionPolicy`）：
+- 群聊：把机器人拉进群。默认是**智能模式**——它按自己的性格和上下文判断要不要说话；三档触发方式（`mentionPolicy`）：
   - `require`（默认）：只有 @ 才算叫它。
   - `smart`：**模型读最近对话自己判断要不要插嘴**——别人互相聊天不接话，轮到自己或被问到才开口；判定提示词可在设置页改写。
   - `always`：群里每条消息都回（只建议专用小群）。
@@ -97,7 +97,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 
 - **服务范围**：单聊 / 群聊 / 团队帖子各选四档模式；白名单、黑名单都是**标签输入**——
   回车或逗号成标签，`Backspace` 删最后一个，点 `×` 删单个，不用记格式。
-- **什么时候回话**：触发方式三档；选「智能」时展开称呼、追问延续窗口，以及
+- **什么时候回话**：触发方式三档；选「智能」时展开追问延续窗口，以及
   **判定提示词编辑器**（多行、等宽字体、可一键恢复出厂默认）。
 - **上下文与会话**：群聊上下文条数、闲置回收分钟数，带单位后缀与用途说明。
 - **工作区**：下拉直接选目录（默认工作区 / `~/workspace` 下的项目 / 当前值），不用手打绝对路径。
@@ -117,12 +117,11 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent 工作目录 |
 | `requireMention` | boolean | `true` | 群聊是否必须 @bot（`mentionPolicy` 未设置时用它推导） |
 | `requireMentionInPost` | boolean | `true` | 团队帖子是否必须 @bot |
-| `mentionPolicy` | `'require'` | `require` / `always` / `smart`：仅 @ / 全部 / 模型判断该不该插嘴 |
-| `botAliases` | `[]` | 机器人的称呼（憨包、小秘…），交给判定提示词当线索 |
+| `mentionPolicy` | `'smart'` | `smart` / `require` / `always`：按人格与上下文自主判断（默认）/ 仅 @ / 全部 |
 | `smartFollowUpMs` | `120000` | 机器人回复后，同一个人接着说话算「同一轮对话」的窗口（ms） |
 | `smartJudge.enabled` | `true` | 智能模式用模型判断；关掉退回确定性规则 |
 | `smartJudge.prompt` | 内置文案 | **判定提示词，可整段改写**（设置页可视化编辑，留空恢复默认） |
-| `smartJudge.maxHistory` | `12` | 判定时交给模型的历史消息条数 |
+| `smartJudge.maxHistory` | `50` | 判定时交给模型的历史消息条数 |
 | `smartJudge.cooldownMs` | `20000` | 同一会话两次判定的最小间隔，防止每条消息都调模型 |
 | `smartJudge.timeoutMs` | `8000` | 判定超时（超时视为不插嘴） |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
@@ -139,7 +138,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `maxQueue` | `20` | 同 peer 消息队列上限 |
 | `processingTimeoutMs` | `1800000` | 单轮处理超时（ms） |
 | `askTimeoutMs` | `300000` | 待答问题超时（ms） |
-| `historyLimit` | `10` | 群/帖子历史缓冲条数 |
+| `historyLimit` | `50` | 群/帖子历史缓冲条数 |
 | `showToolResults` | `false` | 是否展示工具成功结果（错误始终展示） |
 
 ### 访问控制
@@ -150,7 +149,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `access.c2cAllow` / `c2cBlock` | `[]` | 单聊白名单 / **黑名单**（域账号或 UID，黑名单优先） |
 | `access.groupMode` | `open` | 群聊模式（同上四档） |
 | `access.groupAllow` / `groupBlock` | `[]` | 群白名单 / **黑名单**（group_id） |
-| `access.postMode` | `open` | 团队帖子模式（同上四档） |
+| `access.postMode` | `disabled` | 团队帖子模式（同上四档；默认禁用，要用再开） |
 | `access.postAllow` / `postBlock` | `[]` | 帖子白名单 / **黑名单**（channel_id 或 team_id） |
 
 > `allowlist` 模式下名单为空 = **拒绝所有人**（fail-closed）。
@@ -164,7 +163,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `media.ttlHours` | `24` | 媒体保留时长，0 = 永久 |
 | `vision.enabled` | `false` | 启用 `tuitui_describe_image` 工具 |
 | `vision.provider` / `vision.model` | - | 视觉模型路由 |
-| `sendFile.restrictPaths` | `true` | 路径白名单（media + cwd + extraRoots） |
+| `sendFile.restrictPaths` | `false` | 是否限制可发送的文件路径；默认放开，打开后只允许 media + cwd + extraRoots |
 | `sendFile.extraRoots` | `[]` | 额外允许发送的目录 |
 | `sendFile.sendPresentedFiles` | `true` | 轮末投递 `present` 声明的文件 |
 
@@ -174,7 +173,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | --- | --- | --- |
 | `interactive.enabled` | `true` | 用交互卡片做审批/提问（关闭后走编号文本应答） |
 | `interactive.headBgColor` / `headTextColor` | `#1F6FEB` / `#FFFFFF` | 卡片头部配色 |
-| `agentSteps.enabled` | `true` | 上报模型/工具步骤给推推客户端原生展示 |
+| `agentSteps.enabled` | `false` | 上报模型/工具步骤给推推客户端原生展示（默认关） |
 | `agentSteps.includeToolPayload` | `false` | 是否上报工具参数/结果原文 |
 | `agentSteps.maxResultChars` | `800` | 工具结果截断长度 |
 | `apiBaseUrl` / `websocketBaseUrl` | - | 私有化部署端点覆盖（亦可用 `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`） |
@@ -200,7 +199,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 
 | 工具 | 说明 |
 | --- | --- |
-| `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话（走路径白名单） |
+| `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话；默认不限制路径，想发什么发什么 |
 | `tuitui_describe_image` | 视觉理解（需 `vision.enabled`，复用 dsh llm + attachments） |
 
 ## 智能插话是怎么工作的
@@ -213,8 +212,10 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
    要求只回一行 JSON：`{"join":true,"why":"十个字以内"}`。
 4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
    宁可漏答一句，也不在群里刷屏。
-5. **关掉开关**（`smartJudge.enabled=false`）退回确定性规则：提到称呼、或刚聊过的人接着追问。
+5. **关掉开关**（`smartJudge.enabled=false`）退回确定性兜底：只保留「机器人刚回过的人接着说话」这一条，没有「出现某个词就回」的规则——那跟人格设定冲突。
 
+提示词里**没有判断清单**——写成清单，它就变成按表格打勾的机器人。出厂文案给的是处境和动机
+（感兴趣、不同意、觉得好笑、无聊、手上有信息、被叫到、该有人拍板），让它自己拿主意。
 提示词是**一等配置**：不同群需要不同的「人设」，在设置页整段改，改完保存即生效；
 清空输入框恢复出厂默认（见 [`src/shared/smart-prompt.ts`](./src/shared/smart-prompt.ts)）。
 

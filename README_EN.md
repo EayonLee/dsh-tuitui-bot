@@ -67,7 +67,8 @@ credentials with `property.info()` and writes them into the profile's `cordis.pa
 
 Then talk to the bot: DM it, @-mention it in a group, or post in a team channel and @-mention it.
 
-Group trigger modes (`mentionPolicy`):
+Group trigger modes (`mentionPolicy`). The default is **smart** — the bot decides from its own
+personality and the conversation:
 
 - `require` (default): only @-mentions count.
 - `smart`: a model reads recent context and decides whether to join in — it stays quiet when others
@@ -104,12 +105,11 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `preset` | string | - | Agent preset id (applies to new sessions) |
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent working directory |
 | `requireMention` | boolean | `true` | Require @bot in groups (fallback when `mentionPolicy` is unset) |
-| `mentionPolicy` | `'require'` | `require` / `always` / `smart`: @ only / everything / model decides |
-| `botAliases` | `[]` | Names the bot answers to; passed to the judging prompt as a hint |
+| `mentionPolicy` | `'smart'` | `smart` / `require` / `always`: persona-driven judgement (default) / @ only / everything |
 | `smartFollowUpMs` | `120000` | Window where a reply from the same person counts as the same turn (ms) |
 | `smartJudge.enabled` | `true` | Model-based interjection; disable to fall back to deterministic rules |
 | `smartJudge.prompt` | built-in | **Judging prompt, fully editable** (Settings UI; empty restores default) |
-| `smartJudge.maxHistory` | `12` | History messages handed to the model |
+| `smartJudge.maxHistory` | `50` | History messages handed to the model |
 | `smartJudge.cooldownMs` | `20000` | Minimum gap between judgements per conversation |
 | `smartJudge.timeoutMs` | `8000` | Judgement timeout (a timeout means "do not join") |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
@@ -127,7 +127,7 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `maxQueue` | `20` | Per-peer queue limit |
 | `processingTimeoutMs` | `1800000` | Turn timeout (ms) |
 | `askTimeoutMs` | `300000` | Pending question timeout (ms) |
-| `historyLimit` | `10` | Group/post history buffer size |
+| `historyLimit` | `50` | Group/post history buffer size |
 | `showToolResults` | `false` | Show successful tool output (errors always shown) |
 
 ### Access control
@@ -136,7 +136,8 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 `open` | `allowlist` | `blocklist` | `disabled`; the matching `c2cAllow`/`c2cBlock`,
 `groupAllow`/`groupBlock`, `postAllow`/`postBlock` arrays take accounts or UIDs, group ids, and
 channel/team ids. Deny lists win over everything. An empty allowlist in `allowlist` mode
-**denies everyone** (fail-closed).
+**denies everyone** (fail-closed). Team posts are **disabled by default**
+(`access.postMode = 'disabled'`); switch them on when you actually use channels.
 
 ### Media, vision, attachments
 
@@ -146,7 +147,7 @@ channel/team ids. Deny lists win over everything. An empty allowlist in `allowli
 ### Tuitui-native switches
 
 `interactive.enabled` (cards for approval/questions), `interactive.headBgColor` / `headTextColor`,
-`agentSteps.enabled` / `includeToolPayload` / `maxResultChars`, and `apiBaseUrl` / `websocketBaseUrl`
+`agentSteps.enabled` (off by default) / `includeToolPayload` / `maxResultChars`, and `apiBaseUrl` / `websocketBaseUrl`
 for private deployments (also `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`).
 
 ## Commands

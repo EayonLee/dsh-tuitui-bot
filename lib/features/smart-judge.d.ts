@@ -21,10 +21,6 @@ export interface SmartJudgeOptions {
         provider: string;
         model: string;
     } | undefined;
-    /** 机器人名字（用于提示词，让它知道「自己」是谁） */
-    botName?: string;
-    /** 用户给机器人起过的称呼（作为线索，不作为硬规则） */
-    aliases?: readonly string[];
     /** 最近的对话（按时间正序，不含本条） */
     history: readonly JudgeLine[];
     /** 最新一条待判断的消息 */

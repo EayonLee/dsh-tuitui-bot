@@ -328,7 +328,7 @@ describe('配置读写', () => {
     mentionPolicy: 'smart',
     textChunkLimit: 3000,
     debug: false,
-    botAliases: ['小助手'],
+    sendFile: { restrictPaths: false, extraRoots: [], sendPresentedFiles: true },
     access: { c2cMode: 'open', groupMode: 'allowlist', groupAllow: ['g-1'] },
     interactive: { enabled: true, headBgColor: '#fff' },
     agentSteps: { enabled: false, includeToolPayload: false },
@@ -480,22 +480,22 @@ describe('配置读写', () => {
     const patches: Record<string, unknown>[] = [];
     const h = harness({ onUpdateConfig: (patch) => { patches.push(patch); return true; } });
     const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', {
-      body: { botAliases: ['  小助手 ', '', '   ', '小助手', 'bot'], 'access.c2cAllow': ['u-1', ' u-1 ', 'u-2'] },
+      body: { 'access.groupAllow': ['  g-1 ', '', '   ', 'g-1', 'g-2'], 'access.c2cAllow': ['u-1', ' u-1 ', 'u-2'] },
     }));
 
     expect(res.statusCode).toBe(200);
     expect(patches.at(-1)).toEqual({
-      botAliases: ['小助手', 'bot'],
+      'access.groupAllow': ['g-1', 'g-2'],
       'access.c2cAllow': ['u-1', 'u-2'],
     });
   });
 
   it('名单为含 null 的数组：非字符串项被拒绝', async () => {
     const h = harness();
-    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { botAliases: ['ok', 42] } }));
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { 'access.postAllow': ['ok', 42] } }));
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ ok: false, error: 'botAliases 的每一项都必须是字符串' });
+    expect(res.json()).toEqual({ ok: false, error: 'access.postAllow 的每一项都必须是字符串' });
   });
 
   it('名单单项超过 200 字符被拒绝', async () => {
@@ -525,10 +525,10 @@ describe('配置读写', () => {
 
   it('名单传入非数组被拒绝', async () => {
     const h = harness();
-    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { botAliases: '小助手' } }));
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { 'access.groupBlock': 'g-1' } }));
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ ok: false, error: 'botAliases 必须是字符串数组' });
+    expect(res.json()).toEqual({ ok: false, error: 'access.groupBlock 必须是字符串数组' });
   });
 
   it('cwd 必须是绝对路径，空串表示沿用默认', async () => {
