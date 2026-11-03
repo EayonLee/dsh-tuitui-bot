@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "icon": "./assets/icons/tuitui.svg",
   "description": "在推推（Tuitui）单聊、群聊与团队频道里直接对话 DeepSeek Harness。 Chat with DeepSeek Harness in Tuitui IM.",
+  "author": "EayonLee",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -19,13 +20,15 @@
   },
   "files": [
     "lib",
-    "src",
+    "scripts",
     "locale",
     "assets",
     "cordis.patch.yml",
+    "install.sh",
     "README.md",
     "README_EN.md",
     "CHANGELOG.md",
+    "CHANGELOG_EN.md",
     "LICENSE"
   ],
   "scripts": {
@@ -36,7 +39,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:live": "node scripts/smoke-live.mjs"
+    "smoke:live": "node scripts/smoke-live.mjs",
+    "verify": "node scripts/verify-bootstrap.mjs"
   },
   "keywords": [
     "deepseek-harness",
@@ -47,9 +51,19 @@
     "im",
     "cordis",
     "plugin",
-    "chatbot"
+    "chatbot",
+    "tuitui-bot",
+    "360"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EayonLee/dsh-tuitui-bot.git"
+  },
+  "homepage": "https://github.com/EayonLee/dsh-tuitui-bot#readme",
+  "bugs": {
+    "url": "https://github.com/EayonLee/dsh-tuitui-bot/issues"
+  },
   "engines": {
     "node": ">=20.3.0",
     "dsh": ">=0.2.0 <0.3.0"

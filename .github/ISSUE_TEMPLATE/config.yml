@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 上游 QQ 插件（结构参考）
+    url: https://github.com/tencent-connect/dsh-qqbot
+    about: 本插件是它的推推移植版，目录结构、中间件顺序与行为语义一一对应。
+  - name: DeepSeek Harness
+    url: https://github.com/deepseek-ai/deepseek-harness
+    about: 宿主框架（cordis 插件模型 / profile / bundle patch）的问题请提给上游。
+  - name: 推推机器人开放文档
+    url: https://easydoc.qihoo.net/doc?project=1d414e4d0ce730bec9b805b12ca28509&doc=3596913a227ae858de8e1dcca7dae3d6&config=toc
+    about: 凭据、事件、卡片等平台侧能力以推推官方文档为准。

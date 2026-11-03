@@ -6,9 +6,12 @@
 
 在推推（Tuitui）**单聊、群聊、团队频道帖子**里直接对话 DeepSeek Harness。
 
-[![npm](https://img.shields.io/badge/npm-@qihoo/dsh--tuitui--bot-blue)](https://www.npmjs.com/)
+[![CI](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
+[![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
+
+**仓库：[EayonLee/dsh-tuitui-bot](https://github.com/EayonLee/dsh-tuitui-bot) · 上游结构参考：[tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)**
 
 **简体中文 | [English](./README_EN.md)**
 
@@ -49,13 +52,17 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 ### 2. 安装插件
 
 ```bash
-# 从 npm 安装（推荐）
+# 一键安装脚本（自动选包、建 profile、提示配置）
+sh install.sh
+
+# 从 GitHub 直接安装（仓库内已提交构建产物 lib/，无需本地构建）
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+
+# 从 npm 安装（发布后可用）
 dsh plugin --profile tuitui add @qihoo/dsh-tuitui-bot
 
-# 或从本地源码安装（会自动跑 prepare 构建）
+# 或从本地源码 / tarball 安装
 dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
-
-# 或从 tarball 安装
 npm pack && dsh plugin --profile tuitui add ./qihoo-dsh-tuitui-bot-0.1.0.tgz
 ```
 
@@ -235,6 +242,22 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 | 频道（guild） | 团队频道帖子 | `sendPost` / `editPost` |
 | 扫码绑定机器人 | 手填凭据 + `property.info()` 校验 | 推推无扫码流程 |
 
+## 贡献
+
+欢迎提 issue / PR：
+
+- Bug 请用 [Bug 报告](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml) 模板，附上 dsh 版本、插件版本与脱敏日志；
+- 功能建议请用 [功能建议](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) 模板，说明推推侧可复用的原生能力；
+- 提交前请跑通 `npm run typecheck`、`npm test`、`npm run build`（CI 会做同样的事）。
+
+变更记录见 [CHANGELOG.md](./CHANGELOG.md)（英文：[CHANGELOG_EN.md](./CHANGELOG_EN.md)）。
+
+## 致谢
+
+- 结构与行为语义参考 [@tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)（MIT）；
+- 宿主框架 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)；
+- 推推开放平台 [@qihoo/tuitui-bot-sdk](https://www.npmjs.com/package/@qihoo/tuitui-bot-sdk)。
+
 ## 许可
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) © 2026 EayonLee and dsh-tuitui-bot contributors

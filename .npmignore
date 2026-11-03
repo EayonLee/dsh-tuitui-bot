@@ -1,0 +1,14 @@
+src/
+scripts/
+docs/
+cordis.dev.yml
+tsconfig.json
+tsconfig.client.json
+tsdown.client.config.ts
+.github/
+.env
+.env.example
+.dsh-sessions/
+.dsh-tuitui/
+*.tsbuildinfo
+node_modules/

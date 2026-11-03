@@ -6,8 +6,12 @@
 
 Chat with DeepSeek Harness in Tuitui **direct messages, group chats and team channel posts**.
 
+[![CI](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
+[![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
+
+**Repo: [EayonLee/dsh-tuitui-bot](https://github.com/EayonLee/dsh-tuitui-bot) · Structural reference: [tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)**
 
 **[简体中文](./README.md) | English**
 
@@ -44,7 +48,9 @@ swapped for the Tuitui SDK ([`@qihoo/tuitui-bot-sdk`](https://www.npmjs.com/pack
 
 ```bash
 # 1. install the bundle into a profile
-dsh plugin --profile tuitui add @qihoo/dsh-tuitui-bot
+sh install.sh                                              # one-shot script
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot   # straight from GitHub (lib/ is committed)
+dsh plugin --profile tuitui add @qihoo/dsh-tuitui-bot      # npm (after release)
 # (or from a local checkout / tarball)
 dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
 
@@ -184,6 +190,20 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 | Guild channels | team channel posts |
 | QR-code binding | credential form + `property.info()` verification |
 
+## Contributing
+
+Issues and PRs are welcome — please use the [bug report](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml)
+or [feature request](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) template,
+and make sure `npm run typecheck`, `npm test` and `npm run build` pass locally (CI runs the same).
+
+See [CHANGELOG_EN.md](./CHANGELOG_EN.md) for changes (Chinese: [CHANGELOG.md](./CHANGELOG.md)).
+
+## Credits
+
+- Structure and behavioural semantics follow [@tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot) (MIT);
+- Host framework: [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness);
+- Platform SDK: [@qihoo/tuitui-bot-sdk](https://www.npmjs.com/package/@qihoo/tuitui-bot-sdk).
+
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) © 2026 EayonLee and dsh-tuitui-bot contributors

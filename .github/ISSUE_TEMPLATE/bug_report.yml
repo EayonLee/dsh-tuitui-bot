@@ -1,0 +1,83 @@
+name: Bug 报告
+description: 报告一个可复现的问题（推推里的消息异常、启动失败、卡片/流式行为不对等）
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量补齐下面的信息，能大幅缩短定位时间。
+        提交前请确认已脱敏：不要贴 appSecret、API Key、内部系统域名。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 期望行为和实际行为分别是什么
+      placeholder: |
+        期望：@机器人 后按流式回复
+        实际：只发了一条“处理中”就没有下文
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 在群（或单聊 / 团队频道）里 @机器人
+        2. 输入 “帮我列一下当前目录”
+        3. 观察回复
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 会话形态
+      options:
+        - 单聊（c2c）
+        - 群聊（group）
+        - 团队频道帖子（post）
+        - 交互卡片 / 审批 / 问答
+        - 端内绑定页 / 设置面板
+        - 启动 / 配置
+        - 不确定
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      description: "使用 `package.json` 中的 version，或 `dsh plugin --profile <name> list` 的输出"
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: dsh 版本
+      description: "使用 `dsh --version` 的输出"
+      placeholder: 0.2.1-rc.5
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node / 平台
+      placeholder: Node 22.20.0 / macOS 15
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 插件日志（含 `im-tuitui` 前缀）或报错堆栈，注意脱敏
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: config
+    attributes:
+      label: 与默认值不同的配置
+      description: 只贴你改过的键（不要贴 appId / appSecret 明文）
+      render: yaml
+    validations:
+      required: false
