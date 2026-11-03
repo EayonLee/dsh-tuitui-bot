@@ -99,6 +99,21 @@ async function dispatchInteraction(
   return question || approval;
 }
 
+/**
+ * 安全读取宿主服务。
+ *
+ * cordis 的 ctx 是代理：访问未在 `inject` 里声明的服务会抛错，而不是返回 undefined。
+ * 可选依赖（比如智能判定要用的 llm）一律走这里，读不到就当没有。
+ */
+function readContextService(ctx: unknown, name: string): unknown {
+  try {
+    const target = ctx as { get?: (key: string) => unknown };
+    return typeof target.get === 'function' ? target.get(name) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function bootstrapGateway(
   ctx: Context,
   agents: DshAgentRegistry,
@@ -128,7 +143,9 @@ export async function bootstrapGateway(
     commands,
     // 智能插话：模型 + 该会话生效的模型路线 + 机器人自称
     smartJudge: {
-      llm: (ctx as unknown as { llm?: unknown }).llm,
+      // 必须走 ctx.get：cordis 对未 inject 的服务直接抛「cannot get property」，
+      // 拿不到就当没有（判定降级为规则），不能因此把整个插件启动搞挂
+      llm: readContextService(ctx, 'llm'),
       resolveRoute: (mctx) => {
         const { scope, peerId } = getScopePeer(mctx.message);
         return manager.getEffectiveModel(scope, peerId);

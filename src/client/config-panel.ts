@@ -108,6 +108,29 @@ const PANEL_CSS: readonly string[] = [
   '  .imqb2-row-label { padding-top: 0; }',
   '}',
 
+  /* ── 作用域卡片：三个范围各自成块，标题带模式下拉 ── */
+  '.imqb2-scope {',
+  '  box-sizing: border-box; padding: 2px 14px 6px; margin-top: 10px;',
+  '  border: 0.5px solid var(--dsw-alias-border-l2); border-radius: 12px;',
+  '  background: var(--dsw-alias-bg-layer-2);',
+  '}',
+  '.imqb2-scope-head { display: flex; align-items: center; gap: 10px; padding: 12px 0 6px; }',
+  '.imqb2-scope-title-wrap { display: flex; flex-direction: column; gap: 1px; min-width: 0; }',
+  '.imqb2-scope-name { font-size: 13px; font-weight: 600; line-height: 18px; color: var(--dsw-alias-label-primary); }',
+  '.imqb2-scope-desc { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }',
+  '.imqb2-scope-head .imqb2-select {',
+  '  flex: 0 0 auto; width: 112px; max-width: 112px; height: 28px; margin-left: auto; padding: 0 24px 0 9px;',
+  '  background-position: calc(100% - 14px) 12px, calc(100% - 9px) 12px;',
+  '}',
+  '.imqb2-scope .imqb2-row { grid-template-columns: 92px minmax(0, 1fr); gap: 4px 12px; padding: 6px 0; }',
+  '.imqb2-scope .imqb2-row + .imqb2-row { border-top: 0; }',
+  '.imqb2-scope .imqb2-row-label { padding-top: 7px; font-size: 12px; font-weight: 400; color: var(--dsw-alias-label-secondary); }',
+  '.imqb2-scope .imqb2-help { font-size: 11px; line-height: 16px; }',
+  '@media (max-width: 620px) {',
+  '  .imqb2-scope .imqb2-row { grid-template-columns: minmax(0, 1fr); }',
+  '  .imqb2-scope .imqb2-row-label { padding-top: 0; }',
+  '}',
+
   /* ── Switch ── */
   '.imqb2-switch {',
   '  box-sizing: border-box; position: relative; flex: 0 0 auto;',
@@ -242,6 +265,31 @@ function useConfigPanelStyles(): void {
 }
 
 /* ────────────────────────── 原子组件 ────────────────────────── */
+
+/**
+ * 作用域卡片：一个会话范围 = 一块。
+ * 标题行右侧是模式下拉，卡片内只留这个模式真正用得上的名单，避免一行行平铺。
+ */
+function ScopeCard({ title, desc, mode, options, onMode, children }: {
+  title: string; desc?: string; mode: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onMode: (next: string) => void;
+  children?: ReactNode;
+}): ReactNode {
+  return createElement('div', { className: 'imqb2-scope' },
+    createElement('div', { className: 'imqb2-scope-head' },
+      createElement('div', { className: 'imqb2-scope-title-wrap' },
+        createElement('span', { className: 'imqb2-scope-name' }, title),
+        desc !== undefined ? createElement('span', { className: 'imqb2-scope-desc' }, desc) : null,
+      ),
+      createElement('select', {
+        className: 'imqb2-select', value: mode, 'aria-label': title + ' 访问模式',
+        onChange: (event: { target: { value: string } }) => { onMode(event.target.value); },
+      }, options.map((option) => createElement('option', { key: option.value, value: option.value }, option.label))),
+    ),
+    children,
+  );
+}
 
 function Switch({ checked, label, onChange }: {
   checked: boolean; label: string; onChange: (next: boolean) => void;
@@ -523,55 +571,85 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
 
     createElement(Section, {
       title: '服务范围',
-      desc: '决定机器人愿意在哪些会话里工作。黑名单优先级最高，命中即不处理，也不会写进上下文。',
+      desc: '机器人愿意在哪些会话里工作。三个范围各自独立设置，模式没选到的那份名单不会显示，也不会生效。',
     },
-      createElement(SegmentedRow, {
-        label: '单聊', value: form['access.c2cMode'] ?? 'open', options: MODE_OPTIONS,
-        onChange: (v) => { patch('access.c2cMode', v as AccessMode); },
-      }),
-      createElement(TagsRow, {
-        label: '单聊白名单', value: form['access.c2cAllow'] ?? [],
-        placeholder: '域账号或 uid，回车添加',
-        sub: '仅「白名单」模式生效',
-        onChange: (v) => { patch('access.c2cAllow', v); },
-      }),
-      createElement(TagsRow, {
-        label: '单聊黑名单', value: form['access.c2cBlock'] ?? [],
-        placeholder: '域账号或 uid，回车添加',
-        sub: '任何模式下都优先拦截',
-        onChange: (v) => { patch('access.c2cBlock', v); },
-      }),
+      createElement(ScopeCard, {
+        title: '单聊', desc: '同事私聊机器人', mode: form['access.c2cMode'] ?? 'open', options: MODE_OPTIONS,
+        onMode: (v) => { patch('access.c2cMode', v as AccessMode); },
+      },
+        (form['access.c2cMode'] ?? 'open') === 'allowlist'
+          ? createElement(TagsRow, {
+              label: '名单', value: form['access.c2cAllow'] ?? [],
+              placeholder: '域账号或 uid，回车添加',
+              help: (form['access.c2cAllow'] ?? []).length === 0
+                ? '名单为空 = 谁都不理（失败即关闭）。'
+                : undefined,
+              onChange: (v) => { patch('access.c2cAllow', v); },
+            })
+          : (form['access.c2cMode'] ?? 'open') === 'blocklist'
+            ? createElement(TagsRow, {
+                label: '屏蔽', value: form['access.c2cBlock'] ?? [],
+                placeholder: '域账号或 uid，回车添加',
+                help: '只拦这些人，其余照常。',
+                onChange: (v) => { patch('access.c2cBlock', v); },
+              })
+            : createElement('p', { className: 'imqb2-help', style: { padding: '4px 0 8px' } },
+                (form['access.c2cMode'] ?? 'open') === 'disabled'
+                  ? '单聊完全关闭：发消息不会有任何回应。'
+                  : '谁私聊都回应。'),
+      ),
 
-      createElement(SegmentedRow, {
-        label: '群聊', value: form['access.groupMode'] ?? 'open', options: MODE_OPTIONS,
-        onChange: (v) => { patch('access.groupMode', v as AccessMode); },
-      }),
-      createElement(TagsRow, {
-        label: '群聊白名单', value: form['access.groupAllow'] ?? [],
-        placeholder: 'group_id，回车添加',
-        onChange: (v) => { patch('access.groupAllow', v); },
-      }),
-      createElement(TagsRow, {
-        label: '群聊黑名单', value: form['access.groupBlock'] ?? [],
-        placeholder: 'group_id，回车添加',
-        onChange: (v) => { patch('access.groupBlock', v); },
-      }),
+      createElement(ScopeCard, {
+        title: '群聊', desc: '拉进群之后在群里说话', mode: form['access.groupMode'] ?? 'open', options: MODE_OPTIONS,
+        onMode: (v) => { patch('access.groupMode', v as AccessMode); },
+      },
+        (form['access.groupMode'] ?? 'open') === 'allowlist'
+          ? createElement(TagsRow, {
+              label: '名单', value: form['access.groupAllow'] ?? [],
+              placeholder: 'group_id，回车添加',
+              help: (form['access.groupAllow'] ?? []).length === 0
+                ? '名单为空 = 哪个群都不理（失败即关闭）。'
+                : undefined,
+              onChange: (v) => { patch('access.groupAllow', v); },
+            })
+          : (form['access.groupMode'] ?? 'open') === 'blocklist'
+            ? createElement(TagsRow, {
+                label: '屏蔽', value: form['access.groupBlock'] ?? [],
+                placeholder: 'group_id，回车添加',
+                help: '只屏蔽这些群，其余照常。',
+                onChange: (v) => { patch('access.groupBlock', v); },
+              })
+            : createElement('p', { className: 'imqb2-help', style: { padding: '4px 0 8px' } },
+                (form['access.groupMode'] ?? 'open') === 'disabled'
+                  ? '群聊完全关闭：@ 它也不回应。'
+                  : '任何群 @ 它都回应（具体听不听 @ 见下方「什么时候回话」）。'),
+      ),
 
-      createElement(SegmentedRow, {
-        label: '团队频道帖子', value: form['access.postMode'] ?? 'open', options: MODE_OPTIONS,
-        sub: '按 channel_id 或 team_id 匹配',
-        onChange: (v) => { patch('access.postMode', v as AccessMode); },
-      }),
-      createElement(TagsRow, {
-        label: '帖子白名单', value: form['access.postAllow'] ?? [],
-        placeholder: 'channel_id 或 team_id，回车添加',
-        onChange: (v) => { patch('access.postAllow', v); },
-      }),
-      createElement(TagsRow, {
-        label: '帖子黑名单', value: form['access.postBlock'] ?? [],
-        placeholder: 'channel_id 或 team_id，回车添加',
-        onChange: (v) => { patch('access.postBlock', v); },
-      }),
+      createElement(ScopeCard, {
+        title: '团队频道帖子', desc: '按 channel_id 或 team_id 匹配', mode: form['access.postMode'] ?? 'open', options: MODE_OPTIONS,
+        onMode: (v) => { patch('access.postMode', v as AccessMode); },
+      },
+        (form['access.postMode'] ?? 'open') === 'allowlist'
+          ? createElement(TagsRow, {
+              label: '名单', value: form['access.postAllow'] ?? [],
+              placeholder: 'channel_id 或 team_id，回车添加',
+              help: (form['access.postAllow'] ?? []).length === 0
+                ? '名单为空 = 哪个频道都不理（失败即关闭）。'
+                : undefined,
+              onChange: (v) => { patch('access.postAllow', v); },
+            })
+          : (form['access.postMode'] ?? 'open') === 'blocklist'
+            ? createElement(TagsRow, {
+                label: '屏蔽', value: form['access.postBlock'] ?? [],
+                placeholder: 'channel_id 或 team_id，回车添加',
+                help: '只屏蔽这些频道，其余照常。',
+                onChange: (v) => { patch('access.postBlock', v); },
+              })
+            : createElement('p', { className: 'imqb2-help', style: { padding: '4px 0 8px' } },
+                (form['access.postMode'] ?? 'open') === 'disabled'
+                  ? '帖子完全关闭：频道里发帖不会回应。'
+                  : '所有频道的帖子都会处理。'),
+      ),
     ),
 
     createElement(Section, {
@@ -603,16 +681,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             onChange: (v) => { patch('smartFollowUpMs', v * 1000); },
           })
         : null,
-      createElement(SwitchRow, {
-        label: '流式输出', checked: form.streaming ?? true,
-        help: '单聊里先发一条消息，再原地编辑分段刷新，回复体感更快。',
-        onChange: (v) => { patch('streaming', v); },
-      }),
-      createElement(SwitchRow, {
-        label: '显示工具调用结果', checked: form.showToolResults ?? false,
-        help: '把 agent 调用工具的结构化结果也发到聊天里，排查问题时有用。',
-        onChange: (v) => { patch('showToolResults', v); },
-      }),
     ),
 
     policy === 'smart'
@@ -693,6 +761,22 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         label: '中间步骤上报', checked: form['agentSteps.enabled'] ?? true,
         help: '把模型与工具调用步骤实时展示在推推客户端。',
         onChange: (v) => { patch('agentSteps.enabled', v); },
+      }),
+    ),
+
+    createElement(Section, {
+      title: '输出与调试',
+      desc: '回复怎么送到推推，以及排查问题时要看多少细节。',
+    },
+      createElement(SwitchRow, {
+        label: '流式输出', checked: form.streaming ?? true,
+        help: '先发一条消息，再原地编辑分段刷新，回复体感更快。',
+        onChange: (v) => { patch('streaming', v); },
+      }),
+      createElement(SwitchRow, {
+        label: '显示工具调用结果', checked: form.showToolResults ?? false,
+        help: '把 agent 调用工具的结果也发到聊天里，排查问题时有用。',
+        onChange: (v) => { patch('showToolResults', v); },
       }),
       createElement(SwitchRow, {
         label: '调试日志', checked: form.debug ?? false,
