@@ -15,8 +15,8 @@
  * shared/bind-protocol.ts 的 ConfigPatchWire 完全一致——客户端与服务端
  * 各自维护一套嵌套/扁平映射必然漂移，这里干脆只用一个形态。
  *
- * 字段策略：只开放用户必要的配置；cwd 只读展示；超时与性能调优
- * 类字段走 profile patch / 环境变量。
+ * 字段策略：只开放用户必要的配置（服务范围 / 上下文 / 模型 / 工作区 /
+ * 推推原生能力）；其余调优类字段走 profile patch / 环境变量。
  */
 import { createElement, useCallback, useEffect, useState, type CSSProperties, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
@@ -24,7 +24,7 @@ import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
 /** 访问模式三值（与 src/config.ts 的 AccessControlConfig 一致） */
 type AccessMode = 'open' | 'allowlist' | 'disabled';
 
-/** GET 回显 / POST 提交的扁平配置（appSecret 已剔除，cwd 只读） */
+/** GET 回显 / POST 提交的扁平配置（appSecret 已剔除） */
 interface ConfigWire {
   provider?: string;
   model?: string;
@@ -35,6 +35,8 @@ interface ConfigWire {
   streaming?: boolean;
   showToolResults?: boolean;
   debug?: boolean;
+  historyLimit?: number;
+  sessionIdleTimeout?: number;
   'access.c2cMode'?: AccessMode;
   'access.groupMode'?: AccessMode;
   'access.postMode'?: AccessMode;
@@ -214,7 +216,32 @@ function FieldRow({ label, help, value, placeholder, onChange }: {
   );
 }
 
+/** 数字行（label 左 + 数字输入右 + 可选 help） */
+function NumberRow({ label, help, value, min, max, step, onChange }: {
+  label: string; help?: string; value: number; min?: number; max?: number; step?: number;
+  onChange: (next: number) => void;
+}): ReactNode {
+  return createElement('div', { className: 'imqb2-field' },
+    createElement('div', { className: 'imqb2-head' },
+      createElement('span', { className: 'imqb2-label' }, label),
+      createElement('input', {
+        type: 'number',
+        className: 'imqb2-input imqb2-input--number',
+        value: Number.isFinite(value) ? String(value) : '',
+        min, max, step,
+        onChange: (event: ChangeEvent<HTMLInputElement>) => {
+          const raw = event.currentTarget.value;
+          const next = Number(raw);
+          if (raw !== '' && Number.isFinite(next)) onChange(next);
+        },
+      }),
+    ),
+    help === undefined ? null : createElement('p', { className: 'imqb2-hint' }, help),
+  );
+}
+
 /** 访问模式分段选择行 */
+
 function SegmentedRow({ label, help, value, options, onChange }: {
   label: string; help?: string; value: AccessMode;
   options: ReadonlyArray<{ value: AccessMode; label: string }>; onChange: (next: AccessMode) => void;
@@ -282,8 +309,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     if (busy || initial === null || form === null) return;
     const changed: Record<string, unknown> = {};
     for (const key of Object.keys(form) as Array<keyof ConfigWire>) {
-      // cwd 只读：即便回显有值也不参与提交
-      if (key === 'cwd') continue;
       if (!shallowEqual(form[key], initial[key])) changed[key] = form[key];
     }
     if (Object.keys(changed).length === 0) return;
@@ -318,7 +343,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   }
 
   const dirty = (Object.keys(form) as Array<keyof ConfigWire>)
-    .some((key) => key !== 'cwd' && !shallowEqual(form[key], initial[key]));
+    .some((key) => !shallowEqual(form[key], initial[key]));
 
   return createElement('form', { className: 'imqb2-form', onSubmit: submit },
     createElement('div', { className: 'imqb2-group-title' }, '服务范围'),
@@ -358,6 +383,18 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       onChange: (v) => { patch('showToolResults', v); },
     }),
 
+    createElement('div', { className: 'imqb2-group-title' }, '上下文'),
+    createElement(NumberRow, {
+      label: '群聊上下文条数', value: form.historyLimit ?? 10, min: 0, max: 1000, step: 1,
+      help: '群聊/频道里 @机器人 时，把最近 N 条消息一起带给模型；0 = 不带群历史。私聊不受影响（私聊靠会话自身记忆）',
+      onChange: (v) => { patch('historyLimit', v); },
+    }),
+    createElement(NumberRow, {
+      label: '会话闲置回收（分钟）', value: Math.round((form.sessionIdleTimeout ?? 1800000) / 60000), min: 1, max: 1440, step: 1,
+      help: '超过该时长没有新消息就回收内存里的 agent；下次消息会自动 resume 原会话，上下文不丢',
+      onChange: (v) => { patch('sessionIdleTimeout', v * 60000); },
+    }),
+
     createElement('div', { className: 'imqb2-group-title' }, '模型'),
     createElement(FieldRow, {
       label: 'Provider', value: form.provider ?? '', placeholder: '留空继承宿主默认',
@@ -389,15 +426,14 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       onChange: (v) => { patch('debug', v); },
     }),
 
-    form.cwd !== undefined && form.cwd !== ''
-      ? createElement('div', { className: 'imqb2-field' },
-          createElement('div', { className: 'imqb2-head' },
-            createElement('span', { className: 'imqb2-label' }, 'Agent 工作目录'),
-            createElement('span', { className: 'imqb2-hint' }, '只读'),
-          ),
-          createElement('p', { className: 'imqb2-readonly' }, form.cwd),
-        )
-      : null,
+    createElement('div', { className: 'imqb2-group-title' }, '工作区'),
+    createElement(FieldRow, {
+      label: 'Agent 工作目录',
+      value: form.cwd ?? '',
+      placeholder: '留空使用默认（~/.dsh-tuitui/workspace）',
+      help: '所有会话（单聊/群聊/频道）共用这一个目录；必须是绝对路径，保存后插件重载生效',
+      onChange: (v) => { patch('cwd', v); },
+    }),
 
     createElement('div', { className: 'imqb2-footer' },
       result !== null

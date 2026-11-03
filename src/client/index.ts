@@ -16,8 +16,8 @@
  * 声明访问（声明缺失时插件保持 inactive，不阻塞浏览器启动）。
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { createElement, type ReactNode } from 'react';
-import { BIND_STATE_PATH } from '../shared/bind-protocol.ts';
+import { createElement, type FC, type ReactNode } from 'react';
+import { BIND_STATE_PATH, type BindStateWire } from '../shared/bind-protocol.ts';
 import { BindPanelBody, useBindState, TUITUI_LOGO_PATH, installPanelStyles } from './bind-page.ts';
 import { ConfigPanel } from './config-panel.ts';
 
@@ -72,12 +72,24 @@ function BindGuideIcon(): ReactNode {
   );
 }
 
+/**
+ * createElement 的组件投影（显式 FC 标注）。
+ *
+ * @types/react 18 的 createElement 重载在推断「纯函数签名 + 全可选 props」
+ * 的组件时会全部落空，退到最后一个重载（props 只认 Attributes）并报错；
+ * 先落成 FC<P> 再传进去推断正常。运行时无差别。
+ */
+const BindPanelBodyView = BindPanelBody as FC<{
+  state?: BindStateWire | null; gone?: boolean; recheck?: () => void;
+}>;
+const ConfigPanelView = ConfigPanel as FC<{ bindPhase?: string }>;
+
 /** 设置页栏目：共享一份绑定状态轮询，驱动绑定面板与配置刷新 */
 function TuituiSettingsSection(): ReactNode {
   const { state, gone, recheck } = useBindState();
   return createElement('div', null,
-    createElement(BindPanelBody, { state, gone, recheck }),
-    createElement(ConfigPanel, { bindPhase: state?.phase }),
+    createElement(BindPanelBodyView, { state, gone, recheck }),
+    createElement(ConfigPanelView, { bindPhase: state?.phase }),
   );
 }
 

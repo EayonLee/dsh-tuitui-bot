@@ -130,7 +130,7 @@ function accessModeSchema(name: string): (value: unknown) => unknown {
  * 因此改一个子项不会把父对象的其余子项固化成字面量。
  */
 const EDITABLE_CONFIG_KEYS = [
-  'provider', 'model', 'preset',
+  'provider', 'model', 'preset', 'cwd',
   'requireMention', 'requireMentionInPost',
   'textChunkLimit', 'streaming',
   'sessionIdleTimeout', 'maxQueue', 'processingTimeoutMs', 'askTimeoutMs', 'historyLimit',
@@ -146,6 +146,7 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   provider: stringSchema('provider'),
   model: stringSchema('model'),
   preset: stringSchema('preset'),
+  cwd: cwdSchema,
   requireMention: (v) => booleanSchema(v, 'requireMention'),
   requireMentionInPost: (v) => booleanSchema(v, 'requireMentionInPost'),
   textChunkLimit: numberSchema('textChunkLimit', 1, 100000),
@@ -163,6 +164,22 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
 };
+
+/**
+ * Agent 工作目录校验：必须是绝对路径。
+ *
+ * 所有会话共用这一个目录（与上游 QQ 插件一致）；相对路径会随宿主进程 cwd
+ * 漂移，因此直接拒绝。空串/纯空白视为「沿用默认」，由 config 层回落。
+ */
+function cwdSchema(value: unknown): unknown {
+  if (typeof value !== 'string') throw new Error('cwd 必须是字符串');
+  const trimmed = value.trim();
+  if (trimmed === '') return '';
+  if (trimmed.length > 1024) throw new Error('cwd 过长');
+  if (trimmed.includes('\0')) throw new Error('cwd 含非法字符');
+  if (!trimmed.startsWith('/')) throw new Error('cwd 必须是绝对路径');
+  return trimmed;
+}
 
 /** manual / verify 请求体大小上限（appId + appSecret 远小于此值） */
 const MAX_MANUAL_BODY_BYTES = 4096;
@@ -183,7 +200,7 @@ function readPath(source: unknown, dottedKey: string): unknown {
   return node;
 }
 
-/** 把当前生效配置投影成端内表单可直接回显的扁平快照（cwd 只读附带） */
+/** 把当前生效配置投影成端内表单可直接回显的扁平快照 */
 function projectConfig(current: ImTuituiConfig): Record<string, unknown> {
   const snapshot: Record<string, unknown> = {};
   for (const key of EDITABLE_CONFIG_KEYS) {
@@ -460,7 +477,7 @@ function handleUnbind(req: IncomingMessage, res: ServerResponse, options: BindRo
 
 /**
  * 配置读写：
- * - GET：回显当前生效配置（扁平 dotted key 快照，appSecret 永不返回，cwd 只读）
+ * - GET：回显当前生效配置（扁平 dotted key 快照，appSecret 永不返回）
  * - POST：白名单 + 逐键 Schema 校验 → 最小写入 profile patch → HMR 重载
  */
 async function handleConfig(req: IncomingMessage, res: ServerResponse, options: BindRoutesOptions): Promise<void> {
@@ -497,14 +514,12 @@ async function handleConfig(req: IncomingMessage, res: ServerResponse, options: 
   }
   const submitted = body as Record<string, unknown>;
 
-  // 白名单与凭据/只读字段拦截
+  // 白名单与凭据字段拦截
   for (const key of Object.keys(submitted)) {
     if (!isEditableKey(key)) {
       const reason = key === 'appId' || key === 'appSecret'
         ? '凭据请使用绑定/更换/解绑功能'
-        : key === 'cwd'
-          ? 'cwd 为只读字段'
-          : '不支持的字段';
+        : '不支持的字段';
       sendJson(res, 400, { ok: false, error: `${reason}: ${key}` });
       return;
     }
