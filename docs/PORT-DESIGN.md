@@ -229,3 +229,22 @@ W4 依赖 W2 的 `MiddlewareContext` 形态（见 §3）。**只依赖 §3 契�
 3. `node scripts/smoke-live.mjs`：用真实凭据验证 `property.info()` + WS 连接 + 一次真实收发（群 `鱼塘`）。
 4. `npx dsh --profile tuitui --dump-config` 能看到 `# == @qihoo/dsh-tuitui-bot` 层。
 5. README（中/英）、CHANGELOG、locale 齐全。
+---
+
+## 8. 实现期决策记录（与上游的差异，落地后回填）
+
+| 议题 | 决策 | 理由 |
+|---|---|---|
+| 会话键 | `tuitui:<scope>:<peerId>`（不含 appId） | 设计期约定；post 用 channelId，同频道多帖共用一会话 |
+| 作用域 prompt | `c2c→directPrompt`、`group→groupPrompt`、`post→postPrompt`，section `tuitui:scope-prompt` | 比上游多一个 post 作用域 |
+| 绑定流程 | 手填 appId/appSecret → `property.info()` 在线校验 → 写 profile patch → 热重载 | 推推无扫码协议 |
+| 流式 | 首条发送拿 msgid，随后 `im.modifyText({withoutPush:true})`；拿不到 msgid 或 uid 目标时降级静态发送 | `modifyText` 只接受 account 目标 |
+| 交互卡片 | `im.sendInteractive` + `interactive_action` + `im.modifyInteractive`；帖子降级为 markdown 文本 | 推推卡片能力仅单聊/群聊 |
+| 媒体归一化 | 自研：优先 `_tuitui_media` 影子字段，回退 `images/voice/video/file` | SDK 只在 `dist/events` 导出该函数，包 exports 未开放；避免依赖内部路径 |
+| 并发中断 | `concurrencyGuard.onInterrupt` → `record.agent.cancel({kind:'user'})` | MiddlewareContext 无 AbortSignal；只停链会让 token 继续烧 |
+| 限流默认值 | perSender 30/min、perGroup 120/min、global 600/min（可传 `false` 关闭） | 上游裸调用等于不限流；这里只防机器人自激循环 |
+| 语音转写 | `state.processedAttachments[].voiceText` 由 `attachmentProcessor` 从 `asr_refer_text` 补齐 | `downloadMessageMedia` 只回下载结果，不回转写 |
+| 客户端 | 设置页 `settings.section` + 右侧栏 tab（`slots` / `sidebarRight` / `sidebarRightTabs`） | 与上游一致的席位契约，bundle 用 `window.__ModuleLoader__.load({id, factory})` |
+| 原生步骤上报 | `client.agent.report.*`，默认不含工具参数/结果 | 推推独有能力，QQ 只能用文本模拟 |
+| 超时/闲置 | `processingTimeoutMs`、`sessionIdleTimeout` 与上游同义 | 会话回收由 `IdleEvictor` 驱动 |
+

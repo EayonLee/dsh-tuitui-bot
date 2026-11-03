@@ -5,3 +5,5 @@ dist/
 .dsh-tuitui/
 .env
 *.tsbuildinfo
+*.tgz
+coverage/

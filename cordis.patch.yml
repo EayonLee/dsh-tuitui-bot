@@ -1,0 +1,42 @@
+# dsh-tuitui-bot bundle patch
+#
+# 当本包通过 `dsh plugin --profile <name> add @qihoo/dsh-tuitui-bot` 安装后，
+# dsh 启动时自动加载此 patch。
+#
+# 环境变量：
+#   TUITUI_BOT_APPID   - 推推机器人 AppID（必填）
+#   TUITUI_BOT_SECRET  - 推推机器人 AppSecret（必填）
+#
+# 叠加顺序：dsh-base → 本 bundle patch → profile cordis.patch.yml → --patch
+#
+# 注意：patch 会整体替换目标行的 config（不做深合并），因此这里给出的一行
+# 必须自洽；未列出的键由 schemastery 默认值补齐。
+
+# ── 插入 im-tuitui 插件行 ──
+- insert:
+    - id: im-tuitui
+      name: '@qihoo/dsh-tuitui-bot'
+      config:
+        appId: __FROM_ENV__
+        appSecret: __FROM_ENV__
+        # provider/model 留空：从宿主默认模型路由继承
+        # 用户可通过 /model 命令在聊天中切换
+        requireMention: true
+        requireMentionInPost: true
+        textChunkLimit: 4000
+        streaming: true
+        streamIntervalMs: 600
+        sessionIdleTimeout: 1800000
+        processingTimeoutMs: 1800000
+        maxQueue: 20
+        historyLimit: 10
+        showToolResults: false
+        interactive:
+          enabled: true
+          headBgColor: '#1F6FEB'
+          headTextColor: '#FFFFFF'
+        agentSteps:
+          enabled: true
+          includeToolPayload: false
+          maxResultChars: 800
+        debug: false
