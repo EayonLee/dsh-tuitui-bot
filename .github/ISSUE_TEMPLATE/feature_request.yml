@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        这个插件的定位是「把推推当作 dsh 的一个渠道前端」，与 `@tencent-connect/dsh-qqbot` 保持结构对齐。
+        这个插件的定位是「把推推当作 dsh 的一个渠道前端」，按 dsh 的渠道插件契约实现。
         提建议时如果能说明「推推侧有什么原生能力可以更好利用」，会更容易被采纳。
   - type: textarea
     id: problem

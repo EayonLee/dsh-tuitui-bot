@@ -19,7 +19,7 @@ export interface ContentSanitizerOptions {
   /** 折叠多余空白（代码块/引用块内不折叠），默认 true */
   collapseWhitespace?: boolean;
   /**
-   * QQ 专有的表情标签解析开关。
+   * 兼容旧式表情标签（`[face:xx]`）的解析开关。
    *
    * 上游拿它处理 `[<face,id=xx/>]` 与 `<faceType=..,ext="..">`；推推的消息体里没有
    * 这种标记，因此这里保留字段只是为了不改动上游的调用点（middleware-setup 照抄了

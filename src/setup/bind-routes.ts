@@ -9,10 +9,13 @@
  * manual/verify 提交走与绑定流程一致的校验 + persist 路径
  * （写入 profile patch → HMR 重载生效）。
  *
- * 与上游差异：推推无扫码，因此没有 refresh 路由；新增 verify 路由供绑定页
- * 「先校验再保存」，避免把错误凭据写进 profile 触发一次失败的重载。
+ * 推推无扫码，因此没有 refresh 路由；verify 路由供绑定页「先校验再保存」，
+ * 避免把错误凭据写进 profile 触发一次失败的重载。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 import type { ImTuituiConfig } from '../config.ts';
 import type { Logger } from '../types.ts';
@@ -163,6 +166,8 @@ const EDITABLE_CONFIG_KEYS = [
   'access.groupAllow', 'access.groupBlock',
   'access.postAllow', 'access.postBlock',
   'mentionPolicy', 'botAliases', 'smartFollowUpMs',
+  'smartJudge.enabled', 'smartJudge.prompt', 'smartJudge.maxHistory',
+  'smartJudge.cooldownMs', 'smartJudge.timeoutMs',
   'interactive.enabled', 'agentSteps.enabled',
 ] as const;
 
@@ -197,6 +202,11 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   mentionPolicy: (v) => mentionPolicySchema(v),
   botAliases: (v) => stringListSchema(v, 'botAliases'),
   smartFollowUpMs: numberSchema('smartFollowUpMs', 5000, 60 * 60 * 1000),
+  'smartJudge.enabled': (v) => booleanSchema(v, 'smartJudge.enabled'),
+  'smartJudge.prompt': (v) => promptSchema(v, 'smartJudge.prompt'),
+  'smartJudge.maxHistory': numberSchema('smartJudge.maxHistory', 0, 50),
+  'smartJudge.cooldownMs': numberSchema('smartJudge.cooldownMs', 0, 60 * 60 * 1000),
+  'smartJudge.timeoutMs': numberSchema('smartJudge.timeoutMs', 1000, 120000),
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
 };
@@ -204,7 +214,7 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
 /**
  * Agent 工作目录校验：必须是绝对路径。
  *
- * 所有会话共用这一个目录（与上游 QQ 插件一致）；相对路径会随宿主进程 cwd
+ * 所有会话共用这一个目录；相对路径会随宿主进程 cwd
  * 漂移，因此直接拒绝。空串/纯空白视为「沿用默认」，由 config 层回落。
  */
 function cwdSchema(value: unknown): unknown {
@@ -234,6 +244,32 @@ function readPath(source: unknown, dottedKey: string): unknown {
     node = (node as Record<string, unknown>)[segment];
   }
   return node;
+}
+
+/**
+ * 工作区下拉候选目录。
+ *
+ * 用户不该手打绝对路径：列出现有目录（默认工作区 + ~/workspace 下的项目，
+ * 其中就包含其它插件的仓库）让他直接选。当前生效值即使不在磁盘上也保留，
+ * 否则下拉框会把配置回显成空。
+ */
+function collectWorkspaceOptions(currentCwd: string): string[] {
+  const options: string[] = [];
+  const add = (dir: string): void => {
+    if (dir !== '' && !options.includes(dir)) options.push(dir);
+  };
+  add(currentCwd);
+  const workspaceRoot = join(homedir(), 'workspace');
+  try {
+    for (const entry of readdirSync(workspaceRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      add(join(workspaceRoot, entry.name));
+    }
+  } catch {
+    // 没有 ~/workspace 就只给默认目录
+  }
+  add(join(homedir(), '.dsh-tuitui', 'workspace'));
+  return options.slice(0, 50);
 }
 
 /** 把当前生效配置投影成端内表单可直接回显的扁平快照 */
@@ -374,6 +410,21 @@ async function readJsonBody(req: IncomingMessage, maxBytes: number = MAX_MANUAL_
   }
   if (size === 0) throw new Error('empty request body');
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+/**
+ * 提示词校验：允许换行与中文标点，拒绝控制字符，限制长度避免把配置撑爆。
+ *
+ * 空串是合法值——表示「用内置默认提示词」，用户清空输入框即可恢复出厂。
+ */
+function promptSchema(value: unknown, name: string): unknown {
+  if (typeof value !== 'string') throw new TypeError(`${name} 必须是字符串`);
+  if (value.length > 8000) throw new TypeError(`${name} 过长（最多 8000 字符）`);
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)) {
+    throw new TypeError(`${name} 含非法控制字符`);
+  }
+  return value;
 }
 
 /** 校验手动提交的凭据形态（不打印内容） */
@@ -533,7 +584,14 @@ async function handleConfig(req: IncomingMessage, res: ServerResponse, options: 
       sendJson(res, 200, { config: {} });
       return;
     }
-    sendJson(res, 200, { config: projectConfig(current()) });
+    const config = current();
+    sendJson(res, 200, {
+      config: {
+        ...projectConfig(config),
+        // 只读候选，写回时会被服务端白名单忽略
+        workspaceOptions: collectWorkspaceOptions(typeof config.cwd === 'string' ? config.cwd : ''),
+      },
+    });
     return;
   }
 

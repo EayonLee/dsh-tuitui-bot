@@ -70,7 +70,7 @@ interface AssembledPrompt {
   [key: string]: unknown;
 }
 
-/** 复刻宿主 latestCompletedPrefixBoundary：最后一个 turn/end 起到下一 turn 开始前的边界 */
+/** 与宿主 latestCompletedPrefixBoundary 同义：最后一个 turn/end 起到下一 turn 开始前的边界 */
 export function latestCompletedPrefixBoundary(events: readonly unknown[]): number | undefined {
   const list = events as Array<{ type?: string; seq?: number; surfaceOp?: string }>;
   let lastTurnEndSeq: number | undefined;

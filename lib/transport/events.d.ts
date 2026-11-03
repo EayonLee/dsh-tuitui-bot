@@ -103,9 +103,7 @@ export interface StreamFrameDelta {
  * 解析 `agent/assistant-stream` 的 payload（对齐 @deepseek-ai/dsh-agent 的
  * AssistantStreamFrame 最小契约，避免硬依赖）。
  *
- * **与上游的差异**：上游返回 discriminated union
- * （`{kind:'attempt-start'}` / `{kind:'text-delta',text}`）。dsh-tuitui 的集成
- * 契约定成"增量即字符串"，于是用空串编码 attempt 边界：
+ * 集成契约取"增量即字符串"，于是用空串编码 attempt 边界：
  *   - start 帧 → `delta: ''`，出站路由器收到空串即重置该会话累积文本；
  *   - chunk 的 text-delta → `delta: <text>`；
  *   - 其余（reasoning-delta / tool-call-delta / end / 未知形态）→ undefined。

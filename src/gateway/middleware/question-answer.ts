@@ -12,7 +12,7 @@
  * 判定顺序：先问题后审批。两个通道的 answerFromText 都自带「有没有 pending」
  * 的判断，只有内容确实是合法答案时才返回 true，闲聊会原样放行，不会吞消息。
  *
- * 与上游的差异：上游在这里补录 msgid 以规避 QQ 被动回复的 4 次/5 分钟限额；
+ * 实现决策：不在这里补录 msgid —— 推推没有被动回复的条数限额，补录反而会让
  * 推推没有被动回复限额（引用回复靠 `referenceMessageId`），所以这一步不需要。
  */
 import type { Logger, Middleware, MiddlewareContext } from '../../types.ts';

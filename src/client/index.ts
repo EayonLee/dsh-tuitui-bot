@@ -18,7 +18,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { createElement, type FC, type ReactNode } from 'react';
 import { BIND_STATE_PATH, type BindStateWire } from '../shared/bind-protocol.ts';
-import { BindPanelBody, useBindState, TUITUI_LOGO_PATH, installPanelStyles } from './bind-page.ts';
+import { BindPanelBody, useBindState, installPanelStyles } from './bind-page.ts';
+import { TUITUI_ICON_DATA_URI } from './brand-icon.ts';
 import { ConfigPanel } from './config-panel.ts';
 
 export const name = 'im-tuitui-client';
@@ -60,16 +61,12 @@ interface SlotsLike {
   register(spec: Record<string, unknown>, component: unknown): () => void;
 }
 
-/** 绑定入口图标（推推机器人，跟随主题图标色变量） */
+/** 绑定入口图标（推推官方图标） */
 function BindGuideIcon(): ReactNode {
-  return createElement('svg', {
-    width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true,
-  },
-    createElement('path', {
-      d: TUITUI_LOGO_PATH,
-      fill: 'var(------icon_primary, #1A1A1A)',
-    }),
-  );
+  return createElement('img', {
+    src: TUITUI_ICON_DATA_URI, width: 24, height: 24,
+    alt: '', 'aria-hidden': true, className: 'imqb-tuicon',
+  });
 }
 
 /**
@@ -104,10 +101,11 @@ function TuituiPage(): ReactNode {
 
 /** 左侧栏入口图标（宿主传入 size：展开 18 / 收起 16；currentColor 跟随侧栏配色与选中态） */
 function TuituiSidebarIcon({ size = 16 }: { size?: number; active?: boolean }): ReactNode {
-  return createElement('svg', {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true,
-  },
-    createElement('path', { d: TUITUI_LOGO_PATH, fill: 'currentColor' }));
+  return createElement('img', {
+    src: TUITUI_ICON_DATA_URI,
+    width: size, height: size, alt: '', 'aria-hidden': true,
+    className: 'imqb-tuicon',
+  });
 }
 
 /** 插件详情「设置」按钮：仅在本包的 bundle / 组件行详情页渲染，其他插件不显示 */

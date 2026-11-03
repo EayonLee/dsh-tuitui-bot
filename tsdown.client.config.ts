@@ -6,7 +6,7 @@
  * - externals 经注入 require 解析（客户端平台种子表）
  * - 单文件入口（无动态 chunk），sourcemap 供浏览器诊断
  *
- * 与上游 dsh-qqbot 保持一致的契约，仅保留外部插件所需的最小集。
+ * 只保留外部插件加载所需的最小契约集。
  */
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'tsdown';

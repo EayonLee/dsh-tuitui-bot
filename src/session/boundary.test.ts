@@ -4,7 +4,7 @@ import { latestCompletedPrefixBoundary } from './session-manager.ts';
 const ev = (seq: number, type: string, surfaceOp?: string) =>
   ({ type, seq, time: 1, ...(surfaceOp ? { surfaceOp } : {}) }) as unknown;
 
-describe('latestCompletedPrefixBoundary（复刻宿主 session-controller 语义）', () => {
+describe('latestCompletedPrefixBoundary（同宿主 session-controller 语义）', () => {
   it('取最后一个 turn/end 的 seq', () => {
     const events = [ev(0, 'turn/start'), ev(1, 'user/message', 'append'), ev(2, 'turn/end'), ev(3, 'turn/start'), ev(4, 'turn/end')];
     expect(latestCompletedPrefixBoundary(events)).toBe(4);

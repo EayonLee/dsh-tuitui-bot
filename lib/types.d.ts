@@ -171,7 +171,7 @@ export type MediaSource = string | {
     contentType?: string;
 };
 /**
- * 推推出站原语（合并上游 QQBotSender + MediaSenderLike）。
+ * 推推出站原语（文本 / 流式 / 卡片 / 媒体 / 撤回 / 回应合一）。
  *
  * transport / commands / features / media 全部通过本接口发消息，
  * 不直接触碰 @qihoo/tuitui-bot-sdk。

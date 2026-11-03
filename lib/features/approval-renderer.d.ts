@@ -3,8 +3,8 @@
  *
  * 单次审批：一次只渲染一个审批请求（每个会话同时只有一个 pending 审批）。
  *
- * 推推没有 QQ 的 InlineKeyboard：审批卡片由 head/body/footer/action 四段组成，
- * 点击后靠 modifyInteractive 原地把按钮换成结果文案（QQ 是 SDK 自动把按钮置灰）。
+ * 推推的审批卡片由 head/body/footer/action 四段组成，点击后靠 modifyInteractive
+ * 原地把按钮换成结果文案——平台不会自动把按钮置灰，这一步得自己做。
  */
 import type { TuituiInteractiveAction, TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { ApprovalRequest } from './approval-channel.ts';
@@ -35,7 +35,7 @@ export declare function buildApprovalCard(request: ApprovalRequest, command: str
 /**
  * 构建已决策卡片：删掉按钮，只留结果。
  *
- * 推推的交互卡片不像 QQ 有 visited_label 自动置灰，必须由我们在同一 msgid 上
+ * 推推的交互卡片没有自动置灰（visited_label）能力，必须由我们在同一 msgid 上
  * modifyInteractive 重写整张卡片，否则旧按钮还能被重复点击。
  */
 export declare function buildApprovalResolvedCard(request: ApprovalRequest, command: string | undefined, resolution: ApprovalResolution, theme?: Partial<CardTheme>): TuituiOutboundInteractiveMessage;

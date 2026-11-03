@@ -1,9 +1,9 @@
 /**
  * StreamingWriter — 推推流式文本写入器
  *
- * 与上游（QQ）唯一的差别在传输层：流式会话由 `TuituiSender.openStream` 提供，
- * 内部是 `im.modifyText` 原地重写同一条消息；拿不到 msgid（团队帖子、
- * 群聊，或首条消息还没落地）时返回 null，此处必须优雅降级为静态发送。
+ * 流式会话由 `TuituiSender.openStream` 提供，内部是 `im.modifyText` 原地重写
+ * 同一条消息；拿不到 msgid（团队帖子、群聊，或首条消息还没落地）时返回 null，
+ * 此处必须优雅降级为静态发送。
  *
  * 边界条件设计：
  *   - 节流（throttle）：固定间隔 flush，避免每 token 发一次 HTTP，同时保证长文本分多次推送

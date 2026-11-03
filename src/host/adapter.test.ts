@@ -73,7 +73,7 @@ describe('host adapter', () => {
   });
 
   it('buildForkSeed：模块不可解析时返回 undefined（不抛，调用方降级为 dispose）', async () => {
-    // 上游用「装不上 @deepseek-ai/dsh-session/fork 的旧宿主」覆盖这条降级路径；
+    // 用「装不上 @deepseek-ai/dsh-session/fork 的旧宿主」覆盖这条降级路径；
     // 本仓该子路径确实存在，改为让模块加载失败来复现同一分支
     vi.doMock('@deepseek-ai/dsh-session/fork', () => { throw new Error('not resolvable'); });
     try {

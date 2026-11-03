@@ -157,6 +157,42 @@ describe('mentionGate', () => {
     expect(reachedNext).toBe(true);
   });
 
+  it('smart 模式下异步探针返回 true 时放行', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: async () => true }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+    expect((ctx.state.mention as MentionDecision).policy).toBe('smart');
+  });
+
+  it('smart 模式下异步探针返回 false 时跳过', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: async () => false }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(false);
+    expect(ctx.skipped).toBe('mention');
+  });
+
+  it('smart 模式下探针抛错时当作不插嘴', async () => {
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({
+        policy: 'smart',
+        isSmartReply: async () => { throw new Error('model down'); },
+      }),
+      ctx,
+    );
+
+    // 错误由外层 errorHandler 处理；这里只断言没有因为判定失败而放行
+    expect(reachedNext).toBe(false);
+  });
+
   it('跳过时触发 onSkip 回调', async () => {
     const decisions: MentionDecision[] = [];
     const ctx = makeCtx(makeMessage({ atMe: false }));

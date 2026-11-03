@@ -4,8 +4,8 @@
  * 名单语义与审批按钮校验（approval-channel）一致：c2cMode=allowlist 时发送者
  * 必须在 c2cAllow；身份缺失同样拒绝（fail-closed）。open 模式放行。
  *
- * 上游把校验挂在 SDK 的 SlashCommand.authorized 钩子上；本插件的 CommandEntry
- * 没有这个钩子（中间件不参与业务鉴权），因此由管理类命令在 handler 首行调用。
+ * 本插件的 CommandEntry 没有 authorized 钩子（中间件不参与业务鉴权），
+ * 因此由管理类命令在 handler 首行调用。
  */
 import type { Logger } from '../types.ts';
 /** 鉴权配置投影（结构化，便于单测） */
@@ -15,7 +15,7 @@ export interface CommandAuthConfigLike {
         c2cAllow: readonly string[];
     };
 }
-/** 鉴权只关心发送者身份（上游用 openid；推推同时有域账号与 uid） */
+/** 鉴权只关心发送者身份（推推同时有域账号与 uid，任一对上即放行） */
 export interface CommandAuthContextLike {
     message: {
         senderId?: string;

@@ -1,9 +1,9 @@
 /**
  * Agent 步骤上报 — client.agent → 推推客户端原生执行过程展示
  *
- * 这是推推相对 QQ 的增量能力：SDK 提供 message_received / llm_input / llm_output /
- * before_tool_call / after_tool_call / agent_end 事件上报，推推客户端据此渲染
- * "AI 正在做什么"。上游 QQ 只能用文本消息模拟，这里优先用原生通道。
+ * 推推 SDK 提供 message_received / llm_input / llm_output / before_tool_call /
+ * after_tool_call / agent_end 事件上报，推推客户端据此渲染"AI 正在做什么"；
+ * 这里优先用这条原生通道，而不是用文本消息模拟。
  *
  * 约束：
  * - 上报是尽力而为：任何失败只记 debug，绝不影响消息主流程。

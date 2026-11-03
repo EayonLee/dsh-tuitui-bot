@@ -8,7 +8,7 @@
  * media.enabled=false 时连下载都不尝试 —— 关掉富媒体就该彻底不落盘。
  *
  * 下载器由 W4 的 transport/attachment.ts 提供（推推的媒体 URL 需要鉴权头，
- * 逻辑与 QQ 完全不同），本中间件只负责「何时调、结果写哪」。
+ * 逻辑在 SDK 侧），本中间件只负责「何时调、结果写哪」。
  */
 import { downloadMessageMedia } from '../../transport/attachment.ts';
 import type { ImTuituiConfig } from '../../config.ts';

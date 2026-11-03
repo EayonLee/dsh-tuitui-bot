@@ -1,7 +1,6 @@
 /**
  * 命令依赖与注册表类型
  *
- * 上游命令直接实现 QQ SDK 的 SlashCommand（name 可为数组、带 category/usage/authorized 钩子）；
  * 本插件的斜杠命令中间件由 gateway/middleware 自己实现，注册表契约因此收敛为
  * CommandEntry：命令名 + 别名 + 说明 + handler。category/usage 作为可选扩展保留，
  * 只给 /help 分组展示，中间件不读这两个字段。
@@ -38,9 +37,8 @@ export interface CategorizedCommand extends CommandEntry {
 /**
  * 取命令参数。
  *
- * 优先用中间件解析好的 ctx.state.command（W2 的 slash-command 会写入，与上游
- * SDK 的 state.command 同名）；拿不到时从正文里剥掉命令名——命令实现不绑定
- * 中间件内部细节，两种来源都能工作。
+ * 优先用中间件解析好的 ctx.state.command（W2 的 slash-command 会写入）；拿不到
+ * 时从正文里剥掉命令名——命令实现不绑定中间件内部细节，两种来源都能工作。
  */
 export declare function commandArgs(ctx: MiddlewareContext): string;
 /** 统一回复：命令输出全部走分块发送（长表格/模型列表不会撞推推单条上限） */

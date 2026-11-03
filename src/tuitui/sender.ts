@@ -4,7 +4,7 @@
  * 全插件唯一的"真正发消息"的地方：
  * - 单聊/群聊：client.im（文本 / 交互卡片 / 文件 / 编辑 / 撤回 / emoji）
  * - 团队帖子：client.teams（发帖 / 编辑帖 / 文件 / emoji）
- * 上游 QQ 的"被动回复 + openStream"在这里变成"首条发送拿 msgid + modifyText 原地编辑"。
+ * 流式走"首条发送拿 msgid + modifyText 原地编辑"。
  */
 import type { ToTarget, TuituiBotClient, TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type {
@@ -280,7 +280,7 @@ export class TuituiSenderImpl implements TuituiSender {
 
   public async recall(target: ReplyTarget, msgId: string): Promise<void> {
     if (target.scope === 'post') {
-      // 团队帖子无撤回 API，静默跳过（上游 QQ 有 recall，这里记录一次 warn 便于观测）
+      // 团队帖子无撤回 API，静默跳过（记一次 debug 便于观测）
       this.logger.debug?.(`recall unsupported for post target (postId=${msgId})`);
       return;
     }
@@ -319,7 +319,6 @@ export class TuituiSenderImpl implements TuituiSender {
 /**
  * 流式会话：首帧发送拿 msgid，后续帧 modifyText(without_push) 原地刷新。
  *
- * 与上游 QQ openStream 的差异：QQ 是"针对入站消息开流"（天然有 msg_id），
  * 推推必须先发一条真实消息才有 msgid，因此首帧承担"建消息"的职责；
  * 拿不到 msgid（uid 目标/帖子返回缺失）时退化为每帧追加发送，保证不丢内容。
  */

@@ -4,8 +4,8 @@
  * - /bot-ping /bot-version /bot-me：推推插件特有（连通性测试、版本、身份）
  * - /stop：中止当前生成（对应底层 agent cancel，通用能力）
  *
- * 与上游的差异：QQ SDK 会把 handler 的返回字符串自动发出去，推推没有这层，
- * 因此每个命令自己调 replyText 发送（所以 ping 也需要拿到 config）。
+ * 推推 SDK 不会自动把 handler 的返回字符串发出去，因此每个命令自己调
+ * replyText 发送（所以 ping 也需要拿到 config）。
  */
 import type { CommandDeps, CategorizedCommand } from './types.ts';
 /** /bot-ping — 测试当前 dsh 与推推连接的网络延迟 */

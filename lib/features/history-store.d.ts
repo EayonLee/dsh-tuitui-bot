@@ -4,11 +4,11 @@
  * historyBuffer 中间件需要一个跨调用可访问的 HistoryStore 实例，
  * 以便在回复完成后清空某群的历史缓存（避免下次 @ 时重复组包）。
  *
- * 上游直接用 QQ SDK 自带的 MemoryHistoryStore；推推 SDK 没有中间件层，
- * 因此这里保留同样的接口与内存实现——接口不变，多实例部署时换成 Redis 实现即可。
+ * 推推 SDK 没有中间件层，历史缓冲由本插件自己维护，因此这里给出一套接口 +
+ * 内存实现——接口不变，多实例部署时换成 Redis 实现即可。
  */
 import type { HistoryEntry } from '../types.ts';
-/** 可插拔的历史存储后端（与上游 SDK 的 HistoryStore 同构） */
+/** 可插拔的历史存储后端 */
 export interface HistoryStore {
     /** 追加一条记录（超过 limit 时丢弃最旧的） */
     append(groupKey: string, entry: HistoryEntry, limit: number): void;

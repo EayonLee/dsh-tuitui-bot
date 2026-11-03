@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/icons/tuitui.svg" width="96" alt="Tuitui Bot" />
+<img src="./assets/icons/tuitui.jpg" width="96" alt="Tuitui Bot" />
 
 **基于 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) 的 360 推推机器人插件**
 
@@ -21,24 +21,25 @@
 把推推机器人做成 dsh 的一个**渠道前端**：推推消息 → 归一化 → 中间件链 → dsh Agent；
 dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡片、原地编辑流式输出。
 
-结构上与腾讯官方的 `@tencent-connect/dsh-qqbot`（QQ 插件）**一一对应**：同样的目录分层、
-同样的中间件顺序、同样的会话/命令/审批/问答语义，只是把 QQ Bot 传输层换成了推推 SDK
-（[`@qihoo/tuitui-bot-sdk`](https://www.npmjs.com/package/@qihoo/tuitui-bot-sdk)）。
+传输层用推推官方 SDK（[`@qihoo/tuitui-bot-sdk`](https://www.npmjs.com/package/@qihoo/tuitui-bot-sdk)），
+上层是自带的洋葱中间件链：**访问控制 → 历史缓冲 → 触发门控 → 清洗 → 限流 → 命令 →
+并发串行 → 打字状态 → 引用解析 → 附件处理 → 上下文组包**，顺序即行为契约。
 
 ### 功能一览
 
 | 能力 | 说明 |
 | --- | --- |
-| 💬 三种会话形态 | 单聊、群聊（@bot 触发）、团队频道帖子（含回帖串） |
-| ⚡ 流式输出 | 首条消息拿到 `msgid` 后用 `modifyText(without_push)` 原地刷新，不刷屏 |
+| 💬 三种会话形态 | 单聊、群聊、团队频道帖子（含回帖串），各自独立的会话上下文 |
+| ⚡ 流式输出 | 首条消息拿到 `msgid` 后用 `modifyText` 原地刷新，不刷屏；降级时自动切成追加片段 |
 | 🃏 原生交互卡片 | 审批 / 提问用推推交互卡片，点击后 `modifyInteractive` 原地更新为最终状态 |
 | 🖼️ 富媒体理解 | 图片/文件/语音/视频落地到本地媒体目录，交给 agent 读取（视觉工具可选） |
 | 📎 文件回传 | `tuitui_send_file` 工具 + `present` 交付物自动投递到当前会话 |
 | 🧭 上下文感知 | 群历史缓冲、引用消息解析、发送者部门路径、@ 标记清洗 |
 | 🧩 斜杠命令 | `/new` `/compact` `/model` `/preset` `/status` `/stop` 等，同步为推推快捷指令 |
 | 🧠 原生步骤上报 | 通过 `client.agent` 上报模型/工具调用，推推客户端原生展示执行过程 |
-| 🔐 三种访问模式 | open / allowlist / disabled，单聊/群聊/帖子分别配置 |
-| 🛠️ 端内绑定 | 设置页手填 appId/appSecret → `property.info()` 在线校验 → 写入 profile |
+| 🔐 四档访问控制 | open / allowlist / blocklist / disabled，单聊 / 群聊 / 帖子分别配置，黑白名单以标签录入 |
+| 🗣️ 智能插话 | smart 模式下由模型读群聊上下文自行判断要不要开口，**判定提示词可在设置页整段改写** |
+| 🛠️ 端内设置页 | 凭据绑定 + 全部常用配置可视化编辑，保存即写 profile 并自动重载；名单是标签，工作区是下拉 |
 
 ## 快速开始
 
@@ -79,13 +80,31 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 ### 4. 在推推里聊
 
 - 私聊机器人：直接发消息
-- 群聊：把机器人拉进群，`@机器人 你的问题`（`mentionPolicy` 默认 `require`；改成 `smart` 后不 @ 也会回，但只回引用机器人/叫到名字/刚聊过的人追问的消息；改成 `always` 则全部回）
+- 群聊：把机器人拉进群，`@机器人 你的问题`。三档触发方式（`mentionPolicy`）：
+  - `require`（默认）：只有 @ 才算叫它。
+  - `smart`：**模型读最近对话自己判断要不要插嘴**——别人互相聊天不接话，轮到自己或被问到才开口；判定提示词可在设置页改写。
+  - `always`：群里每条消息都回（只建议专用小群）。
 - 团队频道：在频道里发帖并 `@机器人`（或回复机器人的帖子）
 
 ## 配置
 
 配置项定义在 [`src/config.ts`](./src/config.ts)，可在 profile 的 `cordis.patch.yml` 中覆盖
 （**patch 是整体替换 config，需写全你要保留的键**）。
+
+### 设置页（推荐）
+
+dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后写回 profile 并自动重载：
+
+- **服务范围**：单聊 / 群聊 / 团队帖子各选四档模式；白名单、黑名单都是**标签输入**——
+  回车或逗号成标签，`Backspace` 删最后一个，点 `×` 删单个，不用记格式。
+- **什么时候回话**：触发方式三档；选「智能」时展开称呼、追问延续窗口，以及
+  **判定提示词编辑器**（多行、等宽字体、可一键恢复出厂默认）。
+- **上下文与会话**：群聊上下文条数、闲置回收分钟数，带单位后缀与用途说明。
+- **工作区**：下拉直接选目录（默认工作区 / `~/workspace` 下的项目 / 当前值），不用手打绝对路径。
+- **推推原生能力**：交互卡片、中间步骤上报、调试日志三个开关。
+
+> 名单、提示词这类长文本提交前都在服务端重新校验（长度、控制字符、类型），
+> 客户端校验只负责体验，安全边界在宿主。
 
 ### 基础
 
@@ -98,9 +117,14 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent 工作目录 |
 | `requireMention` | boolean | `true` | 群聊是否必须 @bot（`mentionPolicy` 未设置时用它推导） |
 | `requireMentionInPost` | boolean | `true` | 团队帖子是否必须 @bot |
-| `mentionPolicy` | `require` | `require` / `always` / `smart` | 触发方式：仅 @ / 全部 / 智能（只回相关消息） |
-| `botAliases` | `[]` | smart 模式：出现这些名字即视为在叫机器人 |
-| `smartFollowUpMs` | `120000` | smart 模式：机器人回复后同一个人追问的延续窗口 |
+| `mentionPolicy` | `'require'` | `require` / `always` / `smart`：仅 @ / 全部 / 模型判断该不该插嘴 |
+| `botAliases` | `[]` | 机器人的称呼（憨包、小秘…），交给判定提示词当线索 |
+| `smartFollowUpMs` | `120000` | 机器人回复后，同一个人接着说话算「同一轮对话」的窗口（ms） |
+| `smartJudge.enabled` | `true` | 智能模式用模型判断；关掉退回确定性规则 |
+| `smartJudge.prompt` | 内置文案 | **判定提示词，可整段改写**（设置页可视化编辑，留空恢复默认） |
+| `smartJudge.maxHistory` | `12` | 判定时交给模型的历史消息条数 |
+| `smartJudge.cooldownMs` | `20000` | 同一会话两次判定的最小间隔，防止每条消息都调模型 |
+| `smartJudge.timeoutMs` | `8000` | 判定超时（超时视为不插嘴） |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
 | `debug` | boolean | `false` | 调试日志（含原始事件体） |
@@ -179,6 +203,65 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 | `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话（走路径白名单） |
 | `tuitui_describe_image` | 视觉理解（需 `vision.enabled`，复用 dsh llm + attachments） |
 
+## 智能插话是怎么工作的
+
+`mentionPolicy: 'smart'` 时，群里**每条**消息（未 @ 也算）会走一次判定：
+
+1. **冷却**：同一会话 `smartJudge.cooldownMs` 内只判一次，超出的消息直接按「不插嘴」处理，不烧 token。
+2. **取上下文**：从历史缓冲拿最近 `smartJudge.maxHistory` 条（带说话人，机器人自己标 `[你]`）。
+3. **问模型**：用该会话当前生效的模型，把 `smartJudge.prompt` + 历史 + 新消息发过去，
+   要求只回一行 JSON：`{"join":true,"why":"十个字以内"}`。
+4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
+   宁可漏答一句，也不在群里刷屏。
+5. **关掉开关**（`smartJudge.enabled=false`）退回确定性规则：提到称呼、或刚聊过的人接着追问。
+
+提示词是**一等配置**：不同群需要不同的「人设」，在设置页整段改，改完保存即生效；
+清空输入框恢复出厂默认（见 [`src/shared/smart-prompt.ts`](./src/shared/smart-prompt.ts)）。
+
+## 会话与上下文
+
+| 行为 | 说明 |
+| --- | --- |
+| 会话隔离 | 会话键是 `tuitui:<scope>:<peerId>`：单聊按对方账号、群聊按 `group_id`、帖子按 `channel_id`，各自独立上下文 |
+| 群上下文 | 未 @ 的群消息也会进历史缓冲（受 `historyLimit` 约束），被叫到时随消息一起交给 agent |
+| 闲置回收 | 超过 `sessionIdleTimeout` 没消息就回收内存里的 agent；下次说话自动恢复原会话，上下文不丢 |
+| 长任务保护 | agent 正在跑（非 idle）的会话不会被回收，避免长任务被中途清掉 |
+| 并发串行 | 同一 peer 的消息排队串行处理（`maxQueue`），不同 peer 互不阻塞 |
+| 引用解析 | 被回复的那条消息会作为引用一起交给 agent，群里「它刚才说」这类指代不会丢 |
+
+## 安装后刷新 / 卸载
+
+改完配置或想升级时，重装同一路径即可（profile 会原地替换），然后重启对应 profile：
+
+```bash
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot   # 或本地 tarball / 源码目录
+dsh --profile <name>                                      # 重启让新版本加载
+```
+
+`dsh --profile <name> --dump-config | grep -A3 im-tuitui` 可以确认插件行已进入组合树。
+
+卸载：
+
+```bash
+dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
+# 凭据写在 profile 的 cordis.patch.yml 里，需要的话一并手动删除
+```
+
+## 常见问题
+
+**群里不回应？** 先看 `/auth` 自检，再确认触发方式：`require` 只认 @；`smart` 要看模型判定；
+`always` 才全回。帖子还要确认 `requireMentionInPost`。
+
+**智能模式太安静 / 太吵？** 安静就调小 `smartJudge.cooldownMs`、把提示词写得更积极；
+太吵就反过来，或者直接把 `mentionPolicy` 调回 `require`。
+
+**设置页说「凭据来自环境变量」不能解绑？** 环境变量优先于 profile，端内解绑删不掉它。
+去部署环境删掉 `TUITUI_BOT_APPID` / `TUITUI_BOT_SECRET` 再重启。
+
+**改了配置没生效？** 设置页保存会写 profile 并触发重载；手改 `cordis.patch.yml` 需要重启。
+
+**为什么有时回复变成好几条？** 单条超过 `textChunkLimit` 会被切成多段；流式降级时也会追加片段。
+
 ## 架构
 
 ```
@@ -243,7 +326,6 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 
 ## 致谢
 
-- 结构与行为语义参考 [@tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)（MIT）；
 - 宿主框架 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)；
 - 推推开放平台 [@qihoo/tuitui-bot-sdk](https://www.npmjs.com/package/@qihoo/tuitui-bot-sdk)。
 

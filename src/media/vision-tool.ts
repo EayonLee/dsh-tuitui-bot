@@ -121,7 +121,7 @@ async function callVision(
   imageRef: ImageAttachmentRef,
   signal: AbortSignal,
 ): Promise<string> {
-  // producer-owned source kind（与上游同款改写）：本地 dsh-llm 的 MessageSource 联合
+  // producer-owned source kind：本地 dsh-llm 的 MessageSource 联合
   // 只列 user/model/tool/system-prompt，插件自有 kind 按「merge-extensible」约定
   // 由生产方声明，因此这里做一次显式类型桥接
   const visionSource = { kind: 'plugin:dsh-tuitui-bot' } as unknown as MessageSource;

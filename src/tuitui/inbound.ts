@@ -1,9 +1,8 @@
 /**
  * 推推事件归一化 — TuituiEventBody → InboundMessage
  *
- * 上游这一步由 @tencent-connect/qqbot-nodejs 的 SDK 完成（C2C_MESSAGE_CREATE /
- * GROUP_AT_MESSAGE_CREATE → MiddlewareContext.message）。推推 SDK 只提供
- * 事件体与文本渲染，因此这里集中做一次映射，后续中间件/传输层只认 InboundMessage。
+ * 推推 SDK 只提供事件体与文本渲染，不产出中间件上下文，因此这里集中做一次
+ * 映射：TuituiEventBody → InboundMessage，后续中间件/传输层只认 InboundMessage。
  *
  * 支持的事件：
  * - single_chat       单聊消息

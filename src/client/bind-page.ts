@@ -19,6 +19,7 @@
  * Desktop 下由壳的 IPC 桥自动附加 Host 认证转发。
  */
 import { createElement, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { TUITUI_ICON_DATA_URI } from './brand-icon.ts';
 import {
   BIND_MANUAL_PATH,
   BIND_STATE_PATH,
@@ -382,26 +383,14 @@ function ManualForm({ initialAppId }: { initialAppId?: string }): ReactNode {
   );
 }
 
-/**
- * 推推机器人图标（矢量路径，内嵌以保持 bundle 自包含）。
- *
- * 用「对话气泡」表达 IM 机器人身份：推推没有对外统一的品牌图形资源，
- * 自绘矢量在明暗主题下都能跟随 currentColor。
- */
-export const TUITUI_LOGO_PATH =
-  'M12 3.2c-4.97 0-9 3.4-9 7.6 0 2.32 1.24 4.4 3.2 5.83v3.42a.6.6 0 0 0 .92.5l3.5-2.1c.45.06.91.09 1.38.09 4.97 0 9-3.4 9-7.6s-4.03-7.6-9-7.6Z';
-
-/** 推推机器人图标（透明底，随 size 缩放） */
+/** 推推官方图标（内嵌 base64，随 size 缩放，圆角与推推客户端一致） */
 function TuituiIcon({ size = 28 }: { size?: number }): ReactNode {
-  return createElement('svg', {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
-    'aria-hidden': true, className: 'imqb-tuicon',
-  },
-    createElement('path', { d: TUITUI_LOGO_PATH, fill: '#1F6FEB' }),
-    createElement('circle', { cx: 8.4, cy: 10.8, r: 1.15, fill: '#fff' }),
-    createElement('circle', { cx: 12, cy: 10.8, r: 1.15, fill: '#fff' }),
-    createElement('circle', { cx: 15.6, cy: 10.8, r: 1.15, fill: '#fff' }),
-  );
+  return createElement('img', {
+    src: TUITUI_ICON_DATA_URI,
+    width: size, height: size,
+    alt: '', 'aria-hidden': true,
+    className: 'imqb-tuicon',
+  });
 }
 
 /** 已绑定视图：回显机器人名称/账号 + 更换凭据 / 解绑入口 */

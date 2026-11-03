@@ -3,8 +3,7 @@
  *
  * 逐题渲染：一次只渲染一个问题（多题时由状态机逐题推进）。
  *
- * 与上游的差异：QQ 的 InlineKeyboard 有 rows/columns，多选项要分行避免刷屏；
- * 推推卡片的 action 是一维按钮条，由客户端自行排版，因此这里不再切行。
+ * 推推卡片的 action 是一维按钮条，由客户端自行排版，因此这里不切行。
  */
 import type { TuituiInteractiveAction, TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { UserQuestion, UserQuestionAnswer } from './question-channel.ts';

@@ -4,7 +4,7 @@
  * 全插件唯一的"真正发消息"的地方：
  * - 单聊/群聊：client.im（文本 / 交互卡片 / 文件 / 编辑 / 撤回 / emoji）
  * - 团队帖子：client.teams（发帖 / 编辑帖 / 文件 / emoji）
- * 上游 QQ 的"被动回复 + openStream"在这里变成"首条发送拿 msgid + modifyText 原地编辑"。
+ * 流式走"首条发送拿 msgid + modifyText 原地编辑"。
  */
 import type { ToTarget, TuituiBotClient, TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { Logger, MediaSource, ReplyTarget, SendResult, StreamSessionLike, TuituiSender } from '../types.ts';

@@ -3,7 +3,7 @@ import type { ChatScope, Logger, ReplyTarget } from '../types.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type { ModelRoute, ModelEntry } from '../model/types.ts';
 import type { DshAgent, DshAgentRegistry, PresetEntry, PresetSwitchOutcome, SessionRecord, SessionStatus, TokenUsageStats, CompactOutcome, QuestionChannelLike, ApprovalChannelLike } from './types.ts';
-/** 复刻宿主 latestCompletedPrefixBoundary：最后一个 turn/end 起到下一 turn 开始前的边界 */
+/** 与宿主 latestCompletedPrefixBoundary 同义：最后一个 turn/end 起到下一 turn 开始前的边界 */
 export declare function latestCompletedPrefixBoundary(events: readonly unknown[]): number | undefined;
 export declare class SessionManager {
     private sessions;

@@ -1,18 +1,18 @@
 /**
  * ApprovalChannel — 把 dsh 的审批 seam（`approval/request` waterfall）桥接到推推。
  *
- * 接入方式与上游一致：监听 `approval/request` waterfall，按 `request.agent.id` 路由到
+ * 接入方式：监听 `approval/request` waterfall，按 `request.agent.id` 路由到
  * 推推会话；非本插件的会话委托链上其他 answerer（`next()`），多通道（Web/TUI）共存。
  *
  * 每个会话同一时间最多一个 pending 审批（审批是阻塞式的）；outcome 是 dsh 协议的
  * 闭合集合，无 allow-always，只提供「允许一次 / 拒绝」两个选择。
  *
- * 传输层差异（这是本文件与上游唯一的实质区别）：
- * - 审批载体：QQ InlineKeyboard → 推推交互卡片（im.sendInteractive）；
- * - 点击回执：INTERACTION_CREATE → interactive_action（由 gateway 分发），
- *   决策后用 im.modifyInteractive 在同一 msgid 上把按钮换成结果（QQ 自动置灰）；
+ * 传输层：
+ * - 审批载体：推推交互卡片（im.sendInteractive）；
+ * - 点击回执：interactive_action（由 gateway 分发），决策后用 im.modifyInteractive
+ *   在同一 msgid 上把按钮换成结果（平台不会自动置灰）；
  * - 纯文本兜底：卡片关闭/发送失败时退化为「回复 1 同意 / 2 拒绝」，因此多一个
- *   `tryAnswer` 入口（上游没有：QQ 审批必须有按钮才能作答）。
+ *   `tryAnswer` 入口（按钮不是唯一入口）。
  */
 import type { EventOptions } from '@deepseek-ai/cordis';
 import type { TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
@@ -132,7 +132,7 @@ export declare class ApprovalChannel {
     /**
      * 点击者白名单校验。
      *
-     * 上游只校验一个 openid；推推同时有域账号与 uid，名单里两种写法都可能出现，
+     * 推推同时有域账号与 uid，名单里两种写法都可能出现，
      * 任一命中即放行。身份完全缺失时 fail-closed。
      */
     private isClickerAllowed;

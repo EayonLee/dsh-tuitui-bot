@@ -5,7 +5,7 @@
  * 判定结果写进 `ctx.state.mention`，供下游（历史缓冲、入站组装）复用，
  * 这样「不回应但仍记账」才能成立。
  *
- * 推推的原生信号比 QQ 干净得多：事件体直接带 `at_me` 布尔位（群聊与帖子都有），
+ * 推推的原生信号很干净：事件体直接带 `at_me` 布尔位（群聊与帖子都有），
  * 不需要再扫内容里的 `<@!appId>` 标记，也不存在「同一事件既推全量又推 @ 版」的歧义。
  * 因此判定优先级是：
  *   1. `message.atMe`（推推权威信号）
@@ -34,8 +34,12 @@ export interface MentionGateOptions {
      *   require=仅 @ 才回；always=全部回；smart=不 @ 也回，但只回相关消息
      */
     policy?: 'require' | 'always' | 'smart';
-    /** smart 模式的相关性探针（引用机器人 / 命中别名 / 追问窗口） */
-    isSmartReply?: (ctx: MiddlewareContext) => boolean;
+    /**
+     * smart 模式的插话判定探针。
+     *
+     * 允许异步：真正的智能模式要把上下文交给模型判断，同步规则只是它的降级路径。
+     */
+    isSmartReply?: (ctx: MiddlewareContext) => boolean | Promise<boolean>;
     /** 单聊一律视为对机器人说，默认 true */
     alwaysAnswerC2C?: boolean;
     /** 隐式 @ 探针（如回复了机器人的消息） */

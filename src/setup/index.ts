@@ -12,8 +12,8 @@
  * 凭据已配置的 fiber 调用 registerBoundCredentialRoutes 注册常驻路由
  * （bound 状态回显 + 手动编辑/更换 + 配置编辑），与绑定流程共用持久化路径。
  *
- * 与上游差异：推推无扫码，ensureCredentials 不再有「等待扫码结果」的挂起
- * Promise——向导打印完即 resolve null，凭据由用户手填后经 persist 落盘。
+ * 推推无扫码：ensureCredentials 不做「等待扫码结果」的挂起 Promise——
+ * 向导打印完即 resolve null，凭据由用户手填后经 persist 落盘。
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { ImTuituiConfig } from '../config.ts';

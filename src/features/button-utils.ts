@@ -1,10 +1,9 @@
 /**
  * 交互卡片按钮协议与点击事件归一化（QuestionChannel / ApprovalChannel 共用）。
  *
- * 上游用 QQ InlineKeyboard：按钮回调数据是 JSON 字符串（button_data），点击以
- * INTERACTION_CREATE 事件回传、由 `dispatchInteraction` 统一解码分发。推推用原生
- * 交互卡片：`action[].value` 直接接收对象，点击以 `interactive_action` 事件推送，
- * 原始回调体挂在入站消息的 `raw` 上。
+ * 推推用原生交互卡片：`action[].value` 直接接收对象，点击以 `interactive_action`
+ * 事件推送，原始回调体挂在入站消息的 `raw` 上，由 `dispatchInteraction` 统一解码
+ * 分发。
  *
  * 载体变了，协议字段不变：所有卡片按钮的 value 仍带顶层 `t` 判别字段，gateway 据此
  * 决定交给哪个通道，避免多通道各自 try 造成误判。
@@ -50,8 +49,8 @@ export type ButtonData = QuestionButtonData | ApprovalButtonData;
 /**
  * 编码按钮 value。
  *
- * 上游返回 JSON 字符串（QQ 的 button_data 只能放字符串）；推推的 value 允许直接放对象，
- * 因此这里返回对象本身——少一次序列化/转义，也让 SDK 侧不需要再 parse。
+ * 推推的 value 允许直接放对象，因此这里返回对象本身——少一次序列化/转义，
+ * 也让 SDK 侧不需要再 parse。
  * 显式重建而不是展开原对象：避免调用方多塞的字段（如调试信息）进到用户可点击的载荷里。
  */
 export function encodeButtonData(data: ButtonData): ButtonData {
@@ -65,8 +64,8 @@ export function encodeButtonData(data: ButtonData): ButtonData {
  * 解码按钮 value；非法载荷或缺少合法 `t` 时返回 undefined。
  *
  * 同时接受对象与 JSON 字符串：SDK 的 value 类型是 `string | Record`，若中转链路
- * 把它序列化成字符串，语义不应丢失。字段做类型校验（而非上游的直接断言）——推推卡片
- * 的 value 是开放结构，弱校验会把别的卡片载荷误判成本通道的点击。
+ * 把它序列化成字符串，语义不应丢失。字段做类型校验而不是直接断言——推推卡片的
+ * value 是开放结构，弱校验会把别的卡片载荷误判成本通道的点击。
  */
 export function decodeButtonData(raw: unknown): ButtonData | undefined {
   const parsed = typeof raw === 'string' ? parseJson(raw) : raw;
@@ -113,7 +112,7 @@ export function resolveCardTheme(theme?: Partial<CardTheme>): CardTheme {
 // ── 点击事件归一化 ──
 
 /**
- * 交互卡片点击的归一化视图（对应上游 QQ 的 `InteractionEvent`）。
+ * 交互卡片点击的归一化视图。
  *
  * 推推 SDK 没有为 `interactive_action` 定义收窄的事件体类型，回调结构藏在
  * `InboundMessage.raw` 里；这里集中做一次安全提取，通道代码只依赖本结构。
@@ -174,7 +173,7 @@ function interactiveValueOf(message: InboundMessage): unknown {
 }
 
 /**
- * 构建单行按钮：推推的 action 是一维数组（没有 QQ 那种 rows/columns 概念），
+ * 构建单行按钮：推推的 action 是一维数组，
  * name 是稳定的按钮标识（重放回调时可核对），text 是用户看到的文案。
  */
 export function buildAction(options: {

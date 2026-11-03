@@ -3,8 +3,7 @@
  *
  * 从 gateway 层抽离，保持 bootstrap 只做组装。
  *
- * 上游（QQ）这里做的是"被动回复三级兜底"：显式 msgId → 缓存里未超频的 msgId →
- * 主动推送。推推没有被动回复额度，三级兜底塌缩成两级：
+ * 引用目标解析是两级兜底：
  *   1. 优先显式 target.msgId（且确认还在缓存窗口内，避免引用一条早已不可见的消息）；
  *   2. 否则取该 peer 最近一条入站 msgId 作为引用；都没有就不引用，直接发送。
  * 帖子作用域走 teams：回复挂在 parentPostId 上，不引用 msgid。
@@ -61,8 +60,8 @@ export declare function resolveReplyTarget(target: ReplyTarget, opts?: ResolveRe
 /**
  * 发送 markdown：解析引用目标（可选节流）后交给发送器。
  *
- * 上游这里要区分 msg_id / event_id 两条发送通道；推推统一走 sendText +
- * referenceMessageId（帖子走 sendPost），因此只保留"解析 + 发送"两步。
+ * 推推统一走 sendText + referenceMessageId（帖子走 sendPost），因此只保留
+ * "解析 + 发送"两步。
  * 命中节流排队时返回空结果（没有 msgId），调用方无需特殊处理。
  */
 export declare function sendResolvedMarkdown(bot: MarkdownSenderLike | TuituiSender, target: ReplyTarget, content: string, opts?: {

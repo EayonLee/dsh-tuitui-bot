@@ -417,8 +417,8 @@ describe('QuestionChannel.install routing', () => {
   it('routes tuitui sessions to the tuitui channel and delegates others', async () => {
     const sent: SentMessage[] = [];
     const record = makeRecord(sessionKey('c2c', 'u9'));
-    (record as { sessionId?: string }).sessionId = 'sess-qq';
-    const manager = createManager({ findBySessionId: (id) => (id === 'sess-qq' ? record : undefined) });
+    (record as { sessionId?: string }).sessionId = 'sess-a';
+    const manager = createManager({ findBySessionId: (id) => (id === 'sess-a' ? record : undefined) });
     const ch = new QuestionChannel(manager, createSender(sent), { requireMention: false, askTimeoutMs: 60_000 }, createLogger());
     let origCalled = 0;
     const uq = { ask: vi.fn(async () => { origCalled += 1; return { answers: [] }; }) };
@@ -427,7 +427,7 @@ describe('QuestionChannel.install routing', () => {
     await uq.ask({ questions: [q2('x')], agent: { id: 'sess-web' } });
     expect(origCalled).toBe(1);
 
-    const p = uq.ask({ questions: [q2()], agent: { id: 'sess-qq' } });
+    const p = uq.ask({ questions: [q2()], agent: { id: 'sess-a' } });
     await new Promise((r) => setTimeout(r, 10));
     expect(ch.tryAnswer('c2c', 'u9', '1')).toBe(true);
     expect(await p).toEqual({ answers: [{ id: 'q', selected: ['A'] }] });

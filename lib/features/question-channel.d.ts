@@ -1,7 +1,7 @@
 /**
  * QuestionChannel — 把 dsh 的 ask_user_question 桥接到推推通道。
  *
- * 接入方式与上游一致：包装 `userQuestions.ask`（而非 registerProvider），按
+ * 接入方式：包装 `userQuestions.ask`（而非 registerProvider），按
  * `request.agent.id` 路由到推推会话；非本插件的会话委托宿主默认 provider
  * （Web 弹出框等），多通道共存。
  *
@@ -10,9 +10,8 @@
  *   - 逐题推进：多问题时一次问一题，答完一题再问下一题
  *   - 完成 / 中断（abort / 超时 / 会话回收）：reject(ASK_ABORTED)
  *
- * 传输层差异：QQ 用 InlineKeyboard + INTERACTION_CREATE，推推用交互卡片 +
- * interactive_action；点完按钮要 modifyInteractive 把卡片改成"已回答"，
- * 因为推推不会像 QQ 那样自动把按钮置灰。
+ * 传输层：交互卡片 + interactive_action；点完按钮要 modifyInteractive 把卡片
+ * 改成"已回答"，因为平台不会自动把按钮置灰。
  */
 import type { TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { ChatScope, InboundMessage, Logger, MiddlewareContext, ReplyTarget, SendResult, TuituiSender } from '../types.ts';

@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReplyLimiter } from './reply-limiter.ts';
 
 /**
- * 上游的 ReplyLimiter 测试针对"每条消息最多被动回复 4 次"的 QQ 限额；
- * 推推没有这套限额，语义已改造成出站节流/去重守卫，因此这里重写为
- * 节流、去重、排队与容错四组用例（见 reply-limiter.ts 文件头）。
+ * ReplyLimiter 的语义是出站节流 / 去重守卫，因此用例分四组：
+ * 节流、去重、排队与容错（设计说明见 reply-limiter.ts 文件头）。
  */
 describe('ReplyLimiter', () => {
   beforeEach(() => {

@@ -9,8 +9,8 @@
  * manual/verify 提交走与绑定流程一致的校验 + persist 路径
  * （写入 profile patch → HMR 重载生效）。
  *
- * 与上游差异：推推无扫码，因此没有 refresh 路由；新增 verify 路由供绑定页
- * 「先校验再保存」，避免把错误凭据写进 profile 触发一次失败的重载。
+ * 推推无扫码，因此没有 refresh 路由；verify 路由供绑定页「先校验再保存」，
+ * 避免把错误凭据写进 profile 触发一次失败的重载。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ImTuituiConfig } from '../config.ts';

@@ -1,10 +1,10 @@
 # Changelog
 
-This project (`@eayonlee/dsh-tuitui-bot`) is a Tuitui port of `@tencent-connect/dsh-qqbot`; versions evolve independently.
+This project (`@eayonlee/dsh-tuitui-bot`) is a dsh channel plugin for 360 Tuitui IM; versions evolve independently.
 
 ## 0.1.0
 
-First release: a structural port of the QQ Bot channel plugin to a 360 Tuitui bot channel plugin.
+First release: an implementation of a dsh bot channel plugin for 360 Tuitui IM.
 
 ### Added
 
@@ -14,7 +14,7 @@ First release: a structural port of the QQ Bot channel plugin to a 360 Tuitui bo
   - `sender.ts`: the `TuituiSender` implementation (text, interactive cards, files, in-place edits, recall, emoji reactions; posts go through `teams`)
   - `agent-reporter.ts`: native step reporting via `client.agent`
   - `shortcut.ts`: quick-command sync on startup
-- **Own middleware kernel (`src/gateway/middleware/`)**: onion kernel plus 13 middlewares matching the QQ SDK chain
+- **Own middleware kernel (`src/gateway/middleware/`)**: onion kernel plus 13 middlewares covering filtering, history, gating, sanitizing, rate limiting, commands and concurrency
 - **Session layer (`src/session/`, `src/host/`, `src/model/`)**: single-flight creation, idle eviction, preset/model preference persistence, per-scope system prompts
 - **Transport layer (`src/transport/`)**: markdown-aware chunking, streaming writer, outbound buffer, tool presentation, deliverable delivery, attachment download
 - **Approval/questions (`src/features/`)**: native Tuitui interactive cards with a numbered-text fallback
@@ -22,9 +22,14 @@ First release: a structural port of the QQ Bot channel plugin to a 360 Tuitui bo
 - **Rich media (`src/media/`)**: `tuitui_send_file`, `tuitui_describe_image`, media TTL cleanup
 - **In-app binding (`src/setup/`, `src/client/`)**: credential form + `property.info()` verification + profile persistence + settings panel
 
-### Differences from the QQ version
+- **Smart interjection (`src/features/smart-judge.ts`)**: in `smart` mode a model reads the group context and decides whether to speak; the judging prompt is fully editable in Settings (default: `src/shared/smart-prompt.ts`), with per-conversation cooldown, timeout, and a fail-closed fallback
+- **Settings page rework (`src/client/config-panel.ts`)**: section cards plus a two-column field grid that collapses on narrow screens; allow/deny lists and aliases are chip inputs (Enter commits, Backspace removes, × deletes one); workspace is a server-fed dropdown; smart mode reveals the prompt editor; model selection removed
+- **Brand icon**: plugin icon and the settings/sidebar/binding icons now use the official Tuitui logo (inlined base64, self-contained bundle)
+
+### Runtime model notes
 
 - New `post` scope (team channel posts); session key `tuitui:post:<channelId>`
-- No QQ passive-reply window (`reply-limiter` becomes outbound throttling / duplicate guard)
+- `reply-limiter` is an outbound throttling / duplicate guard: a minimum interval per target plus short-window dedupe, queueing instead of dropping
 - Streaming is "send first message to obtain `msgid`, then `modifyText`", degrading to static sends when no msgid is available
-- Binding is manual credentials plus online verification instead of a QR-code flow
+- Binding is manual credentials plus online verification
+- Smart triggering no longer relies on an "answer when the name appears" hard rule: the model decides, and deterministic rules only act as a fallback

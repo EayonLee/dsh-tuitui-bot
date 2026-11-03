@@ -1,7 +1,7 @@
 /**
  * 入站处理器 — 经中间件链处理后的消息 → dsh Agent followup
  *
- * 内容组装逻辑（与上游逐层对应）：
+ * 内容组装逻辑分五层：
  * - Layer 1: userContent（文本 + 语音转录 + 附件类型标签）
  * - Layer 2: quotePart（引用消息块）
  * - Layer 3: userMessage（带发送者标签）
@@ -15,9 +15,9 @@
  * - 回复后清历史的作用域从"仅群聊"扩到"群聊 + 帖子"，两者都靠 @ 触发并共享
  *   同一份历史缓冲，不清会让下次 @ 时重复组包。
  *
- * 注意：`ctx.state.envelope` 由中间件的 envelopeFormatter 生成，但上游 inbound
- * 并不使用它（自行按 history/quote/mention 重建，envelope 主要服务于
- * concurrency-guard 的消息合并）。这里保持同样的分工，避免两套组装互相污染。
+ * 注意：`ctx.state.envelope` 由中间件的 envelopeFormatter 生成，但 inbound
+ * 不使用它（自行按 history/quote/mention 重建，envelope 主要服务于
+ * concurrency-guard 的消息合并）。保持这个分工，避免两套组装互相污染。
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';

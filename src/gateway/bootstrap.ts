@@ -4,10 +4,10 @@
  * 将推推 IM 作为 dsh 的前端协议驱动：入站事件 → 归一化 → 中间件链 → handleInbound → dsh agent，
  * dsh session/event + agent/assistant-stream → outbound → 推推出站。
  *
- * 与上游（QQ）的差异集中在两处：
- * 1. 事件来源：QQ SDK 自带 middleware/bot.on('message')；推推是 client.event.subscribe 的裸事件体，
+ * 两处结构性差异值得记住：
+ * 1. 事件来源：推推没有 SDK 自带的 middleware，只有 client.event.subscribe 的裸事件体，
  *    因此我们自己在 onEvent 里完成归一化 + 中间件分发。
- * 2. 交互回调：QQ 是 interaction 事件 + button_data；推推是 interactive_action 事件 + 卡片回调结构。
+ * 2. 交互回调：推推用独立的 interactive_action 事件 + 卡片回调结构，不是消息事件里的按钮数据。
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { TuituiBotClient, TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
@@ -25,6 +25,7 @@ import { ensureVisionInputModal, registerDescribeImageTool } from '../media/visi
 import { registerSendFileTool } from '../media/send-file-tool.ts';
 import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
+import { getScopePeer } from '../shared/index.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type { InboundMessage, Logger, MiddlewareContext, ReplyTarget, TuituiSender } from '../types.ts';
 
@@ -120,7 +121,22 @@ export async function bootstrapGateway(
 
   // ── 中间件链 ──
   const commands = buildCommandList({ manager, config, logger });
-  const kernel = setupMiddlewares({ config, manager, logger, commands });
+  const kernel = setupMiddlewares({
+    config,
+    manager,
+    logger,
+    commands,
+    // 智能插话：模型 + 该会话生效的模型路线 + 机器人自称
+    smartJudge: {
+      llm: (ctx as unknown as { llm?: unknown }).llm,
+      resolveRoute: (mctx) => {
+        const { scope, peerId } = getScopePeer(mctx.message);
+        return manager.getEffectiveModel(scope, peerId);
+      },
+      botName: config.botAliases[0] ?? '机器人',
+      settings: config.smartJudge,
+    },
+  });
 
   // ── 问答 / 审批通道（交互卡片 + 文本兜底） ──
   const questionChannel = new QuestionChannel(manager, sender, config, logger);

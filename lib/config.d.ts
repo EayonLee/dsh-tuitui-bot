@@ -1,8 +1,8 @@
 /**
  * dsh-tuitui-bot 插件配置 Schema
  *
- * 语义与上游 dsh-qqbot 一一对应；新增推推专有项（post 作用域、交互卡片、
- * agent 步骤上报、服务端地址覆盖）。
+ * 覆盖三类能力：会话与触发策略、推推专有交互（团队帖子 / 交互卡片 /
+ * agent 步骤上报）、以及指向推推服务端的地址覆盖。
  */
 import Schema from '@deepseek-ai/schemastery';
 /** 单个作用域的访问模式：开放 / 仅白名单 / 仅排除黑名单 / 全拒 */
@@ -100,6 +100,21 @@ export interface ImTuituiConfig {
     botAliases: string[];
     /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
     smartFollowUpMs: number;
+    /** smart 模式：把上下文交给模型判断是否插嘴的参数 */
+    smartJudge: {
+        /** 关掉就退回确定性规则（别名 / 追问窗口） */
+        enabled: boolean;
+        /** 判定时携带的历史条数 */
+        maxHistory: number;
+        /** 判定输出上限（只要一行 JSON，不需要多） */
+        maxTokens: number;
+        /** 判定超时（超时视为不插嘴） */
+        timeoutMs: number;
+        /** 同一会话两次判定的最小间隔 */
+        cooldownMs: number;
+        /** 判定提示词（设置页可编辑，出厂值见 DEFAULT_SMART_PROMPT） */
+        prompt: string;
+    };
     /** 群聊额外 system prompt */
     groupPrompt?: string;
     /** 私聊额外 system prompt */

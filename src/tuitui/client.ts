@@ -1,7 +1,6 @@
 /**
  * 推推客户端构造 — 凭据/端点/日志适配的唯一入口
  *
- * 上游（QQ）在这里 new QQBot({ appId, appSecret, transport: 'websocket', baseUrl })；
  * 推推 SDK 只需 appId + appSecret + 可选端点覆盖，事件订阅走 client.event.subscribe。
  */
 import { TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
@@ -80,7 +79,7 @@ export function extractMessageId(response: unknown): string | undefined {
  * 记录 API 失败详情。
  *
  * 推推错误对象带 endpoint / errcode / status / trans_id（在 response 里），
- * 排查必须完整打印——上游注释里也强调"记录完整错误对象"。
+ * 排查必须完整打印——日志里记录完整错误对象，只有一句 message 定位不了问题。
  */
 export function describeApiError(error: unknown): string {
   if (typeof error !== 'object' || error === null) return String(error);

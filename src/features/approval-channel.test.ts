@@ -81,8 +81,8 @@ function makeRequest(opts?: {
 }): ApprovalRequest {
   return {
     agent: opts?.noSession === true
-      ? { id: opts?.id ?? 'sess-qq' }
-      : { id: opts?.id ?? 'sess-qq', session: { snapshotEvents: () => opts?.events ?? [] } },
+      ? { id: opts?.id ?? 'sess-a' }
+      : { id: opts?.id ?? 'sess-a', session: { snapshotEvents: () => opts?.events ?? [] } },
     toolName: opts?.toolName ?? 'bash',
     ...(opts?.callId !== undefined ? { callId: opts.callId } : {}),
     ...(opts?.reason !== undefined ? { reason: opts.reason } : {}),
@@ -212,7 +212,7 @@ describe('ApprovalChannel.install', () => {
   it('routes tuitui sessions to park and delegates others to next', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
@@ -225,20 +225,20 @@ describe('ApprovalChannel.install', () => {
     expect(sent).toHaveLength(0);
 
     // 本插件会话 → park（发卡片 + 挂起）
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent).toHaveLength(1);
     expect(lastCard(sent).action).toHaveLength(2);
 
     // 点击 allow → resolve allowed-once
-    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'allow'), { user: 'peer-qq' })))).toBe(true);
+    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'allow'), { user: 'peer-a' })))).toBe(true);
     await expect(p).resolves.toBe('allowed-once');
   });
 
   it('recovers the gated command from the session log', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
@@ -246,11 +246,11 @@ describe('ApprovalChannel.install', () => {
     const { handler } = installAndCapture(ch);
 
     const events = [{ type: 'tool/call', data: { callId: 'c1', arguments: JSON.stringify({ command: 'ls -la' }) } }];
-    const p = handler(makeRequest({ id: 'sess-qq', callId: 'c1', events }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a', callId: 'c1', events }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(lastCard(sent).body?.content).toContain('ls -la');
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 
@@ -270,7 +270,7 @@ describe('ApprovalChannel.install', () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
       createManager({
-        findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
+        findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
       }),
       createSender(sent),
       makeConfig('allowlist', ['owner-1']),
@@ -278,7 +278,7 @@ describe('ApprovalChannel.install', () => {
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent).toHaveLength(1);
 
@@ -300,7 +300,7 @@ describe('ApprovalChannel.install', () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
       createManager({
-        findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
+        findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
       }),
       createSender(sent),
       makeConfig('allowlist', ['owner-1']),
@@ -308,14 +308,14 @@ describe('ApprovalChannel.install', () => {
     );
     const { handler } = installAndCapture(ch);
 
-    const first = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const first = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     // 第一张卡片作废（cancel）
     ch.cancelPending(sessionKey('group', 'group-1'));
     await expect(first).resolves.toBe('cancelled');
 
     // 第二次审批 → 新卡片（新 nonce）
-    const second = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const second = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent.filter((s) => s.card !== undefined && s.updated !== true)).toHaveLength(2);
 
@@ -339,7 +339,7 @@ describe('ApprovalChannel.install', () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
       createManager({
-        findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
+        findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('group', 'group-1'), 'group') : undefined),
       }),
       createSender(sent),
       makeConfig('allowlist', ['owner-1']),
@@ -347,7 +347,7 @@ describe('ApprovalChannel.install', () => {
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
 
     // 事件不带任何点击者标识 → 拒绝
@@ -361,39 +361,39 @@ describe('ApprovalChannel.install', () => {
   it('allowlist 模式：私聊卡片转发给他人点击无效', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
-      makeConfig('allowlist', ['peer-qq']),
+      makeConfig('allowlist', ['peer-a']),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
 
     // 转发场景：点击者 ≠ 名单成员 → 无效
     expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'allow'), { user: 'forwarded-user' })))).toBe(false);
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 
   it('still sends the prompt when the session log is unavailable', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq', noSession: true }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a', noSession: true }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent).toHaveLength(1);
     expect(lastCard(sent).body?.title).toContain('bash');
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 });
@@ -402,20 +402,20 @@ describe('ApprovalChannel 卡片兜底（推推无 InlineKeyboard）', () => {
   it('interactive.enabled=false：退化为文本 + 编号提示，文本作答 settle 审批', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig('open', [], { enabled: false }),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.card).toBeUndefined();
     expect(sent[0]?.text).toContain('回复编号确认');
 
-    expect(ch.tryAnswer('c2c', 'peer-qq', '1')).toBe(true);
+    expect(ch.tryAnswer('c2c', 'peer-a', '1')).toBe(true);
     await expect(p).resolves.toBe('allowed-once');
   });
 
@@ -423,37 +423,37 @@ describe('ApprovalChannel 卡片兜底（推推无 InlineKeyboard）', () => {
     const sent: SentCard[] = [];
     const logger = createLogger();
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent, { failCard: true }),
       makeConfig('open', [], { enabled: true }),
       logger,
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.text).toContain('1. ✅ 同意');
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 
   it('文本作答不是审批决策时返回 false（不吞掉普通消息）', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
-    expect(ch.tryAnswer('c2c', 'peer-qq', '顺便看下磁盘')).toBe(false);
+    expect(ch.tryAnswer('c2c', 'peer-a', '顺便看下磁盘')).toBe(false);
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 });
@@ -462,25 +462,25 @@ describe('ApprovalChannel.handleInteraction', () => {
   it('settles deny as rejected, rewrites the card and ignores unknown buttons', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
 
     // 非审批按钮 → false，不消费
     expect(
-      await ch.handleInteraction(payload(makeInteraction({ t: 'question', q: 'x', i: 0 }, { user: 'peer-qq' }))),
+      await ch.handleInteraction(payload(makeInteraction({ t: 'question', q: 'x', i: 0 }, { user: 'peer-a' }))),
     ).toBe(false);
     // 拒绝 → rejected
-    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'deny'), { user: 'peer-qq' })))).toBe(true);
+    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'deny'), { user: 'peer-a' })))).toBe(true);
     await expect(p).resolves.toBe('rejected');
 
-    // 决策后原地改写卡片：按钮消失、出现结果文案（QQ 的 visited_label 自动置灰在这里要自己做）
+    // 决策后原地改写卡片：按钮消失、出现结果文案（自动置灰能力平台不给，得自己做）
     const updated = sent[sent.length - 1];
     expect(updated?.updated).toBe(true);
     expect(updated?.msgId).toBe('card-1');
@@ -491,19 +491,19 @@ describe('ApprovalChannel.handleInteraction', () => {
   it('无 value 的点击（非卡片回调）不消费', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
 
-    const message = makeInteraction(undefined, { user: 'peer-qq' });
+    const message = makeInteraction(undefined, { user: 'peer-a' });
     expect(await ch.handleInteraction(payload(message))).toBe(false);
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 });
@@ -512,30 +512,30 @@ describe('ApprovalChannel.cancelPending', () => {
   it('cancels a pending approval on session eviction', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender(sent),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    const p = handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
     await sleep(20);
 
-    ch.cancelPending(sessionKey('c2c', 'peer-qq'));
+    ch.cancelPending(sessionKey('c2c', 'peer-a'));
     await expect(p).resolves.toBe('cancelled');
   });
 
   it('fails closed as unavailable when both card and text sending fail', async () => {
     const ch = new ApprovalChannel(
-      createManager({ findBySessionId: (id) => (id === 'sess-qq' ? makeRecord(sessionKey('c2c', 'peer-qq')) : undefined) }),
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
       createSender([], { failCard: true, failText: true }),
       makeConfig(),
       createLogger(),
     );
     const { handler } = installAndCapture(ch);
 
-    await expect(handler(makeRequest({ id: 'sess-qq' }), () => Promise.resolve('unavailable' as ApprovalOutcome)))
+    await expect(handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome)))
       .resolves.toBe('unavailable');
   });
 });
