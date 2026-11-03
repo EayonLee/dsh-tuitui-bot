@@ -6,7 +6,6 @@
 
 Chat with DeepSeek Harness in Tuitui **direct messages, group chats and team channel posts**.
 
-[![CI](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
 [![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
@@ -194,7 +193,7 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 
 Issues and PRs are welcome — please use the [bug report](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml)
 or [feature request](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) template,
-and make sure `npm run typecheck`, `npm test` and `npm run build` pass locally (CI runs the same).
+and make sure `npm run typecheck`, `npm test` and `npm run build` pass locally.
 
 See [CHANGELOG_EN.md](./CHANGELOG_EN.md) for changes (Chinese: [CHANGELOG.md](./CHANGELOG.md)).
 

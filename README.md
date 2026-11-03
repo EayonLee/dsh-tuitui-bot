@@ -6,7 +6,6 @@
 
 在推推（Tuitui）**单聊、群聊、团队频道帖子**里直接对话 DeepSeek Harness。
 
-[![CI](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/EayonLee/dsh-tuitui-bot/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
 [![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
@@ -248,7 +247,7 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 
 - Bug 请用 [Bug 报告](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml) 模板，附上 dsh 版本、插件版本与脱敏日志；
 - 功能建议请用 [功能建议](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) 模板，说明推推侧可复用的原生能力；
-- 提交前请跑通 `npm run typecheck`、`npm test`、`npm run build`（CI 会做同样的事）。
+- 提交前请跑通 `npm run typecheck`、`npm test`、`npm run build`。
 
 变更记录见 [CHANGELOG.md](./CHANGELOG.md)（英文：[CHANGELOG_EN.md](./CHANGELOG_EN.md)）。
 
