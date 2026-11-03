@@ -10,8 +10,6 @@ Chat with DeepSeek Harness in Tuitui **direct messages, group chats and team cha
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
 [![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
 
-**Repo: [EayonLee/dsh-tuitui-bot](https://github.com/EayonLee/dsh-tuitui-bot) · Structural reference: [tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)**
-
 **[简体中文](./README.md) | English**
 
 </div>
@@ -180,23 +178,14 @@ Local source debugging without installing the package:
 dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 ```
 
-## QQ plugin mapping
-
-| QQ plugin | Tuitui plugin |
-| --- | --- |
-| C2C / group | direct / group / team post (`post` scope is new) |
-| `openid` identifiers | `account` / `uid` / `group_id` |
-| Passive reply window | unlimited; `referenceMessageId` quoting |
-| `openStream` | `modifyText` in-place edits |
-| InlineKeyboard + interaction | interactive cards + `interactive_action` |
-| Guild channels | team channel posts |
-| QR-code binding | credential form + `property.info()` verification |
-
 ## Contributing
 
-Issues and PRs are welcome — please use the [bug report](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml)
-or [feature request](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) template,
-and make sure `npm run typecheck`, `npm test` and `npm run build` pass locally.
+Issues and PRs are welcome — read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+
+- Bugs: use the [bug report](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml) template with the dsh version, plugin version and redacted logs;
+- Features: use the [feature request](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) template, and name the Tuitui SDK capability you would reuse;
+- Before opening a PR: `npm run typecheck`, `npm test` and `npm run build` must pass;
+- Participation is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md); report security issues privately per [SECURITY.md](./SECURITY.md).
 
 See [CHANGELOG_EN.md](./CHANGELOG_EN.md) for changes (Chinese: [CHANGELOG.md](./CHANGELOG.md)).
 

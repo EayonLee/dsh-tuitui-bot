@@ -10,8 +10,6 @@
 [![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-8A2BE2)](https://github.com/deepseek-ai/deepseek-harness)
 [![node](https://img.shields.io/badge/node-%3E%3D20.3-339933)](https://nodejs.org)
 
-**仓库：[EayonLee/dsh-tuitui-bot](https://github.com/EayonLee/dsh-tuitui-bot) · 上游结构参考：[tencent-connect/dsh-qqbot](https://github.com/tencent-connect/dsh-qqbot)**
-
 **简体中文 | [English](./README_EN.md)**
 
 </div>
@@ -232,25 +230,14 @@ dsh web --patch /path/to/dsh-tuitui-bot/cordis.dev.yml
 > 本插件的 bundle 层会随 `dsh plugin --profile <name> add` 自动生效；
 > 用 `dsh --profile <name> --dump-config` 可以确认 `im-tuitui` 行已进入组合树。
 
-## 与 QQ 插件的映射
-
-| QQ 插件 | 推推插件 | 说明 |
-| --- | --- | --- |
-| C2C / 群聊 | 单聊 / 群聊 / 团队帖子 | 多了 `post` 作用域 |
-| `user_openid` / `group_openid` | `account` / `uid` / `group_id` | 域账号为主键 |
-| 被动回复（5 分钟 4 次） | 无限制 | `referenceMessageId` 引用回复 |
-| `openStream` 流式 | `modifyText` 原地编辑 | 首条消息拿 msgid 后刷新 |
-| InlineKeyboard + `INTERACTION_CREATE` | 交互卡片 + `interactive_action` | 处理后 `modifyInteractive` |
-| 频道（guild） | 团队频道帖子 | `sendPost` / `editPost` |
-| 扫码绑定机器人 | 手填凭据 + `property.info()` 校验 | 推推无扫码流程 |
-
 ## 贡献
 
-欢迎提 issue / PR：
+欢迎提 issue / PR，动手前请先读 [贡献指南](./CONTRIBUTING.md)：
 
 - Bug 请用 [Bug 报告](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=bug_report.yml) 模板，附上 dsh 版本、插件版本与脱敏日志；
 - 功能建议请用 [功能建议](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml) 模板，说明推推侧可复用的原生能力；
-- 提交前请跑通 `npm run typecheck`、`npm test`、`npm run build`。
+- 提交前请跑通 `npm run typecheck`、`npm test`、`npm run build`；
+- 参与即表示遵守 [行为准则](./CODE_OF_CONDUCT.md)；安全漏洞请按 [SECURITY.md](./SECURITY.md) 私下报告，不要开公开 issue。
 
 变更记录见 [CHANGELOG.md](./CHANGELOG.md)（英文：[CHANGELOG_EN.md](./CHANGELOG_EN.md)）。
 
