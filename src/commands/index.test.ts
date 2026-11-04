@@ -37,7 +37,7 @@ function makeCtx(content: string, sent: string[]): MiddlewareContext {
     eventType: 'single_chat',
     kind: 'c2c',
     senderId: 'u1',
-    senderAccount: 'lizhengtai',
+    senderAccount: 'zhangsan',
     senderName: 'L',
     content,
     messageId: 'm1',
@@ -45,7 +45,7 @@ function makeCtx(content: string, sent: string[]): MiddlewareContext {
     attachments: [],
     raw: {},
   };
-  const replyTarget: ReplyTarget = { scope: 'c2c', targetId: 'lizhengtai', msgId: 'm1' };
+  const replyTarget: ReplyTarget = { scope: 'c2c', targetId: 'zhangsan', msgId: 'm1' };
   const bot = {
     sendMarkdown: vi.fn(async (_target: ReplyTarget, text: string) => {
       sent.push(text);
@@ -150,7 +150,7 @@ describe('buildCommandList（斜杠命令注册表契约）', () => {
     const list = buildCommandList({ manager: makeManager({ setModelOverride }), config: makeConfig() });
     const sent: string[] = [];
     await findCommand(list, 'model').handler(makeCtx('/model deepseek-official/deepseek-v4-flash', sent));
-    expect(setModelOverride).toHaveBeenCalledWith('c2c', 'lizhengtai', {
+    expect(setModelOverride).toHaveBeenCalledWith('c2c', 'zhangsan', {
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',
     });

@@ -548,7 +548,7 @@ describe('normalizeEvent：interactive_action（线上真实回调形状）', ()
   const rawEvent = {
     cid: '7652669648797797',
     uid: '7652738368427950',
-    user_account: 'lizhengtai',
+    user_account: 'zhangsan',
     user_name: '张三',
     is_me: false,
     user_is_bot: false,
@@ -558,7 +558,7 @@ describe('normalizeEvent：interactive_action（线上真实回调形状）', ()
     data: {
       message: {
         msgid: '7704135227344309517',
-        user: { uid: '7652738368427950', cid: '7652669648797797', name: '张三', account: 'lizhengtai' },
+        user: { uid: '7652738368427950', cid: '7652669648797797', name: '张三', account: 'zhangsan' },
         sender: { uid: '7652738368553025', cid: '7652669648797797', name: '小助手', account: '' },
         conversation: { type: 'single', targeted: '7652738368553025' },
         appid: '7652669649120958',
@@ -575,13 +575,13 @@ describe('normalizeEvent：interactive_action（线上真实回调形状）', ()
     expect(message.eventType).toBe('interactive_action');
     expect(message.kind).toBe('c2c');
     expect(message.messageId).toBe('7704135227344309517');
-    expect(message.senderAccount).toBe('lizhengtai');
+    expect(message.senderAccount).toBe('zhangsan');
   });
 
   it('按钮 value 能被 getInteractiveAction 解出来（点击能否结算的命门）', () => {
     const click = getInteractiveAction(normalizeEvent(rawEvent as never, options())!);
     expect(click).toBeDefined();
-    expect(click!.targetId).toBe('lizhengtai');
+    expect(click!.targetId).toBe('zhangsan');
     expect(click!.value).toEqual({ t: 'probe' });
   });
 });

@@ -17,6 +17,7 @@ import type {
 } from '../types.ts';
 import { extractMessageId, describeApiError } from './client.ts';
 import { mergeMentions } from './mention-parse.ts';
+import { settleReceipt } from '../features/receipt-registry.ts';
 
 /** 发送器构造参数 */
 export interface TuituiSenderOptions {
@@ -141,9 +142,12 @@ export class TuituiSenderImpl implements TuituiSender {
         ...(target.msgId ? { referenceMessageId: target.msgId } : {}),
         ...(mentions.length > 0 ? { at: mentions } : {}),
       });
+      // 回复真的发出去了，才把「在算」换成「好了」
+      void settleReceipt(target, 'done', target.msgId);
       return { msgId: extractMessageId(response) };
     } catch (error) {
       this.warnFailure('sendMarkdown', target, error);
+      void settleReceipt(target, 'fail', target.msgId);
       throw error;
     }
   }
