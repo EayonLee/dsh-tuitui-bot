@@ -71,6 +71,47 @@ describe('mentionGate', () => {
     expect(reachedNext).toBe(true);
   });
 
+  it('@ 了机器人就不再调判定模型：省一次调用，也不会被冷却吃掉', async () => {
+    let calls = 0;
+    const ctx = makeCtx(makeMessage({ atMe: true }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: () => { calls += 1; return false; } }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+    expect(calls).toBe(0);
+    expect((ctx.state.mention as MentionDecision).wasMentioned).toBe(true);
+  });
+
+  it('命中隐式 @（引用回复机器人）也不再调判定模型', async () => {
+    let calls = 0;
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({
+        policy: 'smart',
+        isImplicitMention: () => true,
+        isSmartReply: () => { calls += 1; return false; },
+      }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  it('没 @ 时才交给判定模型，且只调一次', async () => {
+    let calls = 0;
+    const ctx = makeCtx(makeMessage({ atMe: false }));
+    const { reachedNext } = await runMiddleware(
+      mentionGate({ policy: 'smart', isSmartReply: () => { calls += 1; return true; } }),
+      ctx,
+    );
+
+    expect(reachedNext).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   it('单聊永远放行', async () => {
     const ctx = makeCtx(makeMessage({ kind: 'c2c', atMe: false }));
     const { reachedNext } = await runMiddleware(mentionGate(), ctx);
