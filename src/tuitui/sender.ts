@@ -20,6 +20,31 @@ import { mergeMentions } from './mention-parse.ts';
 import { resolveTuituiEmoji } from './emoji.ts';
 import { settleReceipt } from '../features/receipt-registry.ts';
 
+/**
+ * 发送重试。
+ *
+ * 推推的群聊发送偶尔会返回 `errcode 10503`（"消息发送失败"，多数是服务端瞬时故障
+ * 或群里一瞬间发太密），换个时间点再发往往就成功了。以前这里直接抛错，结果就是
+ * 模型答完了、用户一个字没看到，而日志里只有一条 warn —— 线上真的丢了 40 多条。
+ */
+const RETRYABLE_ERRCODES = new Set([10503]);
+const RETRY_DELAYS_MS = [600, 1800];
+
+function isRetryableSendError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const record = error as Record<string, unknown>;
+  const errcode = record.errcode;
+  if (typeof errcode === 'number' && RETRYABLE_ERRCODES.has(errcode)) return true;
+  const status = record.status;
+  if (typeof status === 'number' && status >= 500) return true;
+  const message = typeof record.message === 'string' ? record.message : '';
+  return /fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|network error/i.test(message);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
 /** 发送器构造参数 */
 export interface TuituiSenderOptions {
   client: TuituiBotClient;
@@ -28,6 +53,8 @@ export interface TuituiSenderOptions {
   streaming: boolean;
   /** 流式刷新节流(ms) */
   streamIntervalMs: number;
+  /** 发送重试间隔（毫秒），测试里传 [1] 避免真等；生产用默认值 */
+  retryDelaysMs?: number[];
   /** 单条文本上限（超出时由调用方切分，这里只做兜底断言） */
   textChunkLimit: number;
 }
@@ -102,12 +129,36 @@ export class TuituiSenderImpl implements TuituiSender {
   private readonly logger: Logger;
   private readonly streaming: boolean;
   private readonly streamIntervalMs: number;
+  private readonly retryDelaysMs: readonly number[];
 
   public constructor(options: TuituiSenderOptions) {
     this.client = options.client;
     this.logger = options.logger;
     this.streaming = options.streaming;
     this.streamIntervalMs = options.streamIntervalMs;
+    this.retryDelaysMs = options.retryDelaysMs ?? RETRY_DELAYS_MS;
+  }
+
+  /**
+   * 可重试的发送：临时故障重试，别把已经生成好的回复直接扔掉。
+   * 只重试"明显是瞬时"的错误，参数/权限类错误重试也是白搭。
+   */
+  private async withRetry<T>(target: ReplyTarget, run: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
+      try {
+        return await run();
+      } catch (error) {
+        lastError = error;
+        const delay = this.retryDelaysMs[attempt];
+        if (delay === undefined || !isRetryableSendError(error)) break;
+        this.logger.warn(
+          `send retry ${attempt + 1}/${this.retryDelaysMs.length} in ${delay}ms (scope=${target.scope} target=${target.targetId}): ${describeApiError(error)}`,
+        );
+        await sleep(delay);
+      }
+    }
+    throw lastError;
   }
 
   /** 统一失败日志（推推错误必须完整记录，含 trans_id） */
@@ -124,12 +175,12 @@ export class TuituiSenderImpl implements TuituiSender {
     try {
       if (target.scope === 'post') {
         if (!isPostTarget(target)) throw new Error('post target requires teamId/channelId');
-        const response = await this.client.teams.sendPost({
+        const response = await this.withRetry(target, () => this.client.teams.sendPost({
           teamId: target.teamId as string,
           channelId: target.channelId as string,
           text: content,
           ...(target.parentPostId ? { parentId: target.parentPostId } : {}),
-        });
+        }));
         return { msgId: extractMessageId(response) };
       }
       const to = toSdkTarget(target);
@@ -137,12 +188,12 @@ export class TuituiSenderImpl implements TuituiSender {
       // 正文里写了 @某某 只算文字，推推要靠 at 元数据才算「真 @」：
       // 不带上 at，对方收不到通知，别的机器人更是完全看不见。
       const mentions = mergeMentions(opts?.at, content);
-      const response = await this.client.im.sendText({
+      const response = await this.withRetry(target, () => this.client.im.sendText({
         to,
         text: content,
         ...(target.msgId ? { referenceMessageId: target.msgId } : {}),
         ...(mentions.length > 0 ? { at: mentions } : {}),
-      });
+      }));
       // 回复真的发出去了，才把「在算」换成「好了」
       void settleReceipt(target, 'done', target.msgId);
       return { msgId: extractMessageId(response) };
