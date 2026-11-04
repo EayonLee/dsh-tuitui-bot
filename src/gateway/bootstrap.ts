@@ -136,6 +136,16 @@ export async function bootstrapGateway(
 
   // ── 中间件链 ──
   const commands = buildCommandList({ manager, config, logger });
+  // 智能判定到底接上没有：没有就不会有任何插嘴，事后查日志第一件事就是看这行
+  const llmService = readContextService(ctx, 'llm');
+  if (config.mentionPolicy === 'smart') {
+    logger.info(
+      '[tuitui/smart] judge wired: llm=' + (llmService === undefined ? 'MISSING' : 'ok')
+      + ' maxHistory=' + String(config.smartJudge.maxHistory)
+      + ' cooldownMs=' + String(config.smartJudge.cooldownMs)
+      + ' prompt=' + (config.smartJudge.prompt.trim() === '' ? '出厂' : '自定义'),
+    );
+  }
   const kernel = setupMiddlewares({
     config,
     manager,
@@ -145,7 +155,7 @@ export async function bootstrapGateway(
     smartJudge: {
       // 必须走 ctx.get：cordis 对未 inject 的服务直接抛「cannot get property」，
       // 拿不到就当没有（判定降级为规则），不能因此把整个插件启动搞挂
-      llm: readContextService(ctx, 'llm'),
+      llm: llmService,
       resolveRoute: (mctx) => {
         const { scope, peerId } = getScopePeer(mctx.message);
         return manager.getEffectiveModel(scope, peerId);
