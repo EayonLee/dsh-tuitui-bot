@@ -49,6 +49,17 @@ export declare function resetHistoryStores(): void;
  * peerId 由调用方决定：群聊是 group_id，团队帖子是 `teamId/channelId`。
  */
 export declare function historyGroupKey(appId: string, peerId: string): string;
-/** 清空某个会话的历史（回复后调用，避免下次 @ 时重复组包） */
+/** 清空某个会话的历史（保留给测试与手动运维；正常流程已改用水位线） */
 export declare function clearGroupHistory(appId: string, peerId: string): void;
+/** 记下「这条以及之前的都已经给模型看过了」 */
+export declare function markHistoryDelivered(appId: string, peerId: string, messageId: string): void;
+/** 取水位线（没投递过返回 undefined） */
+export declare function getHistoryDelivered(appId: string, peerId: string): string | undefined;
+/**
+ * 从缓冲里挑出「还没投递过」的那一段。
+ *
+ * 水位线那条消息本身也算已投递（它是上一次注入的最后一条），所以从它之后开始截。
+ * 水位线已经滚出缓冲（说明聊了很久）时，按整窗返回。
+ */
+export declare function undeliveredHistory(entries: HistoryEntry[], watermark: string | undefined): HistoryEntry[];
 //# sourceMappingURL=history-store.d.ts.map

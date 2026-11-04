@@ -2,6 +2,26 @@
 
 This project (`@eayonlee/dsh-tuitui-bot`) is a dsh channel plugin for 360 Tuitui IM; versions evolve independently.
 
+## 0.1.17
+
+Image support no longer depends on dsh's own llm providers — point it at any OpenAI-compatible gateway.
+
+### Added
+
+- **Separate endpoints for understanding and generation** (`vision.*`, `imageGeneration.*`): base URL + API key + model id
+- **`tuitui_draw` tool**: generates with the configured model, saves the file and sends it to the current chat
+- **`/tuitui/im-tuitui/test-model` route**: the settings page's "Test connection" — probes `/models` only, no generation, no cost
+- Settings page section "Image understanding & generation" with per-endpoint test buttons and an "already set" marker
+
+### Changed
+
+- `tuitui_describe_image` uses the direct endpoint when `vision.baseUrl` + `vision.apiKey` are set, otherwise falls back to the previous dsh llm path
+- The "smart reply" section now explains what is actually being judged and notes that @-mentions bypass the judge
+
+### Security
+
+- Endpoint API keys are write-only: the config API never returns them; the page only shows whether one is stored
+
 ## 0.1.0
 
 First release: an implementation of a dsh bot channel plugin for 360 Tuitui IM.

@@ -49,13 +49,35 @@ export interface MediaConfig {
   ttlHours: number;
 }
 
-export interface VisionConfig {
+/**
+ * 一个 OpenAI 兼容的图像端点。
+ *
+ * 理解与生成各配一套，互不影响：地址 + 密钥 + 模型 id，就这三样。
+ * apiKey 只在服务端用，永远不往回吐。
+ */
+export interface ImageModelConfig {
   enabled: boolean;
-  provider: string;
+  /** OpenAI 兼容 base url，例如 https://llm.api.zyuncs.com/v1 */
+  baseUrl: string;
+  /** 密钥（只写不读：设置页永远显示空） */
+  apiKey: string;
+  /** 模型 id，例如 qwen/qwen3-vl-30b-a3b-instruct */
   model: string;
+}
+
+export interface VisionConfig extends ImageModelConfig {
+  /** 兼容旧字段：dsh llm adapter 名（配了 baseUrl/apiKey 后不再使用） */
+  provider: string;
   defaultPrompt: string;
   maxBytes: number;
   maxTokens: number;
+  timeoutMs: number;
+}
+
+/** 图像生成配置 */
+export interface ImageGenerationConfig extends ImageModelConfig {
+  /** 出图尺寸，例如 1024x1024 */
+  size: string;
   timeoutMs: number;
 }
 
@@ -180,6 +202,8 @@ export interface ImTuituiConfig {
   media: MediaConfig;
   /** 视觉理解（tuitui_describe_image 工具） */
   vision: VisionConfig;
+  /** 图像生成配置 */
+  imageGeneration: ImageGenerationConfig;
   /** 附件发送 */
   sendFile: SendFileConfig;
   /** 交互卡片 */
@@ -230,9 +254,9 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   reactions: Schema.object({
     enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),
     inGroup: Schema.boolean().default(true).description('群聊里也挂表情回执（默认给，省得以为机器人卡死）'),
-    ack: Schema.string().default('👀').description('收到时挂的表情（留空 = 不挂）'),
-    done: Schema.string().default('✅').description('处理完换成的表情（留空 = 只撤不换）'),
-    fail: Schema.string().default('😵').description('出错换成的表情（留空 = 只撤不换）'),
+    ack: Schema.string().default('微笑').description('收到时挂的表情名（微笑 / OK / 抱拳；推推不认 👀 这种 unicode，留空 = 不挂）'),
+    done: Schema.string().default('OK').description('处理完换成的表情名（留空 = 只撤不换）'),
+    fail: Schema.string().default('委屈').description('出错换成的表情名（留空 = 只撤不换）'),
   }).description('表情回执'),
   groupPrompt: Schema.string().description('群聊额外system prompt'),
   directPrompt: Schema.string().description('私聊额外system prompt'),
@@ -264,22 +288,41 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     ttlHours: Schema.number().default(24).description('富媒体存活时长(小时)，0=永不过期'),
   }).default({ enabled: true, maxMB: 200, ttlHours: 24 }).description('富媒体理解配置'),
   vision: Schema.object({
-    enabled: Schema.boolean().default(false).description('是否启用视觉理解（tuitui_describe_image 工具）'),
-    provider: Schema.string().default('').description('视觉模型 provider（dsh 注册的 llm adapter，如 pi-ai）'),
-    model: Schema.string().default('').description('视觉模型 id（如 qwen-vl-max）'),
+    enabled: Schema.boolean().default(false).description('是否启用图像理解（tuitui_describe_image 工具）'),
+    baseUrl: Schema.string().default('').description('图像理解的 OpenAI 兼容地址，如 https://llm.api.zyuncs.com/v1'),
+    apiKey: Schema.string().default('').description('图像理解密钥（只写不读，设置页不回显）'),
+    provider: Schema.string().default('').description('旧字段：dsh llm adapter 名（配了 baseUrl 后不再使用）'),
+    model: Schema.string().default('').description('图像理解模型 id，如 qwen/qwen3-vl-30b-a3b-instruct'),
     defaultPrompt: Schema.string().default('Describe this image in detail.').description('默认描述 prompt'),
     maxBytes: Schema.number().default(10 * 1024 * 1024).description('图片字节上限'),
     maxTokens: Schema.number().default(1024).description('输出 token 上限'),
     timeoutMs: Schema.number().default(120000).description('视觉调用超时(ms)'),
   }).default({
     enabled: false,
+    baseUrl: '',
+    apiKey: '',
     provider: '',
     model: '',
     defaultPrompt: 'Describe this image in detail.',
     maxBytes: 10 * 1024 * 1024,
     maxTokens: 1024,
     timeoutMs: 120000,
-  }).description('视觉理解配置'),
+  }).description('图像理解配置'),
+  imageGeneration: Schema.object({
+    enabled: Schema.boolean().default(false).description('是否启用图像生成（tuitui_draw 工具）'),
+    baseUrl: Schema.string().default('').description('图像生成的 OpenAI 兼容地址，如 https://llm.api.zyuncs.com/v1'),
+    apiKey: Schema.string().default('').description('图像生成密钥（只写不读，设置页不回显）'),
+    model: Schema.string().default('').description('图像生成模型 id，如 qwen/qwen-image-2512'),
+    size: Schema.string().default('1024x1024').description('出图尺寸，如 1024x1024；留空用服务端默认'),
+    timeoutMs: Schema.number().default(180000).description('出图超时(ms)'),
+  }).default({
+    enabled: false,
+    baseUrl: '',
+    apiKey: '',
+    model: '',
+    size: '1024x1024',
+    timeoutMs: 180000,
+  }).description('图像生成配置'),
   sendFile: Schema.object({
     restrictPaths: Schema.boolean().default(false).description('是否限制可发送的文件路径（默认 false：想发什么发什么；打开后仅允许 media + cwd + extraRoots）'),
     extraRoots: Schema.array(Schema.string()).default([]).description('额外允许访问的根目录'),

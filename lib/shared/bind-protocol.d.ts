@@ -19,6 +19,22 @@ export declare const BIND_VERIFY_PATH = "/tuitui/im-tuitui/bind/verify";
 export declare const BIND_UNBIND_PATH = "/tuitui/im-tuitui/bind/unbind";
 /** 配置读写（设置面板表单） */
 export declare const BIND_CONFIG_PATH = "/tuitui/im-tuitui/config";
+/** 图像理解 / 生成端点的连接测试（不回显密钥） */
+export declare const TEST_MODEL_PATH = "/tuitui/im-tuitui/test-model";
+/** 连接测试请求体：留空的字段表示"用已保存的值" */
+export interface TestModelRequest {
+    kind: 'vision' | 'image';
+    baseUrl?: string;
+    model?: string;
+    /** 只写不读：传空串表示用已保存的密钥 */
+    apiKey?: string;
+}
+/** 连接测试响应 */
+export interface TestModelResponse {
+    ok: boolean;
+    detail: string;
+    modelFound?: boolean;
+}
 /** 线上协议（HTTP 路由序列化形态） */
 export type BindStateWire = {
     phase: 'unconfigured';
@@ -82,5 +98,31 @@ export interface ConfigPatchWire {
     'concurrency.post'?: 'queue' | 'drop' | 'abort' | 'merge';
     'interactive.enabled'?: boolean;
     'agentSteps.enabled'?: boolean;
+    'reactions.enabled'?: boolean;
+    'reactions.inGroup'?: boolean;
+    'reactions.ack'?: string;
+    'reactions.done'?: string;
+    'reactions.fail'?: string;
+    'sendFile.restrictPaths'?: boolean;
+    'smartJudge.prompt'?: string;
+    'smartJudge.maxHistory'?: number;
+    'smartJudge.cooldownMs'?: number;
+    'smartJudge.timeoutMs'?: number;
+    groupPrompt?: string;
+    directPrompt?: string;
+    postPrompt?: string;
+    'vision.enabled'?: boolean;
+    'vision.baseUrl'?: string;
+    'vision.model'?: string;
+    /** 只写：留空表示不改动已保存的密钥 */
+    'vision.apiKey'?: string;
+    /** 只读回显：是否已经存过密钥 */
+    'vision.apiKeySet'?: boolean;
+    'imageGeneration.enabled'?: boolean;
+    'imageGeneration.baseUrl'?: string;
+    'imageGeneration.model'?: string;
+    'imageGeneration.size'?: string;
+    'imageGeneration.apiKey'?: string;
+    'imageGeneration.apiKeySet'?: boolean;
 }
 //# sourceMappingURL=bind-protocol.d.ts.map

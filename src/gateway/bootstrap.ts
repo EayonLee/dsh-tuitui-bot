@@ -32,6 +32,7 @@ import { registerFileTool } from '../tuitui/file-tool.ts';
 import { registerSendTool } from '../tuitui/message-tool.ts';
 import { registerBotTool } from '../tuitui/bot-tool.ts';
 import { registerTeamsTool } from '../tuitui/teams-tool.ts';
+import { registerDrawTool } from '../media/draw-tool.ts';
 import { getJudgeHistoryStore, historyGroupKey } from '../features/history-store.ts';
 import { settleReceipt } from '../features/receipt-registry.ts';
 import { describeGroupEvent, recordGroupEvent } from '../tuitui/group-events.ts';
@@ -350,6 +351,13 @@ export async function bootstrapGateway(
   // ── 视觉工具注册（tuitui_describe_image，复用 dsh llm + attachments） ──
   runOptional(logger, 'vision modal', () => ensureVisionInputModal(config.vision, logger));
   runOptional(logger, 'describe-image tool', () => registerDescribeImageTool(ctx, config.vision, logger));
+  runOptional(logger, 'draw tool', () => {
+    if (!config.imageGeneration.enabled) {
+      logger.info('im-tuitui: 图像生成未启用，tuitui_draw 未注册');
+      return;
+    }
+    registerDrawTool(ctx, sender, manager, config.imageGeneration, logger);
+  });
 
   // ── 附件发送工具注册（tuitui_send_file） ──
   runOptional(logger, 'send-file tool', () => registerSendFileTool(ctx, sender, manager, config, logger));

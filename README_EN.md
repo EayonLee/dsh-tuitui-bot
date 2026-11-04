@@ -118,7 +118,7 @@ All four strategies act at the **turn** level, not just in the middleware chain:
 | `concurrency.post` | `queue` | Team posts: process one at a time |
 | `reactions.enabled` | `true` | React on receipt (working / done / failed) |
 | `reactions.inGroup` | `true` | Also react in groups |
-| `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | Emoji per stage; empty disables it |
+| `reactions.ack` / `done` / `fail` | `微笑` / `OK` / `委屈` | Emoji **name** per stage — Tuitui only accepts its built-in names (微笑 / 强 / OK / 奶茶…); unicode is rejected. Empty disables it |
 | `smartJudge.timeoutMs` | `20000` | Judgement timeout (timeout = do not join; thinking models often need more than 8s) |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
@@ -135,7 +135,7 @@ All four strategies act at the **turn** level, not just in the middleware chain:
 | `maxQueue` | `20` | Per-peer queue limit |
 | `processingTimeoutMs` | `1800000` | Turn timeout (ms) |
 | `askTimeoutMs` | `300000` | Pending question timeout (ms) |
-| `historyLimit` | `50` | Group/post history buffer size |
+| `historyLimit` | `50` | Group/post history buffer size (rolling window; nothing is cleared after a reply, only undelivered messages are added) |
 | `showToolResults` | `false` | Show successful tool output (errors always shown) |
 
 ### Access control
@@ -149,8 +149,12 @@ channel/team ids. Deny lists win over everything. An empty allowlist in `allowli
 
 ### Media, vision, attachments
 
-`media.enabled` / `media.maxMB` / `media.ttlHours`, `vision.enabled` / `vision.provider` /
-`vision.model`, `sendFile.restrictPaths` / `sendFile.extraRoots` / `sendFile.sendPresentedFiles`.
+`media.enabled` / `media.maxMB` / `media.ttlHours`, `vision.enabled` / `vision.baseUrl` /
+`vision.apiKey` / `vision.model` (image understanding), `imageGeneration.enabled` /
+`imageGeneration.baseUrl` / `imageGeneration.apiKey` / `imageGeneration.model` /
+`imageGeneration.size` (image generation), `sendFile.restrictPaths` / `sendFile.extraRoots` /
+`sendFile.sendPresentedFiles`. Endpoint API keys are write-only: they never come back from the
+config API and the settings page only shows whether one is stored.
 
 ### Tuitui-native switches
 
@@ -174,7 +178,8 @@ for private deployments (also `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`).
 | `tuitui_send` | Rich messages: `link` / `page` / `mixed`; `recall` / `modify` / `strong_notice` / `phone_alarm` need `confirm=true` |
 | `tuitui_teams` | Team channels: `channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` read-only; `send_post` / `edit_post` / `send_file` need `confirm=true` |
 | `tuitui_bot` | The bot itself: `info` / `get_shortcuts` read-only; `set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` need `confirm=true` |
-| `tuitui_describe_image` | Vision understanding (requires `vision.enabled`; uses dsh llm + attachments) |
+| `tuitui_describe_image` | Image understanding (requires `vision.enabled`): uses `vision.baseUrl` when set, otherwise dsh llm |
+| `tuitui_draw` | Image generation (requires `imageGeneration.enabled`): draws, sends to the current chat, returns the local path |
 
 ## How smart interjection works
 

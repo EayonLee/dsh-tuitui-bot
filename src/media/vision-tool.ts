@@ -24,6 +24,7 @@ import type {
   StreamChunk,
 } from '@deepseek-ai/dsh-llm';
 import type { VisionConfig } from '../config.ts';
+import { describeImage, isDirectEndpoint } from './openai-compat.ts';
 import type { Logger } from '../types.ts';
 
 /** 通过 dsh-llm 的 ImageBlock 间接引用 dsh-attachment 类型，避免直接依赖 dsh-attachment */
@@ -271,7 +272,13 @@ export function ensureVisionInputModal(vision: VisionConfig, logger: Logger): vo
 /** 注册 tuitui_describe_image 工具（服务缺失时优雅降级，不阻断插件启动） */
 export function registerDescribeImageTool(ctx: Context, config: VisionConfig, logger: Logger): void {
   if (!config.enabled) return;
-  if (!config.provider || !config.model) {
+  // 两种模式：自己配了 OpenAI 兼容端点（直连），或者沿用 dsh 的 llm adapter。
+  const direct = isDirectEndpoint(config);
+  if (direct && config.model.trim() === '') {
+    logger.warn('im-tuitui: vision.model 未配置，tuitui_describe_image 工具未注册');
+    return;
+  }
+  if (!direct && (!config.provider || !config.model)) {
     logger.warn('im-tuitui: vision.provider/model 未配置，tuitui_describe_image 工具未注册');
     return;
   }
@@ -279,8 +286,9 @@ export function registerDescribeImageTool(ctx: Context, config: VisionConfig, lo
   const tools = ctx.get('tools') as ToolsRegistryLike | undefined;
   const llm = ctx.get('llm') as LlmRuntimeLike | undefined;
   const attachments = ctx.get('attachments') as AttachmentStoreLike | undefined;
-  if (!tools?.register || !llm?.stream || !attachments?.saveImage) {
-    logger.warn('im-tuitui: tools/llm/attachments 服务不可用，tuitui_describe_image 工具未注册');
+  // 直连模式只需要 tools；老路还得要 llm + attachments
+  if (!tools?.register || (!direct && (!llm?.stream || !attachments?.saveImage))) {
+    logger.warn('im-tuitui: 依赖服务不可用（直连需 tools；旧模式还需 llm/attachments），tuitui_describe_image 工具未注册');
     return;
   }
 
@@ -326,6 +334,21 @@ export function registerDescribeImageTool(ctx: Context, config: VisionConfig, lo
       }
 
       const loaded = await loadImageBytes(image, config.maxBytes, exec.signal);
+
+      // 配了 baseUrl + apiKey 就直接打用户的 OpenAI 兼容端点；
+      // 没配（老配置）才退回 dsh llm + attachments 那条老路。
+      if (isDirectEndpoint(config)) {
+        const text = await describeImage(
+          { ...config, maxTokens: config.maxTokens, timeoutMs: config.timeoutMs },
+          { bytes: loaded.data, mediaType: loaded.mediaType, prompt: prompt ?? config.defaultPrompt },
+        );
+        return { text, model: config.model, image, mimeType: loaded.mediaType, bytes: loaded.data.length };
+      }
+
+      // 注册时已校验过；这里再收窄一次类型，避免闭包里丢窄化信息
+      if (attachments === undefined || llm === undefined) {
+        throw new Error('tuitui_describe_image: 视觉服务不可用（既没配端点，也没有 dsh llm）');
+      }
       const ref = await attachments.saveImage({
         data: loaded.data,
         mediaType: loaded.mediaType,
@@ -337,5 +360,5 @@ export function registerDescribeImageTool(ctx: Context, config: VisionConfig, lo
   };
 
   tools.register(definition);
-  logger.info(`im-tuitui: tuitui_describe_image 工具已注册 (provider=${config.provider} model=${config.model})`);
+  logger.info(`im-tuitui: tuitui_describe_image 工具已注册 (${direct ? '直连 ' + config.baseUrl : 'provider=' + config.provider} model=${config.model})`);
 }

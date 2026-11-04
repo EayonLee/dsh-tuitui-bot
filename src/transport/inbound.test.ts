@@ -13,8 +13,14 @@ import type {
 } from '../types.ts';
 
 // 历史清理由 features/history-store 承担：断言调用即可，不依赖其真实存储
-vi.mock('../features/history-store.ts', () => ({ clearGroupHistory: vi.fn() }));
-import { clearGroupHistory } from '../features/history-store.ts';
+vi.mock('../features/history-store.ts', () => ({
+  clearGroupHistory: vi.fn(),
+  getHistoryDelivered: vi.fn(() => undefined),
+  markHistoryDelivered: vi.fn(),
+  // 单测里水位线默认不生效：原样返回，断言"历史有没有进 prompt"
+  undeliveredHistory: vi.fn((entries: unknown[]) => entries),
+}));
+import { clearGroupHistory, markHistoryDelivered } from '../features/history-store.ts';
 
 const logger: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 const config = {
@@ -193,7 +199,8 @@ describe('handleInbound: 内容组装', () => {
 
     const text = followedText(record);
     expect(text).toContain('[张三 (zhangsan)] 你好 (@you)');
-    expect(clearGroupHistory).toHaveBeenCalledWith('app-1', 'g-1');
+    // 不再整桶清空：只推进水位线（这里没有历史条目，所以没得推）
+    expect(clearGroupHistory).not.toHaveBeenCalled();
   });
 
   it('群聊未 @ 时也保留文本，但清历史用 groupId', async () => {
@@ -225,7 +232,7 @@ describe('handleInbound: 内容组装', () => {
     expect(text.indexOf('[李四 (u-2)]')).toBeLessThan(text.indexOf('[张三 (zhangsan)]'));
   });
 
-  it('团队帖子：标签含频道名，回复后按 team/channel 清历史', async () => {
+  it('团队帖子：标签含频道名，回复后水位线按 team/channel 推进', async () => {
     const { manager, record } = createManager();
     const ctx = createCtx(
       createMessage({
@@ -246,7 +253,27 @@ describe('handleInbound: 内容组装', () => {
     await handleInbound(ctx, manager, config, logger);
 
     expect(followedText(record)).toContain('[张三 (zhangsan) · 鱼塘] 看下这个');
-    expect(clearGroupHistory).toHaveBeenCalledWith('app-1', 'team-1/ch-1');
+    // 没有历史条目可推进，也不该去清缓冲
+    expect(clearGroupHistory).not.toHaveBeenCalled();
+  });
+
+  it('带历史时推进水位线到最后一条历史，避免下次重复灌', async () => {
+    const { manager, record } = createManager();
+    const ctx = createCtx(
+      createMessage({ kind: 'group', groupId: 'g-9', content: '继续' }),
+      {
+        mention: { wasMentioned: true },
+        history: [
+          { senderId: 'u-2', senderName: '李四', content: '甲', timestamp: 1, messageId: 'h1' },
+          { senderId: 'u-3', senderName: '王五', content: '乙', timestamp: 2, messageId: 'h2' },
+        ],
+      },
+    );
+
+    await handleInbound(ctx, manager, config, logger);
+
+    expect(followedText(record)).toContain('[Chat history begins]');
+    expect(markHistoryDelivered).toHaveBeenCalledWith('app-1', 'g-9', 'h2');
   });
 
   it('引用消息块包在 [Quoted message] 之间', async () => {

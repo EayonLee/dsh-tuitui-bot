@@ -19,6 +19,7 @@ import {
   BIND_STATE_PATH,
   BIND_UNBIND_PATH,
   BIND_VERIFY_PATH,
+  TEST_MODEL_PATH,
   registerBindRoutes,
   type BindRoutesOptions,
   type WebRoute,
@@ -114,7 +115,7 @@ function harness(options: BindRoutesOptions = {}, service: Parameters<typeof reg
 }
 
 describe('registerBindRoutes 路由注册', () => {
-  it('注册 5 条精确路由，注销函数逐条注销', () => {
+  it('注册 6 条精确路由（含图像端点连接测试），注销函数逐条注销', () => {
     const h = harness();
     expect(h.routes.map((route) => route.path).sort()).toEqual([
       BIND_CONFIG_PATH,
@@ -122,6 +123,7 @@ describe('registerBindRoutes 路由注册', () => {
       BIND_STATE_PATH,
       BIND_UNBIND_PATH,
       BIND_VERIFY_PATH,
+      TEST_MODEL_PATH,
     ].sort());
     expect(h.routes.every((route) => route.kind === 'exact')).toBe(true);
 

@@ -43,13 +43,33 @@ export interface MediaConfig {
     /** 富媒体存活时长（小时，TTL），默认 24，0 = 永不过期 */
     ttlHours: number;
 }
-export interface VisionConfig {
+/**
+ * 一个 OpenAI 兼容的图像端点。
+ *
+ * 理解与生成各配一套，互不影响：地址 + 密钥 + 模型 id，就这三样。
+ * apiKey 只在服务端用，永远不往回吐。
+ */
+export interface ImageModelConfig {
     enabled: boolean;
-    provider: string;
+    /** OpenAI 兼容 base url，例如 https://llm.api.zyuncs.com/v1 */
+    baseUrl: string;
+    /** 密钥（只写不读：设置页永远显示空） */
+    apiKey: string;
+    /** 模型 id，例如 qwen/qwen3-vl-30b-a3b-instruct */
     model: string;
+}
+export interface VisionConfig extends ImageModelConfig {
+    /** 兼容旧字段：dsh llm adapter 名（配了 baseUrl/apiKey 后不再使用） */
+    provider: string;
     defaultPrompt: string;
     maxBytes: number;
     maxTokens: number;
+    timeoutMs: number;
+}
+/** 图像生成配置 */
+export interface ImageGenerationConfig extends ImageModelConfig {
+    /** 出图尺寸，例如 1024x1024 */
+    size: string;
     timeoutMs: number;
 }
 /** 附件发送配置（tuitui_send_file 工具与 present 交付物投递共用） */
@@ -170,6 +190,8 @@ export interface ImTuituiConfig {
     media: MediaConfig;
     /** 视觉理解（tuitui_describe_image 工具） */
     vision: VisionConfig;
+    /** 图像生成配置 */
+    imageGeneration: ImageGenerationConfig;
     /** 附件发送 */
     sendFile: SendFileConfig;
     /** 交互卡片 */

@@ -186,6 +186,19 @@ const PANEL_CSS: readonly string[] = [
   '  font: inherit; font-size: 12px; color: var(--dsw-alias-label-tertiary); cursor: pointer;',
   '}',
   '.imqb2-inline-btn:hover { color: var(--dsw-alias-label-primary); }',
+  '.imqb2-inline-btn[disabled] { opacity: .5; cursor: default; }',
+  '.imqb2-subhead { margin: 14px 0 4px; font-size: 12px; font-weight: 600; line-height: 18px; color: var(--dsw-alias-label-secondary); }',
+  '.imqb2-explain { margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: var(--dsw-alias-bg-secondary, rgba(127,127,127,.06)); }',
+  '.imqb2-explain-title { font-size: 12px; font-weight: 600; line-height: 18px; margin-bottom: 4px; }',
+  '.imqb2-explain-list { margin: 0; padding-left: 18px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }',
+  '.imqb2-explain-note { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }',
+  '.imqb2-secret { display: flex; align-items: center; gap: 8px; }',
+  '.imqb2-secret-flag { font-size: 12px; line-height: 16px; white-space: nowrap; color: var(--dsw-alias-label-tertiary); }',
+  '.imqb2-secret-flag--on { color: var(--dsw-alias-label-success, #2f9e44); }',
+  '.imqb2-probe { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }',
+  '.imqb2-probe-result { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }',
+  '.imqb2-probe-result--ok { color: var(--dsw-alias-label-success, #2f9e44); }',
+  '.imqb2-probe-result--bad { color: var(--dsw-alias-label-danger, #e03131); }',
   '.imqb2-select {',
   '  box-sizing: border-box; width: 100%; max-width: 420px; height: 32px; padding: 0 28px 0 10px;',
   '  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md, 8px);',
@@ -308,6 +321,8 @@ const PANEL_CSS: readonly string[] = [
   /* ── 说明走 tooltip：虚线下划线提示「这里可以看」 ── */
   '.imqb2-has-tip { cursor: help; border-bottom: 1px dashed var(--dsw-alias-border-secondary); }',
   '.imqb2-input--text { width: 76px; text-align: center; }',
+  // 地址 / 模型 ID / 密钥这类长串：撑满控件区，别让人在 76px 的框里看 URL
+  '.imqb2-input--wide { width: 100%; min-width: 220px; max-width: 460px; text-align: left; }',
 ];
 
 /** 注入配置面板样式（挂载时注入、卸载时移除） */
@@ -402,14 +417,14 @@ function Row({ label, sub, help, inline = false, children }: {
 }
 
 /** 单行文本输入（表情、短串） */
-function TextRow({ label, sub, help, value, placeholder, maxLength, onChange }: {
+function TextRow({ label, sub, help, value, placeholder, maxLength, wide = false, onChange }: {
   label: string; sub?: string; help?: string; value: string;
-  placeholder?: string; maxLength?: number; onChange: (next: string) => void;
+  placeholder?: string; maxLength?: number; wide?: boolean; onChange: (next: string) => void;
 }): ReactNode {
   return createElement(Row, { label, sub, help, inline: true },
     createElement('input', {
       type: 'text',
-      className: 'imqb2-input imqb2-input--text',
+      className: 'imqb2-input ' + (wide ? 'imqb2-input--wide' : 'imqb2-input--text'),
       value,
       placeholder,
       maxLength,
@@ -420,6 +435,56 @@ function TextRow({ label, sub, help, value, placeholder, maxLength, onChange }: 
 }
 
 /** 模块卡片：一个主题 = 一块独立背景，标题上的问号挂说明 */
+/**
+ * 密钥行：值永远是空的。
+ *
+ * 为什么不做"回显成 ****"：星号长度会泄露密钥长度，而且用户没法判断自己看到的是
+ * 占位符还是真值。这里只显示"已设置 / 未设置"，留空提交 = 不改动。
+ */
+function SecretRow({ label, sub, help, isSet, value, placeholder, onChange }: {
+  label: string; sub?: string; help?: string; isSet: boolean; value: string;
+  placeholder?: string; onChange: (next: string) => void;
+}): ReactNode {
+  return createElement(Row, { label, sub, help, inline: true },
+    createElement('div', { className: 'imqb2-secret' },
+      createElement('input', {
+        type: 'password',
+        className: 'imqb2-input imqb2-input--wide',
+        value,
+        placeholder: isSet ? '已设置（留空不改）' : (placeholder ?? '未设置'),
+        spellCheck: false,
+        autoComplete: 'new-password',
+        onChange: (event: ChangeEvent<HTMLInputElement>) => { onChange(event.currentTarget.value); },
+      }),
+      createElement('span', {
+        className: 'imqb2-secret-flag' + (isSet ? ' imqb2-secret-flag--on' : ''),
+      }, isSet ? '已设置' : '未设置'),
+    ),
+  );
+}
+
+/** 连接测试行：一个按钮 + 一行结论 */
+function ProbeRow({ label, help, state, busy, onTest }: {
+  label: string; help?: string; state?: { ok: boolean; detail: string } | null;
+  busy: boolean; onTest: () => void;
+}): ReactNode {
+  return createElement(Row, { label, help, inline: true },
+    createElement('div', { className: 'imqb2-probe' },
+      createElement('button', {
+        type: 'button',
+        className: 'imqb2-inline-btn',
+        disabled: busy,
+        onClick: onTest,
+      }, busy ? '测试中…' : '测试连接'),
+      state === null || state === undefined
+        ? null
+        : createElement('span', {
+            className: 'imqb2-probe-result' + (state.ok ? ' imqb2-probe-result--ok' : ' imqb2-probe-result--bad'),
+          }, (state.ok ? '✓ ' : '✗ ') + state.detail),
+    ),
+  );
+}
+
 function Section({ id, title, desc, children }: {
   id: string; title: string; desc?: string; children?: ReactNode;
 }): ReactNode {
@@ -601,6 +666,9 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeModule, setActiveModule] = useState('scope');
   const bindPhase = props?.bindPhase;
+  // 连接测试：kind → 结果 / 进行中。只放本地内存，不参与保存。
+  const [probe, setProbe] = useState<Record<string, { ok: boolean; detail: string } | null>>({});
+  const [probeBusy, setProbeBusy] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -624,6 +692,35 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     setResult(null);
   }, []);
 
+  const testEndpoint = useCallback((kind: 'vision' | 'image'): void => {
+    if (probeBusy !== null || form === null) return;
+    const prefix = kind === 'vision' ? 'vision' : 'imageGeneration';
+    setProbeBusy(kind);
+    setProbe((current) => ({ ...current, [kind]: null }));
+    void fetch(TEST_MODEL_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind,
+        baseUrl: form[`${prefix}.baseUrl` as keyof ConfigWire] ?? '',
+        model: form[`${prefix}.model` as keyof ConfigWire] ?? '',
+        // 密钥框是空的就交给服务端用已保存的那份
+        apiKey: form[`${prefix}.apiKey` as keyof ConfigWire] ?? '',
+      }),
+    })
+      .then(async (res) => {
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; detail?: string; error?: string };
+        setProbe((current) => ({
+          ...current,
+          [kind]: { ok: body.ok === true, detail: body.detail ?? body.error ?? 'HTTP ' + res.status },
+        }));
+      })
+      .catch((err: unknown) => {
+        setProbe((current) => ({ ...current, [kind]: { ok: false, detail: err instanceof Error ? err.message : String(err) } }));
+      })
+      .finally(() => { setProbeBusy(null); });
+  }, [form, probeBusy]);
+
   const submit = useCallback((event: FormEvent): void => {
     event.preventDefault();
     if (busy || initial === null || form === null) return;
@@ -644,7 +741,17 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         const body = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string };
         if (res.ok && body.ok === true) {
           setResult({ ok: true, message: body.message ?? '配置已保存，插件将自动重载' });
-          setInitial(form);
+          // 保存成功后把密钥框清空、标记翻成"已设置"：
+          // 否则页面上会一直留着一串明文密码，看着像还能读回来。
+          const synced: ConfigWire = {
+            ...form,
+            'vision.apiKeySet': form['vision.apiKeySet'] === true || (form['vision.apiKey'] ?? '') !== '',
+            'imageGeneration.apiKeySet': form['imageGeneration.apiKeySet'] === true || (form['imageGeneration.apiKey'] ?? '') !== '',
+            'vision.apiKey': '',
+            'imageGeneration.apiKey': '',
+          };
+          setInitial(synced);
+          setForm(synced);
           return;
         }
         setResult({ ok: false, message: body.error ?? '保存失败（HTTP ' + res.status + '）' });
@@ -679,6 +786,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     { id: 'scope', label: '服务范围' },
     { id: 'reply', label: '回话方式' },
     ...(policy === 'smart' ? [{ id: 'smart', label: '智能判断' }] : []),
+    { id: 'image', label: '图像' },
     { id: 'reaction', label: '表情回执' },
     { id: 'context', label: '上下文' },
     { id: 'workspace', label: '工作区' },
@@ -826,21 +934,21 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('reactions.inGroup', v); },
       }),
       createElement(TextRow, {
-        label: '在算', value: form['reactions.ack'] ?? '👀',
-        placeholder: '👀', maxLength: 8,
-        help: '收到消息时挂的表情。留空 = 不挂。',
+        label: '在算', value: form['reactions.ack'] ?? '微笑',
+        placeholder: '微笑', maxLength: 10,
+        help: '填表情名：微笑 / OK / 抱拳 / 玫瑰。推推只认名字，填 👀 这种 unicode 会被服务端拒掉。留空 = 不挂。',
         onChange: (v) => { patch('reactions.ack', v); },
       }),
       createElement(TextRow, {
-        label: '完成', value: form['reactions.done'] ?? '✅',
-        placeholder: '✅', maxLength: 8,
-        help: '处理完把「在算」换成这个。留空 = 只撤不换。',
+        label: '完成', value: form['reactions.done'] ?? 'OK',
+        placeholder: 'OK', maxLength: 10,
+        help: '处理完把「在算」换成这个，同样是表情名（OK / 强 / 鼓掌）。留空 = 只撤不换。',
         onChange: (v) => { patch('reactions.done', v); },
       }),
       createElement(TextRow, {
-        label: '出错', value: form['reactions.fail'] ?? '😵',
-        placeholder: '😵', maxLength: 8,
-        help: '处理失败时换成这个。留空 = 只撤不换。',
+        label: '出错', value: form['reactions.fail'] ?? '委屈',
+        placeholder: '委屈', maxLength: 10,
+        help: '处理失败时换成这个（委屈 / 心碎 / 疑问）。留空 = 只撤不换。',
         onChange: (v) => { patch('reactions.fail', v); },
       }),
     ),
@@ -849,14 +957,25 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       ? createElement(Section, {
           id: 'smart',
           title: '智能判断',
-          desc: '要不要说话、挂个表情还是不理，全由模型读上下文决定；没有名字匹配之类的规则。',
+          desc: '群聊/帖子没有指定叫机器人时，由模型读最近对话决定「这条要不要接」；单聊不经过判定。',
         },
+          createElement('div', { className: 'imqb2-explain' },
+            createElement('div', { className: 'imqb2-explain-title' }, '它到底在判断什么'),
+            createElement('ul', { className: 'imqb2-explain-list' },
+              createElement('li', null, '要不要接这句话 —— 别人在聊自己的事时保持安静，被问到或话题相关才插话。'),
+              createElement('li', null, '接的话怎么接 —— 是正常回答、还是只挂个表情表示看到了。'),
+              createElement('li', null, '什么时候闭嘴 —— 对话已经结束、或者自己刚说过，就不重复刷屏。'),
+            ),
+            createElement('div', { className: 'imqb2-explain-note' },
+              '@ 了机器人、或者引用它的消息回复，一律直接回，不经过这个判定，也不受下面的间隔限制。',
+            ),
+          ),
           createElement(TextAreaRow, {
             label: '判定提示词',
             value: form['smartJudge.prompt'] ?? DEFAULT_SMART_PROMPT,
             rows: 14,
             sub: '支持多行；留空恢复出厂默认',
-            help: '模型会拿到【最近对话】与【新消息】，按这里的规则判断要不要回。',
+            help: '模型会拿到【最近对话】与【新消息】，按这里的规则判断要不要回；改坏了可以直接恢复默认。',
             action: createElement('button', {
               type: 'button', className: 'imqb2-inline-btn',
               onClick: () => { patch('smartJudge.prompt', ''); },
@@ -891,7 +1010,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     },
       createElement(NumberRow, {
         label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
-        help: '被叫到时附带最近 N 条群消息；0 表示不带。私聊靠会话自身记忆，不受影响。',
+        help: '被叫到时附带最近 N 条群消息（滚动保留，回完不清空，只补没给模型看过的新消息）；0 表示不带。私聊靠会话自身记忆，不受影响。',
         onChange: (v) => { patch('historyLimit', v); },
       }),
       createElement(NumberRow, {
@@ -928,26 +1047,68 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
-      id: 'vision',
-      title: '看图',
-      desc: '群里有人发图时，机器人能自己看明白再回话；用的是 dsh 里注册的视觉模型。',
+      id: 'image',
+      title: '图像理解与生成',
+      desc: '两套独立配置，都是「地址 + 密钥 + 模型ID」三样。理解用来看图和 OCR，生成用来画图；密钥只存服务端，页面上永远不回显。',
     },
+      createElement('div', { className: 'imqb2-subhead' }, '① 图像理解（看图 / OCR / 截图分析）'),
       createElement(SwitchRow, {
-        label: '启用视觉理解', checked: form['vision.enabled'] ?? false,
-        help: '打开后注册 tuitui_describe_image 工具，机器人才有"眼睛"。',
+        label: '启用图像理解', checked: form['vision.enabled'] ?? false,
+        help: '打开后注册 tuitui_describe_image 工具，群里有人发图它才能看明白再回话。',
         onChange: (v) => { patch('vision.enabled', v); },
       }),
       createElement(TextRow, {
-        label: '模型 provider', value: form['vision.provider'] ?? '',
-        placeholder: 'pi-ai',
-        help: 'dsh 里注册的 llm adapter 名，留空用默认。',
-        onChange: (v) => { patch('vision.provider', v); },
+        label: '地址', wide: true, value: form['vision.baseUrl'] ?? '',
+        placeholder: 'https://llm.api.zyuncs.com/v1',
+        help: 'OpenAI 兼容 base url，一般以 /v1 结尾。',
+        onChange: (v) => { patch('vision.baseUrl', v); },
       }),
       createElement(TextRow, {
-        label: '模型 id', value: form['vision.model'] ?? '',
-        placeholder: 'qwen-vl-max',
-        help: '视觉模型 id，留空用默认。',
+        label: '模型ID', wide: true, value: form['vision.model'] ?? '',
+        placeholder: 'qwen/qwen3-vl-30b-a3b-instruct',
+        help: '必须是视觉模型（能收图的那种）。',
         onChange: (v) => { patch('vision.model', v); },
+      }),
+      createElement(SecretRow, {
+        label: '密钥', isSet: form['vision.apiKeySet'] === true, value: form['vision.apiKey'] ?? '',
+        placeholder: '粘贴密钥',
+        help: '保存后不再显示；留空保存 = 不改动已存的密钥。',
+        onChange: (v) => { patch('vision.apiKey', v); },
+      }),
+      createElement(ProbeRow, {
+        label: '连接测试', state: probe.vision, busy: probeBusy === 'vision',
+        help: '只探 /models，不生成内容、不花钱；用表单里当前填的值，没填密钥就用已保存的。',
+        onTest: () => { testEndpoint('vision'); },
+      }),
+
+      createElement('div', { className: 'imqb2-subhead' }, '② 图像生成（画图）'),
+      createElement(SwitchRow, {
+        label: '启用图像生成', checked: form['imageGeneration.enabled'] ?? false,
+        help: '打开后注册 tuitui_draw 工具：让它画图，它会生成并发到当前会话。',
+        onChange: (v) => { patch('imageGeneration.enabled', v); },
+      }),
+      createElement(TextRow, {
+        label: '地址', wide: true, value: form['imageGeneration.baseUrl'] ?? '',
+        placeholder: 'https://llm.api.zyuncs.com/v1',
+        help: 'OpenAI 兼容 base url，一般以 /v1 结尾。',
+        onChange: (v) => { patch('imageGeneration.baseUrl', v); },
+      }),
+      createElement(TextRow, {
+        label: '模型ID', wide: true, value: form['imageGeneration.model'] ?? '',
+        placeholder: 'qwen/qwen-image-2512',
+        help: '文生图模型 id。尺寸按模型默认走，不另外配。',
+        onChange: (v) => { patch('imageGeneration.model', v); },
+      }),
+      createElement(SecretRow, {
+        label: '密钥', isSet: form['imageGeneration.apiKeySet'] === true, value: form['imageGeneration.apiKey'] ?? '',
+        placeholder: '粘贴密钥',
+        help: '和上面的理解密钥是两份，可以填同一个也可以填不同的。',
+        onChange: (v) => { patch('imageGeneration.apiKey', v); },
+      }),
+      createElement(ProbeRow, {
+        label: '连接测试', state: probe.image, busy: probeBusy === 'image',
+        help: '只探 /models；出图是否可用，保存后让它真画一张最准。',
+        onTest: () => { testEndpoint('image'); },
       }),
     ),
 

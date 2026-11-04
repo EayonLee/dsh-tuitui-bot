@@ -18,7 +18,7 @@ import {
 } from './binding-service.ts';
 import { BIND_GUIDE_LINES, createTerminalPresenter, isDesktopHost } from './presenters.ts';
 import { ensureCredentials } from './index.ts';
-import { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH } from './bind-routes.ts';
+import { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH, TEST_MODEL_PATH } from './bind-routes.ts';
 import type { Logger } from '../types.ts';
 
 const logger = {
@@ -338,7 +338,7 @@ describe('presenters 终端呈现', () => {
 });
 
 describe('ensureCredentials 编排', () => {
-  it('同步返回 null，注册 5 条路由并挂两个 ctx.effect', async () => {
+  it('同步返回 null，注册 6 条路由并挂两个 ctx.effect', async () => {
     const printed: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => { printed.push(args.join(' ')); });
 
@@ -373,6 +373,7 @@ describe('ensureCredentials 编排', () => {
     expect(scopedEffects.map((item) => item.name)).toEqual(['im-tuitui.bind-routes']);
     expect(routes.map((route) => route.path).sort()).toEqual([
       BIND_CONFIG_PATH,
+      TEST_MODEL_PATH,
       BIND_MANUAL_PATH,
       BIND_STATE_PATH,
       BIND_UNBIND_PATH,

@@ -34,6 +34,8 @@ function makeLogger(): { logger: Logger; info: ReturnType<typeof vi.fn>; warn: R
 
 const vision: VisionConfig = {
   enabled: true,
+  baseUrl: '',
+  apiKey: '',
   provider: 'google',
   model: 'gemini-flash',
   defaultPrompt: '描述这张图',
@@ -63,6 +65,7 @@ function settingsYaml(extraModels = ''): string {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   delete process.env.DSH_HOME;
   while (dirs.length > 0) {
     const dir = dirs.pop();
@@ -220,7 +223,11 @@ describe('registerDescribeImageTool', () => {
     enabled?: boolean;
     provider?: string;
     model?: string;
+    baseUrl?: string;
+    apiKey?: string;
     services?: boolean;
+    /** 只给 tools 服务，模拟"直连模式不需要 llm/attachments" */
+    toolsOnly?: boolean;
     chunks?: unknown[];
     savedRef?: Record<string, unknown>;
   }
@@ -232,6 +239,7 @@ describe('registerDescribeImageTool', () => {
     const ctx = {
       get(name: string) {
         if (options.services === false) return undefined;
+        if (options.toolsOnly === true && name !== 'tools') return undefined;
         if (name === 'tools') return { register: (definition: unknown) => { defs.push(definition as ToolDefinition); } };
         if (name === 'llm') {
           return {
@@ -268,6 +276,8 @@ describe('registerDescribeImageTool', () => {
       enabled: options.enabled ?? true,
       provider: options.provider ?? vision.provider,
       model: options.model ?? vision.model,
+      baseUrl: options.baseUrl ?? vision.baseUrl,
+      apiKey: options.apiKey ?? vision.apiKey,
     };
     registerDescribeImageTool(ctx as never, toolConfig, logger);
     return { defs, saved, streamOptions, warn, definition: defs[0], config: toolConfig };
@@ -298,6 +308,84 @@ describe('registerDescribeImageTool', () => {
     expect(definition?.name).toBe(DESCRIBE_IMAGE_TOOL_NAME);
     expect(definition?.parameters.required).toEqual(['image']);
     expect(definition?.output.render(undefined, { text: '图中是一只猫' })).toEqual([{ type: 'text', text: '图中是一只猫' }]);
+  });
+
+  it('配了 baseUrl + apiKey 就走用户自己的端点，不再碰 dsh llm / attachments', async () => {
+    const home = await makeDshHome();
+    const file = join(home, 'ok.png');
+    await writeFile(file, pngBytes(16));
+
+    const calls: Array<{ url: string; auth: string | undefined; body: string }> = [];
+    vi.stubGlobal('fetch', async (url: string, init: any) => {
+      calls.push({ url, auth: init?.headers?.authorization, body: init?.body ?? '' });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ choices: [{ message: { content: '图片是蓝色的' } }] }),
+      };
+    });
+
+    const { definition, saved, streamOptions } = setupTool({
+      baseUrl: 'https://llm.api.zyuncs.com/v1/',
+      apiKey: 'sk-direct',
+      model: 'qwen/qwen3-vl-30b-a3b-instruct',
+    });
+
+    const out = await definition!.execute({ image: file, prompt: '什么颜色' }, { signal });
+
+    expect(out.text).toBe('图片是蓝色的');
+    expect(out.model).toBe('qwen/qwen3-vl-30b-a3b-instruct');
+    expect(calls[0]?.url).toBe('https://llm.api.zyuncs.com/v1/chat/completions');
+    expect(calls[0]?.auth).toBe('Bearer sk-direct');
+    expect(calls[0]?.body).toContain('什么颜色');
+    // 直连路径不经过 attachments，也不调 dsh llm
+    expect(saved).toEqual([]);
+    expect(streamOptions).toEqual([]);
+  });
+
+  it('直连模式只要求 tools：没有 llm / attachments 也能注册并工作', async () => {
+    const home = await makeDshHome();
+    const file = join(home, 'direct.png');
+    await writeFile(file, pngBytes(16));
+    vi.stubGlobal('fetch', async () => ({
+      ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: '直连结果' } }] }),
+    }));
+
+    const { defs, warn } = setupTool({
+      toolsOnly: true,
+      provider: '',
+      baseUrl: 'https://llm.api.zyuncs.com/v1',
+      apiKey: 'sk-direct',
+      model: 'qwen/qwen3-vl-30b-a3b-instruct',
+    });
+
+    expect(defs).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+    const out = await defs[0]!.execute({ image: file }, { signal });
+    expect(out.text).toBe('直连结果');
+  });
+
+  it('直连但没填模型 id 时也拒绝注册，并说清缺的是哪个', () => {
+    const { defs, warn } = setupTool({
+      provider: '', model: '', baseUrl: 'https://llm.api.zyuncs.com/v1', apiKey: 'k',
+    });
+    expect(defs).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('vision.model'));
+  });
+
+  it('只有 baseUrl 没有 apiKey 时仍走老路（不至于两边都不通）', async () => {
+    const home = await makeDshHome();
+    const file = join(home, 'ok2.png');
+    await writeFile(file, pngBytes(16));
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const { definition, streamOptions } = setupTool({ baseUrl: 'https://llm.api.zyuncs.com/v1' });
+    const out = await definition!.execute({ image: file }, { signal });
+
+    expect(out.text).toBe('一只猫');
+    expect(streamOptions).toHaveLength(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('image 为空或非字符串时报错', async () => {

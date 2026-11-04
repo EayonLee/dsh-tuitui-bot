@@ -17,6 +17,7 @@ import type {
 } from '../types.ts';
 import { extractMessageId, describeApiError } from './client.ts';
 import { mergeMentions } from './mention-parse.ts';
+import { resolveTuituiEmoji } from './emoji.ts';
 import { settleReceipt } from '../features/receipt-registry.ts';
 
 /** 发送器构造参数 */
@@ -303,6 +304,15 @@ export class TuituiSenderImpl implements TuituiSender {
   }
 
   public async emojiReaction(target: ReplyTarget, msgId: string, emoji: string, cancel?: boolean): Promise<void> {
+    // 推推只认表情名（微笑 / OK / 抱拳），unicode emoji 会被服务端拒成
+    // 「不合法的emoji表情」；老配置里的 👀/✅ 在这里兜底翻译。
+    const name = resolveTuituiEmoji(emoji);
+    if (name === '') return;
+    if (name === null) {
+      this.logger.warn?.(`emojiReaction 跳过：推推不认这个表情 ${emoji}，请换成表情名（微笑 / OK / 抱拳 / 玫瑰）`);
+      return;
+    }
+    emoji = name;
     try {
       if (target.scope === 'post') {
         await this.client.teams.emojiReaction({
@@ -318,8 +328,9 @@ export class TuituiSenderImpl implements TuituiSender {
       if (!to) return;
       await this.client.im.emojiReaction({ to, messageId: msgId, emoji, ...(cancel ? { cancel } : {}) });
     } catch (error) {
-      // emoji reaction 属锦上添花，失败不打扰用户
-      this.logger.debug?.(`emojiReaction failed: ${describeApiError(error)}`);
+      // 回执失败不打断主流程，但必须留痕：以前这里用 debug，日志级别 info 起
+      // 记，结果"表情回执完全没效果"在日志里一个字都查不到。
+      this.logger.warn?.(`emojiReaction failed: ${describeApiError(error)} (emoji=${emoji})`);
     }
   }
 }
