@@ -1,6 +1,6 @@
 {
   "name": "@eayonlee/dsh-tuitui-bot",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "icon": "./assets/icons/tuitui.jpg",
   "description": "在推推（Tuitui）单聊、群聊与团队频道里直接对话 DeepSeek Harness。 Chat with DeepSeek Harness in Tuitui IM.",
   "author": "EayonLee",
