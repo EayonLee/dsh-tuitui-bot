@@ -19,6 +19,7 @@ import type { ToolsRegistryLike } from '../transport/tool-presenter.ts';
 import { DeliverablesDeliverer } from '../transport/deliverables.ts';
 import { QuestionChannel } from '../features/question-channel.ts';
 import { ApprovalChannel, type ApprovalChannelContext } from '../features/approval-channel.ts';
+import { decodeButtonData, getInteractiveAction } from '../features/button-utils.ts';
 import { buildCommandList } from '../commands/index.ts';
 import { startMediaCleanup } from '../media/media-cleaner.ts';
 import { ensureVisionInputModal, registerDescribeImageTool } from '../media/vision-tool.ts';
@@ -91,12 +92,42 @@ async function dispatchInteraction(
   payload: InteractionPayload,
   questionChannel: QuestionChannel,
   approvalChannel: ApprovalChannel,
+  logger: Logger,
 ): Promise<boolean> {
   const [question, approval] = await Promise.all([
     questionChannel.handleInteraction(payload).catch(() => false),
     approvalChannel.handleInteraction(payload).catch(() => false),
   ]);
-  return question || approval;
+  if (question || approval) return true;
+
+  // 是本插件协议里的按钮，却没人认领 = 卡片过期（审批/问答早就结束，或插件重启过）。
+  // 静默是这里最差的选项：用户只看到"点了没反应"，然后是会话一直在等。
+  const click = getInteractiveAction(payload.message);
+  const button = click ? decodeButtonData(click.value) : undefined;
+  if (!button) return false;
+  try {
+    await payload.bot.sendMarkdown(
+      payload.replyTarget,
+      '这张卡片已经作废了（审批/问题已经结束，或者机器人刚刚重启过）。要办就重新发一次。',
+    );
+  } catch (error) {
+    logger.warn(`stale-card notice failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return false;
+}
+
+/**
+ * 跑一个"有就有、没有也能聊"的可选注册项：失败只记 warn，不影响插件激活。
+ *
+ * 历史上这里有过一次整插件激活失败（可选服务读取抛错带崩 apply），
+ * 结果是通道静默死掉、卡片全是死的，所以这些点必须各自兜住。
+ */
+function runOptional(logger: Logger, label: string, fn: () => void): void {
+  try {
+    fn();
+  } catch (error) {
+    logger.warn(`${label} registration failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
@@ -167,10 +198,20 @@ export async function bootstrapGateway(
   // ── 问答 / 审批通道（交互卡片 + 文本兜底） ──
   const questionChannel = new QuestionChannel(manager, sender, config, logger);
   manager.questionChannel = questionChannel;
-  questionChannel.install(ctx);
+  // 可选服务（userQuestions / approval）挂载失败只降级对应通道，
+  // 不能把整个插件激活搞挂——插件死了，连消息都收不到。
+  try {
+    questionChannel.install(ctx);
+  } catch (error) {
+    logger.warn(`question channel install failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
   const approvalChannel = new ApprovalChannel(manager, sender, config, logger);
   manager.approvalChannel = approvalChannel;
-  approvalChannel.install(ctx as unknown as ApprovalChannelContext);
+  try {
+    approvalChannel.install(ctx as unknown as ApprovalChannelContext);
+  } catch (error) {
+    logger.warn(`approval channel install failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   // ── 入站：事件 → 归一化 → 中间件 → dsh agent ──
   const handleEvent = async (body: TuituiEventBody): Promise<void> => {
@@ -187,7 +228,7 @@ export async function bootstrapGateway(
     // 交互回调：不进中间件链（没有会话上下文），直接路由到通道
     if (message.eventType === 'interactive_action') {
       try {
-        await dispatchInteraction({ message, replyTarget, bot: sender }, questionChannel, approvalChannel);
+        await dispatchInteraction({ message, replyTarget, bot: sender }, questionChannel, approvalChannel, logger);
       } catch (error) {
         logger.warn(`interaction dispatch failed: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -241,15 +282,19 @@ export async function bootstrapGateway(
 
   // ── 富媒体过期清理 ──
   if (config.media.enabled) {
-    startMediaCleanup(ctx, config.media.ttlHours, logger);
+    try {
+      startMediaCleanup(ctx, config.media.ttlHours, logger);
+    } catch (error) {
+      logger.warn(`media cleanup start failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   // ── 视觉工具注册（tuitui_describe_image，复用 dsh llm + attachments） ──
-  ensureVisionInputModal(config.vision, logger);
-  registerDescribeImageTool(ctx, config.vision, logger);
+  runOptional(logger, 'vision modal', () => ensureVisionInputModal(config.vision, logger));
+  runOptional(logger, 'describe-image tool', () => registerDescribeImageTool(ctx, config.vision, logger));
 
   // ── 附件发送工具注册（tuitui_send_file） ──
-  registerSendFileTool(ctx, sender, manager, config, logger);
+  runOptional(logger, 'send-file tool', () => registerSendFileTool(ctx, sender, manager, config, logger));
 
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void }).effect(() => {
@@ -276,6 +321,9 @@ export async function bootstrapGateway(
     return async () => {
       logger.info('Shutting down');
       subscription.unsubscribe();
+      // 先结算挂起的审批/问答：宿主正在等这些 Promise，拖到进程没了就是永久悬挂
+      approvalChannel.dispose();
+      questionChannel.uninstall();
       await manager.disposeAll();
     };
   }, 'im-tuitui.lifecycle');

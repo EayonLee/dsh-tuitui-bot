@@ -26,7 +26,7 @@ import type {
   SendResult,
   TuituiSender,
 } from '../types.ts';
-import { getScopePeer } from '../shared/scope.ts';
+import { getScopePeer, peerFromSessionKey } from '../shared/scope.ts';
 import { decodeButtonData, getInteractiveAction, type CardTheme, type InteractiveActionEvent } from './button-utils.ts';
 import {
   buildApprovalCard,
@@ -94,6 +94,8 @@ export interface ApprovalChannelConfigLike {
     enabled?: boolean;
     headBgColor?: string;
     headTextColor?: string;
+    /** 审批等待上限（毫秒，0/缺省 = 不限） */
+    approvalTimeoutMs?: number;
   };
 }
 
@@ -124,6 +126,8 @@ interface PendingApproval {
   /** 审批卡片的 msgid（text 作答时也要把卡片改成结果态） */
   cardMsgId?: string;
   onAbort?: () => void;
+  /** 等待上限计时器（超时按 cancelled 结算，避免会话永久悬挂） */
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 const COMMAND_CLIP = 500;
@@ -205,9 +209,27 @@ export class ApprovalChannel {
     const entry = this.pending.get(sessionKey);
     if (!entry) return;
     this.pending.delete(sessionKey);
+    this.clearTimer(entry);
     this.removeAbort(entry);
     entry.resolve('cancelled');
     this.updateResolvedCard(entry, 'cancelled', entry.cardMsgId);
+  }
+
+  /**
+   * 插件卸载/重载时把该实例上所有 pending 审批按 cancelled 结算。
+   *
+   * 不结算的话，宿主的 `approval/request` waterfall 会一直等这个 Promise：
+   * 插件已经没了，新实例也不认识旧卡片的 nonce，点击只会静默落空，
+   * 依赖审批的那次工具调用就把整个会话吊在那里。
+   */
+  public dispose(): void {
+    for (const [key, entry] of this.pending) {
+      this.pending.delete(key);
+      this.clearTimer(entry);
+      this.removeAbort(entry);
+      entry.resolve('cancelled');
+      this.updateResolvedCard(entry, 'cancelled', entry.cardMsgId);
+    }
   }
 
   /**
@@ -260,34 +282,72 @@ export class ApprovalChannel {
     const click = getInteractiveAction(payload.message);
     if (!click) return false;
 
-    const record = this.manager.getSessionRecord(click.scope, click.targetId);
-    if (!record) return false;
-    const entry = this.pending.get(record.sessionKey);
-    if (!entry) return false;
-
     const button = decodeButtonData(click.value);
     if (!button || button.t !== 'approval') return false;
 
+    // 主路径：按点击者的 scope+peerId 找回会话。回调里的身份字段（域账号 / uid）
+    // 偶尔与入站消息不一致（不同事件体带不同字段），那样 sessionKey 就对不上，
+    // 卡片点了会静默落空。nonce 是每次审批唯一且编码在按钮里的，所以按 nonce
+    // 兜底一次：只要当前 pending 里有这张卡，就一定结算它。
+    const record = this.manager.getSessionRecord(click.scope, click.targetId);
+    const key = record?.sessionKey;
+    const entry = (key !== undefined ? this.pending.get(key) : undefined)
+      ?? (button.n ? this.findByNonceForClicker(button.n, click) : undefined);
+    if (!entry) {
+      this.logger.warn(
+        `im-tuitui: approval click without pending entry (stale card): scope=${click.scope} target=${click.targetId} nonce=${button.n ?? '(none)'}`,
+      );
+      return false;
+    }
+    const sessionKey = entry.record.sessionKey;
+
     // nonce 必须匹配 pending：旧卡片/其它会话的卡片点击不 settle（#94-3）
     if (button.n !== entry.nonce) {
-      this.logger.warn(`im-tuitui: approval button nonce mismatch: key=${record.sessionKey}`);
+      this.logger.warn(`im-tuitui: approval button nonce mismatch: key=${sessionKey}`);
       return false;
     }
 
     // 白名单模式下审批只认名单内用户；点击者身份缺失同样拒绝（fail-closed，#94-3）
     if (!this.isClickerAllowed(click)) {
       this.logger.warn(
-        `im-tuitui: approval button rejected (clicker not allowlisted): user=${click.account ?? click.uid ?? '(missing)'} key=${record.sessionKey}`,
+        `im-tuitui: approval button rejected (clicker not allowlisted): user=${click.account ?? click.uid ?? '(missing)'} key=${sessionKey}`,
       );
       return false;
     }
 
-    this.pending.delete(record.sessionKey);
+    this.pending.delete(sessionKey);
+    this.clearTimer(entry);
     this.removeAbort(entry);
     const resolution: ApprovalResolution = button.d === 'allow' ? 'allowed-once' : 'rejected';
     entry.resolve(resolution);
     await this.updateResolvedCardAsync(entry, resolution, click.messageId ?? entry.cardMsgId);
     return true;
+  }
+
+  /**
+   * 按 nonce 找 pending 审批（点击身份字段对不上会话时的兜底路径）。
+   *
+   * 只认"对端一致"的那一条：nonce 虽然在卡片里，但别人也可能点到同一张卡，
+   * 兜底匹配必须自己再核一次点击者，否则等于绕过了会话隔离。
+   */
+  private findByNonceForClicker(nonce: string, click: Pick<InteractiveActionEvent, 'scope' | 'targetId' | 'account' | 'uid'>): PendingApproval | undefined {
+    for (const entry of this.pending.values()) {
+      if (entry.nonce !== nonce) continue;
+      if (this.isSamePeer(entry, click)) return entry;
+      this.logger.warn(`im-tuitui: approval nonce matched an entry of another peer: key=${entry.record.sessionKey}`);
+    }
+    return undefined;
+  }
+
+  /** 点击者是否就是该 pending 审批所属会话的对端 */
+  private isSamePeer(
+    entry: PendingApproval,
+    click: Pick<InteractiveActionEvent, 'scope' | 'targetId' | 'account' | 'uid'>,
+  ): boolean {
+    const peer = peerFromSessionKey(entry.record.sessionKey, entry.record.scope);
+    if (!peer) return false;
+    return peer === click.targetId || peer === click.account || peer === click.uid
+      || entry.record.replyTarget.targetId === click.targetId;
   }
 
   /** 走推推通道：发审批卡片 + 挂起 Promise，等待用户决策 */
@@ -319,6 +379,7 @@ export class ApprovalChannel {
         const onAbort = (): void => {
           if (this.pending.get(key) !== entry) return;
           this.pending.delete(key);
+          this.clearTimer(entry);
           entry.resolve('cancelled');
           this.updateResolvedCard(entry, 'cancelled', entry.cardMsgId);
         };
@@ -326,8 +387,61 @@ export class ApprovalChannel {
         request.signal.addEventListener('abort', onAbort, { once: true });
       }
       this.pending.set(key, entry);
+      this.armTimer(entry, key);
       this.logger.info(`im-tuitui: approval sent to tuitui, waiting for decision key=${key}`);
     });
+  }
+
+  /** 审批等待上限（毫秒）；0 / 非法值 = 不限 */
+  private approvalTimeoutMs(): number {
+    const raw = this.config.interactive?.approvalTimeoutMs;
+    return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+
+  /** 给 pending 审批挂超时计时器（unref：别让一个待批审批拖住宿主退出） */
+  private armTimer(entry: PendingApproval, key: string): void {
+    const timeoutMs = this.approvalTimeoutMs();
+    if (timeoutMs <= 0) return;
+    const timer = setTimeout(() => this.onTimeout(key), timeoutMs);
+    timer.unref?.();
+    entry.timer = timer;
+  }
+
+  private clearTimer(entry: PendingApproval): void {
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = undefined;
+    }
+  }
+
+  /**
+   * 审批超时：按 cancelled 结算（dsh 协议里只有 allowed-once 是放行），
+   * 把卡片改成作废态，并在会话里留一句话——否则用户只看到卡片，不知道它已经废了。
+   */
+  private onTimeout(key: string): void {
+    const entry = this.pending.get(key);
+    if (!entry) return;
+    this.pending.delete(key);
+    this.removeAbort(entry);
+    entry.resolve('cancelled');
+    this.logger.warn(`im-tuitui: approval timed out key=${key}`);
+    this.updateResolvedCard(entry, 'timeout', entry.cardMsgId);
+    void this.notifyExpired(entry, this.approvalTimeoutMs());
+  }
+
+  /** 审批作废后补一句人话（发送失败只记日志，不影响已经 settle 的审批） */
+  private async notifyExpired(entry: PendingApproval, timeoutMs: number): Promise<void> {
+    try {
+      const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+      await this.sender.sendMarkdown(
+        entry.record.replyTarget,
+        `⌛ 刚才那张审批卡等了 ${seconds} 秒没等到确认，已经作废了。要执行就重新发一次。`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `im-tuitui: approval timeout notice failed key=${entry.record.sessionKey}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /**

@@ -12,12 +12,13 @@ import { APPROVAL_OPTIONS } from './answer-parser.ts';
 import { buildAction, resolveCardTheme, type CardTheme } from './button-utils.ts';
 
 /** 审批被点击后落到卡片上的结果文案 */
-export type ApprovalResolution = 'allowed-once' | 'rejected' | 'cancelled';
+export type ApprovalResolution = 'allowed-once' | 'rejected' | 'cancelled' | 'timeout';
 
 const RESOLUTION_TEXT: Record<ApprovalResolution, string> = {
   'allowed-once': '✅ 已允许执行',
   rejected: '❌ 已拒绝执行',
   cancelled: '⚠️ 审批已取消',
+  timeout: '⌛ 审批超时已作废',
 };
 
 /**

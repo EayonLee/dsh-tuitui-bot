@@ -50,7 +50,7 @@ const sessionKey = (scope: ChatScope, peerId: string): string => `tuitui:${scope
 function makeConfig(
   c2cMode: 'open' | 'allowlist' | 'disabled' = 'open',
   c2cAllow: string[] = [],
-  interactive?: { enabled?: boolean },
+  interactive?: { enabled?: boolean; approvalTimeoutMs?: number },
 ): ApprovalChannelConfigLike {
   return { access: { c2cMode, c2cAllow }, ...(interactive ? { interactive } : {}) };
 }
@@ -537,5 +537,89 @@ describe('ApprovalChannel.cancelPending', () => {
 
     await expect(handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome)))
       .resolves.toBe('unavailable');
+  });
+});
+
+// ── 可靠性：不许静默落空、不许永久悬挂 ──
+
+describe('ApprovalChannel 可靠性', () => {
+  it('超时按 cancelled 结算并改写卡片，不会让会话一直等', async () => {
+    const sent: SentCard[] = [];
+    const ch = new ApprovalChannel(
+      createManager({ findBySessionId: () => makeRecord(sessionKey('c2c', 'peer-a')) }),
+      createSender(sent),
+      makeConfig('open', [], { enabled: true, approvalTimeoutMs: 30 }),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+    expect(sent).toHaveLength(1);
+
+    await expect(p).resolves.toBe('cancelled');
+    // 卡片被改写成超时态，且补了一句人话
+    const updated = sent.find((item) => item.updated === true);
+    expect(updated?.card?.footer?.[0]?.text).toContain('超时');
+    expect(sent.some((item) => (item.text ?? '').includes('作废'))).toBe(true);
+  });
+
+  it('点击身份字段与入站消息不一致时按 nonce 兜底结算', async () => {
+    const sent: SentCard[] = [];
+    // getSessionRecord 查不到（模拟回调里 senderAccount 与入站用的是不同字段）
+    const ch = new ApprovalChannel(
+      createManager({
+        findBySessionId: () => makeRecord(sessionKey('c2c', 'peer-a')),
+        getSessionRecord: () => undefined,
+      }),
+      createSender(sent),
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'allow'), { user: 'peer-a' })))).toBe(true);
+    await expect(p).resolves.toBe('allowed-once');
+  });
+
+  it('别人的 nonce 点击不会替会话主人结算', async () => {
+    const sent: SentCard[] = [];
+    const ch = new ApprovalChannel(
+      createManager({
+        findBySessionId: () => makeRecord(sessionKey('c2c', 'peer-a')),
+        getSessionRecord: () => undefined,
+      }),
+      createSender(sent),
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'allow'), { user: 'someone-else' })))).toBe(false);
+    // 仍然是挂起状态：主人点一次才结算
+    expect(await ch.handleInteraction(payload(makeInteraction(buttonValueOf(sent, 'deny'), { user: 'peer-a' })))).toBe(true);
+    await expect(p).resolves.toBe('rejected');
+  });
+
+  it('dispose 把该实例上所有 pending 审批按 cancelled 结算', async () => {
+    const sent: SentCard[] = [];
+    const ch = new ApprovalChannel(
+      createManager({ findBySessionId: () => makeRecord(sessionKey('c2c', 'peer-a')) }),
+      createSender(sent),
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    const allowValue = buttonValueOf(sent, 'allow');
+    ch.dispose();
+    await expect(p).resolves.toBe('cancelled');
+    // 已结算：再点同一张卡不会再被认领
+    expect(await ch.handleInteraction(payload(makeInteraction(allowValue, { user: 'peer-a' })))).toBe(false);
   });
 });

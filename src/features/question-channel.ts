@@ -23,7 +23,7 @@ import type {
   SendResult,
   TuituiSender,
 } from '../types.ts';
-import { getScopePeer } from '../shared/scope.ts';
+import { getScopePeer, peerFromSessionKey } from '../shared/scope.ts';
 import { parseAnswer } from './answer-parser.ts';
 import { buildKeyboard, buildQuestionCard, buildQuestionResolvedCard, formatQuestion } from './question-renderer.ts';
 import { decodeButtonData, getInteractiveAction, type CardTheme } from './button-utils.ts';
@@ -241,13 +241,16 @@ export class QuestionChannel {
     const click = getInteractiveAction(payload.message);
     if (!click) return false;
 
-    const record = this.manager.getSessionRecord(click.scope, click.targetId);
-    if (!record) return false;
-    const entry = this.pending.get(record.sessionKey);
-    if (!entry) return false;
-
     const button = decodeButtonData(click.value);
     if (!button || button.t !== 'question') return false;
+
+    // 主路径按会话找 pending；回调身份字段与入站消息不一致时 sessionKey 会对不上，
+    // 那样点了按钮没有任何反应。题目 id 在每个 pending 里唯一，按它兜底一次。
+    const record = this.manager.getSessionRecord(click.scope, click.targetId);
+    const entry = (record ? this.pending.get(record.sessionKey) : undefined)
+      ?? this.findByQuestionIdForClicker(button.q, click);
+    if (!entry) return false;
+
     const current = entry.request.questions[entry.index];
     if (!current) return false;
     // 校验按钮归属题：旧题按钮在新题推进后被点击（误点/延迟事件），
@@ -262,9 +265,29 @@ export class QuestionChannel {
     const answer: UserQuestionAnswer = { id: current.id, selected: [option.label] };
     // 先取卡片 msgid 再推进：advance 会把 entry.cardMsgId 换成下一题的卡片
     const msgId = click.messageId ?? entry.cardMsgId;
-    this.advance(entry, record.sessionKey, answer);
-    await this.updateAnsweredCardAsync(record, current, answer, msgId);
+    const sessionKey = entry.record.sessionKey;
+    this.advance(entry, sessionKey, answer);
+    await this.updateAnsweredCardAsync(entry.record, current, answer, msgId);
     return true;
+  }
+
+  /**
+   * 按题目 id 找待答问题（点击身份对不上会话时的兜底路径）。
+   *
+   * 和审批一样，兜底必须再核一次点击者对端：题目 id 写在同一张卡片里，
+   * 但别人点到那张卡不能替会话主人作答。
+   */
+  private findByQuestionIdForClicker(
+    questionId: string,
+    click: { scope: ChatScope; targetId: string; account?: string; uid?: string },
+  ): PendingEntry | undefined {
+    for (const entry of this.pending.values()) {
+      if (entry.request.questions[entry.index]?.id !== questionId) continue;
+      const peer = peerFromSessionKey(entry.record.sessionKey, entry.record.scope);
+      if (peer && (peer === click.targetId || peer === click.account || peer === click.uid)) return entry;
+      this.logger.warn(`im-tuitui: question click matched another peer's entry: key=${entry.record.sessionKey}`);
+    }
+    return undefined;
   }
 
   /** 走推推通道：发送首题 + 挂起 Promise，等待逐题作答 */
