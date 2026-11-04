@@ -11,7 +11,6 @@ import type { Logger, MiddlewareContext } from '../types.ts';
 import type { SessionManager } from '../session/index.ts';
 import type { CommandEntry } from '../commands/index.ts';
 import { getHistoryStore, historyGroupKey } from '../features/history-store.ts';
-import { isLikelyFollowUp } from '../features/followup-store.ts';
 import { judgeShouldJoin, type JudgeLine } from '../features/smart-judge.ts';
 import { getScopePeer } from '../shared/index.ts';
 import {
@@ -32,16 +31,14 @@ import {
   envelopeFormatter,
 } from './middleware/index.ts';
 
-/** 智能插话判定所需的外部依赖（模型 + 会话模型路线 + 机器人自称） */
+/** 智能插话判定所需的外部依赖（模型 + 会话模型路线 + 判定参数） */
 export interface SmartJudgeDeps {
-  /** ctx.llm 服务（缺失即退化为规则判定） */
+  /** ctx.llm 服务（缺失即无法判定，此时一律沉默） */
   llm: unknown;
   /** 按消息解析生效的模型路线 */
   resolveRoute: (ctx: MiddlewareContext) => { provider: string; model: string } | undefined;
-  /** 机器人名字（提示词里用） */
   /** 判定参数（来自 config.smartJudge） */
   settings: {
-    enabled: boolean;
     maxHistory: number;
     maxTokens: number;
     timeoutMs: number;
@@ -57,19 +54,8 @@ export interface MiddlewareSetupOptions {
   logger: Logger;
   /** 命令注册表（commands/buildCommandList 产物） */
   commands: CommandEntry[];
-  /** 智能插话判定依赖；不给则 smart 模式退回确定性规则 */
+  /** 智能插话判定依赖；不给则 smart 模式一律沉默 */
   smartJudge?: SmartJudgeDeps;
-}
-
-/**
- * smart 模式下的确定性兜底（模型不可用时的降级路径）。
- *
- * 只保留一条最低保障：机器人刚在这个会话回过这个人，那这句大概率是接着聊
- * （smartFollowUpMs 窗口）。没有任何「出现某个词就回」的规则——那套跟人格设定冲突。
- */
-function smartRuleFallback(ctx: MiddlewareContext, config: ImTuituiConfig): boolean {
-  const { scope, peerId } = getScopePeer(ctx.message);
-  return isLikelyFollowUp(scope, peerId, ctx.message.senderId, config.smartFollowUpMs);
 }
 
 /** 群聊/帖子的历史键（与 historyBuffer 的 groupKey 同源） */
@@ -87,8 +73,8 @@ function probeHistoryKey(ctx: MiddlewareContext, config: ImTuituiConfig): string
 /**
  * smart 模式的插话判定：把上下文交给模型，让它自己决定。
  *
- * 模型/路线不可用或判定失败 → 回落到确定性规则（宁可多回一句，也别在不该沉默
- * 的时候沉默）。冷却由 smart-judge 内部按会话键控制，成本可控。
+ * 没有名字匹配、没有「刚聊过就接话」这类规则——那跟人格设定打架。模型不可用
+ * 或判定失败就沉默（fail-closed），冷却由 smart-judge 内部按会话键控制，成本可控。
  */
 async function smartReplyProbe(
   ctx: MiddlewareContext,
@@ -97,11 +83,10 @@ async function smartReplyProbe(
   logger: Logger,
 ): Promise<boolean> {
   const message = ctx.message;
-  const fallback = smartRuleFallback(ctx, config);
-  if (deps === undefined || !deps.settings.enabled) return fallback;
+  if (deps === undefined) return false;
 
   const route = deps.resolveRoute(ctx);
-  if (route === undefined) return fallback;
+  if (route === undefined) return false;
 
   const key = probeHistoryKey(ctx, config);
   const recent = key === undefined ? [] : getHistoryStore().list(key, deps.settings.maxHistory);

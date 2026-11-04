@@ -52,8 +52,6 @@ interface ConfigWire {
   'access.postBlock'?: string[];
   mentionPolicy?: MentionPolicy;
   'sendFile.restrictPaths'?: boolean;
-  smartFollowUpMs?: number;
-  'smartJudge.enabled'?: boolean;
   'smartJudge.prompt'?: string;
   'smartJudge.maxHistory'?: number;
   'smartJudge.cooldownMs'?: number;
@@ -665,30 +663,17 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         help: policy === 'require'
           ? '只有 @ 机器人才会回应。'
           : policy === 'smart'
-            ? '不 @ 也会看上下文自己判断：别人互相闲聊不插嘴，轮到自己或被问到才开口。'
+            ? '不 @ 也会看上下文自己判断：感兴趣就说，没兴趣就闭嘴，不看名字。'
             : '群里每条消息都会回应——只建议专用小群使用。',
         onChange: (v) => { patch('mentionPolicy', v as MentionPolicy); },
       }),
-      policy === 'smart'
-        ? createElement(NumberRow, {
-            label: '追问延续', value: Math.round((form.smartFollowUpMs ?? 120000) / 1000),
-            min: 10, max: 3600, step: 10, suffix: '秒',
-            help: '机器人刚回过的人接着说话，算同一轮对话，不必重新判断。',
-            onChange: (v) => { patch('smartFollowUpMs', v * 1000); },
-          })
-        : null,
     ),
 
     policy === 'smart'
       ? createElement(Section, {
           title: '智能判断',
-          desc: '机器人要不要插嘴，由模型读上下文决定。提示词可以整段改，改成你群里需要的那个人。',
+          desc: '机器人要不要插嘴，一律由模型读上下文决定——没有名字匹配之类的规则。提示词可以整段改，改成你群里需要的那个人。',
         },
-          createElement(SwitchRow, {
-            label: '启用模型判断', checked: form['smartJudge.enabled'] ?? true,
-            help: '关掉就退回「提到名字 / 刚聊过的人接着说话」这类确定性规则。',
-            onChange: (v) => { patch('smartJudge.enabled', v); },
-          }),
           createElement(TextAreaRow, {
             label: '判定提示词',
             value: form['smartJudge.prompt'] ?? DEFAULT_SMART_PROMPT,

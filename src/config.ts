@@ -35,8 +35,7 @@ export interface AccessControlConfig {
  * 群聊/帖子的触发方式：
  *   - require：必须 @ 机器人才回应（默认）
  *   - always：每条消息都回应（适合小群/专用群）
- *   - smart：不 @ 也回应，但只回「与机器人相关」的消息——引用了机器人、
- *     文本里出现机器人别名、或刚聊过的人继续追问（窗口见 smartFollowUpMs）
+ *   - smart：不 @ 也会说话——每句都交给模型，按人格与上下文自己判断要不要插嘴
  */
 export type MentionPolicy = 'require' | 'always' | 'smart';
 
@@ -106,13 +105,8 @@ export interface ImTuituiConfig {
   requireMentionInPost: boolean;
   /** 群聊/帖子的触发方式，未设置时由上面两个布尔推导 */
   mentionPolicy?: MentionPolicy;
-  /** smart 模式：文本中出现这些名字即视为在叫机器人 */
-  /** smart 模式：机器人回复后多久内、同一个人继续发消息算「延续对话」（ms） */
-  smartFollowUpMs: number;
   /** smart 模式：把上下文交给模型判断是否插嘴的参数 */
   smartJudge: {
-    /** 关掉就退回确定性规则（别名 / 追问窗口） */
-    enabled: boolean;
     /** 判定时携带的历史条数 */
     maxHistory: number;
     /** 判定输出上限（只要一行 JSON，不需要多） */
@@ -191,9 +185,7 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   requireMentionInPost: Schema.boolean().default(true).description('团队帖子是否需要@bot触发'),
   mentionPolicy: Schema.union(['require', 'always', 'smart']).default('smart').description('群聊/帖子触发方式：require=仅@ / always=全部 / smart=按人格与上下文自主判断（默认）'),
 
-  smartFollowUpMs: Schema.number().default(120000).description('smart 模式：追问延续窗口(ms)'),
   smartJudge: Schema.object({
-    enabled: Schema.boolean().default(true).description('智能模式用模型判断是否插嘴；关掉退回确定性规则'),
     maxHistory: Schema.number().default(50).description('判定时携带的群聊历史条数'),
     maxTokens: Schema.number().default(120).description('判定输出上限 token'),
     timeoutMs: Schema.number().default(8000).description('判定超时(ms)，超时视为不插嘴'),

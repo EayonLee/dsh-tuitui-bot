@@ -27,7 +27,6 @@ function makeConfig(overrides: Record<string, unknown> = {}): ImTuituiConfig {
     historyLimit: 10,
     requireMention: true,
     requireMentionInPost: true,
-    smartFollowUpMs: 120_000,
     streaming: false,
     maxQueue: 4,
     processingTimeoutMs: 60_000,
@@ -115,18 +114,10 @@ describe('中间件链编排（集成）', () => {
     expect(await runChain(config, ctx)).toBe('mention');
   });
 
-  it('smart 模式：机器人刚回过同一个人，追问放行', async () => {
+  it('smart 模式：没有模型可判时一律沉默（追问窗口不再兜底）', async () => {
     const config = makeConfig({ mentionPolicy: 'smart' });
     markBotReply('group', GROUP_ID, 'uid-1');
     const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, senderId: 'uid-1', content: '再改一下', atMe: false }));
-
-    expect(await runChain(config, ctx)).toBeUndefined();
-  });
-
-  it('smart 模式：换个人说话不放行', async () => {
-    const config = makeConfig({ mentionPolicy: 'smart' });
-    markBotReply('group', GROUP_ID, 'uid-1');
-    const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, senderId: 'uid-2', content: '我想问个事', atMe: false }));
 
     expect(await runChain(config, ctx)).toBe('mention');
   });

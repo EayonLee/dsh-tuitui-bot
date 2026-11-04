@@ -11,19 +11,17 @@ import type { Logger, MiddlewareContext } from '../types.ts';
 import type { SessionManager } from '../session/index.ts';
 import type { CommandEntry } from '../commands/index.ts';
 import { MiddlewareKernel } from './middleware/index.ts';
-/** 智能插话判定所需的外部依赖（模型 + 会话模型路线 + 机器人自称） */
+/** 智能插话判定所需的外部依赖（模型 + 会话模型路线 + 判定参数） */
 export interface SmartJudgeDeps {
-    /** ctx.llm 服务（缺失即退化为规则判定） */
+    /** ctx.llm 服务（缺失即无法判定，此时一律沉默） */
     llm: unknown;
     /** 按消息解析生效的模型路线 */
     resolveRoute: (ctx: MiddlewareContext) => {
         provider: string;
         model: string;
     } | undefined;
-    /** 机器人名字（提示词里用） */
     /** 判定参数（来自 config.smartJudge） */
     settings: {
-        enabled: boolean;
         maxHistory: number;
         maxTokens: number;
         timeoutMs: number;
@@ -38,7 +36,7 @@ export interface MiddlewareSetupOptions {
     logger: Logger;
     /** 命令注册表（commands/buildCommandList 产物） */
     commands: CommandEntry[];
-    /** 智能插话判定依赖；不给则 smart 模式退回确定性规则 */
+    /** 智能插话判定依赖；不给则 smart 模式一律沉默 */
     smartJudge?: SmartJudgeDeps;
 }
 /** 组装中间件链（顺序与上游逐条对应，见函数体注释编号） */

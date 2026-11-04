@@ -417,8 +417,6 @@ describe('配置读写', () => {
       { maxQueue: 1001 },
       { historyLimit: 1001 },
       { historyLimit: -1 },
-      { smartFollowUpMs: 4999 },
-      { smartFollowUpMs: 3600001 },
     ]) {
       const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body }));
       expect(res.statusCode).toBe(400);
@@ -426,14 +424,13 @@ describe('配置读写', () => {
     }
 
     const boundary = await h.call(BIND_CONFIG_PATH, makeReq('POST', {
-      body: { textChunkLimit: 1, maxQueue: 1000, historyLimit: 0, smartFollowUpMs: 5000, sessionIdleTimeout: 1000 },
+      body: { textChunkLimit: 1, maxQueue: 1000, historyLimit: 0, sessionIdleTimeout: 1000 },
     }));
     expect(boundary.statusCode).toBe(200);
     expect(patches.at(-1)).toEqual({
       textChunkLimit: 1,
       maxQueue: 1000,
       historyLimit: 0,
-      smartFollowUpMs: 5000,
       sessionIdleTimeout: 1000,
     });
   });

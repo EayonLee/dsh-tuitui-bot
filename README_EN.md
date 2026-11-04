@@ -106,8 +106,6 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `cwd` | string | `~/.dsh-tuitui/workspace` | Agent working directory |
 | `requireMention` | boolean | `true` | Require @bot in groups (fallback when `mentionPolicy` is unset) |
 | `mentionPolicy` | `'smart'` | `smart` / `require` / `always`: persona-driven judgement (default) / @ only / everything |
-| `smartFollowUpMs` | `120000` | Window where a reply from the same person counts as the same turn (ms) |
-| `smartJudge.enabled` | `true` | Model-based interjection; disable to fall back to deterministic rules |
 | `smartJudge.prompt` | built-in | **Judging prompt, fully editable** (Settings UI; empty restores default) |
 | `smartJudge.maxHistory` | `50` | History messages handed to the model |
 | `smartJudge.cooldownMs` | `20000` | Minimum gap between judgements per conversation |
@@ -170,7 +168,7 @@ With `mentionPolicy: 'smart'`, every group message (mentioned or not) goes throu
 2. **Context** — the last `smartJudge.maxHistory` entries from the history buffer (with speakers; the bot's own lines are tagged `[you]`).
 3. **Ask the model** — using the conversation's effective model, send `smartJudge.prompt` + history + the new message, and require a single JSON line: `{"join":true,"why":"..."}`.
 4. **Fail closed** — timeouts, unparsable output, model errors, missing service: all mean `join:false`. Missing a reply beats spamming the room.
-5. **Disable** (`smartJudge.enabled=false`) to fall back to deterministic rules: alias mention, or a follow-up from someone the bot just talked to.
+5. **No deterministic fallback** — no name matching, no "someone the bot just talked to keeps going". If judgement is unavailable, the bot stays quiet.
 
 The prompt is first-class configuration: different rooms need different personalities. Edit it in Settings;
 clearing the box restores the factory default ([source](./src/shared/smart-prompt.ts)).
