@@ -249,8 +249,8 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     prompt: Schema.string().default(DEFAULT_SMART_PROMPT).description('智能插话判定的提示词（设置页可编辑）'),
   }).description('智能插话判定参数（smart 触发方式专用）'),
   concurrency: Schema.object({
-    c2c: Schema.union(['queue', 'drop', 'abort', 'merge']).default('abort').description('单聊忙时：默认打断前一条直接接新话'),
-    group: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('群聊忙时：默认排队，一条条来'),
+    c2c: Schema.union(['queue', 'drop', 'abort', 'merge']).default('merge').description('单聊忙时：默认攒着，这一轮完了合成一条一起回'),
+    group: Schema.union(['queue', 'drop', 'abort', 'merge']).default('merge').description('群聊忙时：默认攒着，这一轮完了合成一条一起回'),
     post: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('团队帖子忙时：默认排队'),
   }).description('同一会话多条消息的处理方式'),
   reactions: Schema.object({

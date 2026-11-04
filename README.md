@@ -121,8 +121,8 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `smartJudge.prompt` | 内置文案 | **判定提示词，可整段改写**（设置页可视化编辑，留空恢复默认） |
 | `smartJudge.maxHistory` | `50` | 判定时交给模型的历史消息条数 |
 | `smartJudge.cooldownMs` | `5000` | 同一会话两次判定的最小间隔，防止每条消息都调模型 |
-| `concurrency.c2c` | `abort` | 单聊忙时：打断前一条直接接新话（可选 queue / drop / merge） |
-| `concurrency.group` | `queue` | 群聊忙时：排队一条条来 |
+| `concurrency.c2c` | `merge` | 单聊忙时：攒着，这一轮完了合并成一条一起回（可选 queue / abort / drop） |
+| `concurrency.group` | `merge` | 群聊忙时：攒着，这一轮完了合并成一条一起回 |
 | `concurrency.post` | `queue` | 团队帖子忙时：排队 |
 
 四种策略在**回合这一层**执行（不只是中间件链）：

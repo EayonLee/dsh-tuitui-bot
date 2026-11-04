@@ -109,8 +109,8 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `smartJudge.prompt` | built-in | **Judging prompt, fully editable** (Settings UI; empty restores default) |
 | `smartJudge.maxHistory` | `50` | History messages handed to the model |
 | `smartJudge.cooldownMs` | `5000` | Minimum gap between judgements per conversation |
-| `concurrency.c2c` | `abort` | Direct chats: interrupt the running turn and take the new message (queue / drop / merge also available) |
-| `concurrency.group` | `queue` | Groups: queue one at a time |
+| `concurrency.c2c` | `merge` | Direct chats: interrupt the running turn and take the new message (queue / drop / merge also available) |
+| `concurrency.group` | `merge` | Groups: queue one at a time |
 | `concurrency.post` | `queue` | Team posts: queue |
 
 All four strategies act at the **turn** level, not just in the middleware chain: `queue` waits, `abort` cancels the in-flight turn (its answer gets truncated), `merge` buffers while busy and sends one combined message afterwards, `drop` discards (logged).

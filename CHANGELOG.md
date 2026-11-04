@@ -2,6 +2,21 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
+## 0.1.25
+
+单聊、群聊忙时的默认策略从「打断 / 排队」改成「合并」。
+
+### 变更
+
+- `concurrency.c2c` 默认 `abort` → `merge`：忙时先攒着，这一轮结束合成一条一起回，不会把上一轮掐成半截
+- `concurrency.group` 默认 `queue` → `merge`：群里连发几句不用一条条排队，合成一条答完
+- `concurrency.post` 仍是 `queue`（团队帖子一条条来更稳）
+- `resolveScopeStrategy` 的兜底同步调整，配置缺字段时行为跟默认值一致
+
+### 测试
+
+- 新增 `src/shared/concurrency-defaults.test.ts`：钉住三项默认值与兜底行为
+
 ## 0.1.24
 
 修掉「TEST_MODEL_PATH is not defined」，并补上能让这类事故无法出厂的两道闸。
