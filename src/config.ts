@@ -75,6 +75,13 @@ export interface InteractiveConfig {
   headBgColor: string;
   /** 卡片头部文字颜色 */
   headTextColor: string;
+  /**
+   * 审批卡片等待上限（毫秒，0 = 不限）。
+   *
+   * 超时按 `cancelled` 结算并把卡片改写成「⌛ 审批超时已作废」：点击送不回插件时，
+   * 依赖审批的工具调用会一直挂着，整个会话跟着卡死。
+   */
+  approvalTimeoutMs: number;
 }
 
 /** Agent 执行步骤上报配置（client.agent → 推推客户端原生展示） */
@@ -210,8 +217,8 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
 
   smartJudge: Schema.object({
     maxHistory: Schema.number().default(50).description('判定时携带的群聊历史条数'),
-    maxTokens: Schema.number().default(400).description('判定输出上限 token（思考型模型要留够，否则正文空）'),
-    timeoutMs: Schema.number().default(8000).description('判定超时(ms)，超时视为不插嘴'),
+    maxTokens: Schema.number().default(800).description('判定输出上限 token（思考型模型要留够，否则正文空）'),
+    timeoutMs: Schema.number().default(20000).description('判定超时(ms)：思考型模型几秒才出结果，8 秒经常卡在「还在想」'),
     cooldownMs: Schema.number().default(5000).description('同一会话两次判定的最小间隔(ms)'),
     prompt: Schema.string().default(DEFAULT_SMART_PROMPT).description('智能插话判定的提示词（设置页可编辑）'),
   }).description('智能插话判定参数（smart 触发方式专用）'),
@@ -283,7 +290,12 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     enabled: Schema.boolean().default(true).description('是否使用推推原生交互卡片（问答/审批）'),
     headBgColor: Schema.string().default('#1F6FEB').description('卡片头部背景色'),
     headTextColor: Schema.string().default('#FFFFFF').description('卡片头部文字颜色'),
-  }).default({ enabled: true, headBgColor: '#1F6FEB', headTextColor: '#FFFFFF' }).description('交互卡片配置'),
+    approvalTimeoutMs: Schema.number()
+      .default(300000)
+      .description('审批卡片等待上限（毫秒，0 = 不限）。超时按 cancelled 结算，避免会话永久悬挂'),
+  })
+    .default({ enabled: true, headBgColor: '#1F6FEB', headTextColor: '#FFFFFF', approvalTimeoutMs: 300000 })
+    .description('交互卡片配置'),
   agentSteps: Schema.object({
     enabled: Schema.boolean().default(false).description('是否上报模型/工具调用中间步骤（默认关闭）'),
     includeToolPayload: Schema.boolean().default(false).description('是否上报完整工具参数与结果'),

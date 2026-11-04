@@ -9,4 +9,12 @@
  * 回话方式也给三档：说话 / 挂表情 / 不理，别让「不回」变成唯一的沉默选项。
  */
 export declare const DEFAULT_SMART_PROMPT: string;
+/**
+ * 老版本把「只输出一行 JSON」写进了提示词正文。
+ *
+ * 那份文本很可能已经被用户保存过（设置页把整段存进了配置），而协议现在改由
+ * 工具 schema 下发——正文里留着这几行会跟工具调用打架。这里只剥掉协议段，
+ * 其余性格描述原样保留。
+ */
+export declare function stripLegacyProtocol(prompt: string): string;
 //# sourceMappingURL=smart-prompt.d.ts.map

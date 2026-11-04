@@ -870,6 +870,12 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             onChange: (v) => { patch('smartJudge.cooldownMs', v * 1000); },
           }),
           createElement(NumberRow, {
+            label: '判定超时', value: Math.round((form['smartJudge.timeoutMs'] ?? 20000) / 1000),
+            min: 3, max: 120, step: 1, suffix: '秒',
+            help: '思考型模型几秒才出结果；给太短会把「还在想」误判成不回话。',
+            onChange: (v) => { patch('smartJudge.timeoutMs', v * 1000); },
+          }),
+          createElement(NumberRow, {
             label: '判断时看几条', value: form['smartJudge.maxHistory'] ?? 50,
             min: 0, max: 50, step: 1, suffix: '条',
             help: '交给模型的历史消息条数。太少判断不准，太多费 token。',

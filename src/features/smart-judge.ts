@@ -9,7 +9,13 @@
  */
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm';
 import type { GenerateOptions, MessageSource, StreamChunk } from '@deepseek-ai/dsh-llm';
-import { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
+import {
+  JOIN_DECISION_SCHEMA,
+  JOIN_DECISION_TOOL,
+  validateJoinDecision,
+  type SmartJudgeResult,
+} from '../shared/join-decision.ts';
+import { DEFAULT_SMART_PROMPT, stripLegacyProtocol } from '../shared/smart-prompt.ts';
 import type { Logger } from '../types.ts';
 
 /** llm 服务最小接口（与 media/vision-tool 保持一致的收窄） */
@@ -49,19 +55,7 @@ export interface SmartJudgeOptions {
   logger?: Logger;
 }
 
-/** 模型的回话方式：说句话 / 挂个表情 / 什么都不做 */
-export type SmartJudgeAct = 'text' | 'emoji' | 'silent';
-
-export interface SmartJudgeResult {
-  /** true=说话（文本回复），false=不用文本回复 */
-  join: boolean;
-  /** 模型给的一句话理由（日志用） */
-  reason?: string;
-  /** 回话方式；缺省按 join 推断 */
-  act?: SmartJudgeAct;
-  /** act=emoji 时挂的表情 */
-  emoji?: string;
-}
+export type { SmartJudgeAct, SmartJudgeResult } from '../shared/join-decision.ts';
 
 /** 冷却表：key → 上次判定时间戳（进程内，与会话生命周期同量级，无需持久化） */
 const cooldowns = new Map<string, number>();
@@ -76,7 +70,9 @@ export { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
 /** 生效提示词：用户改过就用用户的，空串/空白视为未改 */
 function activePrompt(options: SmartJudgeOptions): string {
   const custom = options.prompt;
-  return custom !== undefined && custom.trim() !== '' ? custom : DEFAULT_SMART_PROMPT;
+  const text = custom !== undefined && custom.trim() !== '' ? custom : DEFAULT_SMART_PROMPT;
+  // 老配置里可能还留着「只输出一行 JSON」那几行，跟工具 schema 打架，剥掉
+  return stripLegacyProtocol(text);
 }
 
 /** 把对话压成提示词正文 */
@@ -93,7 +89,7 @@ function renderPrompt(options: SmartJudgeOptions): string {
     '【新消息】',
     options.message.sender + ': ' + options.message.text,
     '',
-    '这条消息要回吗？只输出 JSON。',
+    '这条消息怎么处理？用 ' + JOIN_DECISION_TOOL + ' 工具说明你的决定。',
   ].join('\n');
 }
 
@@ -158,7 +154,11 @@ export async function judgeShouldJoin(options: SmartJudgeOptions): Promise<Smart
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => { controller.abort(); }, options.timeoutMs === undefined ? 8000 : options.timeoutMs);
+  // 思考型模型会先花几秒推理，8 秒经常正好卡在「还在想」——
+  // 宁可多等一会，也别把一条本来该回的消息判成不插嘴。
+  const timeoutMs = options.timeoutMs === undefined ? 20000 : options.timeoutMs;
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
 
   try {
     // producer-owned source kind（与 media/vision-tool 同款桥接）
@@ -170,7 +170,13 @@ export async function judgeShouldJoin(options: SmartJudgeOptions): Promise<Smart
         content: [{ type: 'text', text: activePrompt(options) + '\n\n' + renderPrompt(options) }],
         source,
       })],
-      maxTokens: options.maxTokens === undefined ? 400 : options.maxTokens,
+      maxTokens: options.maxTokens === undefined ? 800 : options.maxTokens,
+      // 契约随请求下发：模型要么按 schema 调工具，要么走文本兜底，别再赌它自觉写 JSON
+      tools: [{
+        name: JOIN_DECISION_TOOL,
+        description: '说明你对这条新消息的决定：说句话、只挂个表情、还是什么都不做',
+        parameters: JOIN_DECISION_SCHEMA as unknown as Record<string, unknown>,
+      }],
       signal: controller.signal,
     };
 
@@ -189,6 +195,23 @@ export async function judgeShouldJoin(options: SmartJudgeOptions): Promise<Smart
     const answer = pick(['text']);
     const thinking = pick(['reasoning']);
 
+    // 首选：按 schema 收到的工具调用参数（这是契约路径，能过就是合法的）
+    const call = blocks.find((b) => kindOf(b) === 'tool-call'
+      && (b as { name?: string }).name === JOIN_DECISION_TOOL) as { arguments?: string } | undefined;
+    if (call?.arguments !== undefined) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(call.arguments);
+      } catch {
+        parsed = undefined;
+      }
+      const fromTool = validateJoinDecision(parsed);
+      if (fromTool !== undefined) return fromTool;
+      if (log !== undefined) {
+        log.warn('[tuitui/smart] 工具参数不合约，改看文本: ' + call.arguments.slice(0, 80));
+      }
+    }
+
     const verdict = parseVerdict(answer) ?? parseVerdict(thinking);
     if (verdict === undefined) {
       const kinds = blocks.map((b) => kindOf(b) || '?').join(',');
@@ -196,10 +219,17 @@ export async function judgeShouldJoin(options: SmartJudgeOptions): Promise<Smart
         log.warn('[tuitui/smart] 模型输出无法解析，判为不插嘴: blocks=[' + kinds + '] text="'
           + answer.slice(0, 60) + '" reasoning="' + thinking.slice(0, 60) + '"');
       }
+      if (timedOut) return { join: false, reason: 'timeout' };
       return { join: false, reason: answer === '' && thinking === '' ? 'empty-output' : 'unparsable' };
     }
     return verdict;
   } catch (err) {
+    if (timedOut) {
+      if (log !== undefined) {
+        log.warn('[tuitui/smart] 判定超时（' + timeoutMs + 'ms），判为不插嘴');
+      }
+      return { join: false, reason: 'timeout' };
+    }
     if (log !== undefined) {
       log.warn('[tuitui/smart] 判定失败，判为不插嘴: ' + (err instanceof Error ? err.message : String(err)));
     }

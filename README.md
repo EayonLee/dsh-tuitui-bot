@@ -127,7 +127,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `reactions.enabled` | `true` | 收到消息先挂表情回执（在算 / 好了 / 出错） |
 | `reactions.inGroup` | `true` | 群聊里也挂回执 |
 | `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | 三个阶段的表情；留空表示不挂 |
-| `smartJudge.timeoutMs` | `8000` | 判定超时（超时视为不插嘴） |
+| `smartJudge.timeoutMs` | `20000` | 判定超时（超时视为不插嘴；思考型模型 8 秒经常卡在推理里） |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
 | `debug` | boolean | `false` | 调试日志（含原始事件体） |
@@ -213,9 +213,10 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 1. **冷却**：同一会话 `smartJudge.cooldownMs` 内只判一次，超出的消息直接按「不插嘴」处理，不烧 token。
 2. **取上下文**：从历史缓冲拿最近 `smartJudge.maxHistory` 条（带说话人，机器人自己标 `[你]`）。
 3. **问模型**：用该会话当前生效的模型，把 `smartJudge.prompt` + 历史 + 新消息发过去，
-   要求只回一行 JSON——三种动作任选：`{"act":"text","why":"…"}` 说句话、
-   `{"act":"emoji","emoji":"😂","why":"…"}` 挂个表情、`{"act":"silent","why":"…"}` 不理。
-   （旧的 `{"join":true|false}` 写法仍然认，老配置不会失效。）
+   同时把 `join_decision` 工具的 JSON Schema 一起下发（`act` 枚举 text / emoji / silent），
+   模型按 schema 调工具，参数就是判定结果——**格式由代码定死，不靠模型自觉写 JSON**。
+   工具不可用或参数不合约时退回文本 JSON 解析（老 `{"join":true|false}` 也认）。
+   提示词只管性格，改提示词改不出解析错误。
 4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
    宁可漏答一句，也不在群里刷屏。
 5. **没有确定性兜底**：既不看名字，也不看「刚聊过的人接着说话」。判定不可用 = 不插嘴。

@@ -115,7 +115,7 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `reactions.enabled` | `true` | React on receipt (working / done / failed) |
 | `reactions.inGroup` | `true` | Also react in groups |
 | `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | Emoji per stage; empty disables it |
-| `smartJudge.timeoutMs` | `8000` | Judgement timeout (a timeout means "do not join") |
+| `smartJudge.timeoutMs` | `20000` | Judgement timeout (timeout = do not join; thinking models often need more than 8s) |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
 | `textChunkLimit` | number | `4000` | Max characters per message |
@@ -172,7 +172,7 @@ With `mentionPolicy: 'smart'`, every group message (mentioned or not) goes throu
 
 1. **Cooldown** — at most one judgement per `smartJudge.cooldownMs` per conversation; the rest are treated as "do not join" without spending tokens.
 2. **Context** — the last `smartJudge.maxHistory` entries from the history buffer (with speakers; the bot's own lines are tagged `[you]`).
-3. **Ask the model** — using the conversation's effective model, send `smartJudge.prompt` + history + the new message, and require one JSON line with one of three actions: `{"act":"text","why":"…"}`, `{"act":"emoji","emoji":"😂","why":"…"}`, or `{"act":"silent","why":"…"}`. The older `{"join":true|false}` form still parses.
+3. **Ask the model** — using the conversation's effective model, send `smartJudge.prompt` + history + the new message together with the JSON Schema of a `join_decision` tool (`act` enum: text / emoji / silent). The model calls the tool and its arguments *are* the verdict — **the format is fixed in code, not left to the model's discipline**. Text-JSON parsing stays as a fallback (legacy `{"join":true|false}` included). The prompt only carries personality.
 4. **Fail closed** — timeouts, unparsable output, model errors, missing service: all mean `join:false`. Missing a reply beats spamming the room.
 5. **No deterministic fallback** — no name matching, no "someone the bot just talked to keeps going". If judgement is unavailable, the bot stays quiet.
 

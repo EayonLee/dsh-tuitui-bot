@@ -19,6 +19,30 @@ function fakeLlm(text: string) {
   };
 }
 
+/** 造一个按 schema 调工具的 llm（契约路径） */
+function toolLlm(args: string, extraText = '') {
+  return {
+    stream: () => (async function* generate(): AsyncGenerator<unknown> {
+      if (extraText !== '') yield { type: 'text-delta', index: 0, text: extraText };
+      yield { type: 'tool-call-delta', index: 1, id: 'call-1', name: 'join_decision', argumentsDelta: args };
+      yield { type: 'finish', reason: 'stop' };
+    })(),
+  };
+}
+
+/** 造一个永远吐不出东西的 llm（模拟思考型模型卡在推理里） */
+function hangingLlm() {
+  return {
+    stream: (opts: { signal?: AbortSignal }) => (async function* generate(): AsyncGenerator<Chunk> {
+      // 真的等到被 abort 再抛：这才是 llm.stream 的取消语义
+      await new Promise<void>((_, reject) => {
+        opts.signal?.addEventListener('abort', () => { reject(new Error('aborted')); });
+      });
+      yield { type: 'finish', reason: 'stop' };
+    })(),
+  };
+}
+
 /** 造一个直接抛错的 llm */
 function throwingLlm() {
   return {
@@ -70,6 +94,34 @@ describe('judgeShouldJoin', () => {
     const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"act":"emoji","why":"懒得打字"}') });
     expect(result.join).toBe(false);
     expect(result.act).toBe('silent');
+  });
+
+  it('工具调用路径：schema 参数直接变成判定，不靠解析正文', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: toolLlm('{"act":"emoji","emoji":"😂","why":"好笑"}') });
+    expect(result.act).toBe('emoji');
+    expect(result.emoji).toBe('😂');
+    expect(result.join).toBe(false);
+  });
+
+  it('工具调用路径：正文乱说也不影响（只看 schema 参数）', async () => {
+    const result = await judgeShouldJoin({
+      ...base,
+      llm: toolLlm('{"act":"text","why":"我来说"}', '嗯……让我想想，好像应该插一句？'),
+    });
+    expect(result.act).toBe('text');
+    expect(result.join).toBe(true);
+  });
+
+  it('工具参数不合约（act 非法）时退回文本兜底', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: toolLlm('{"act":"dance"}') });
+    expect(result.join).toBe(false);
+    expect(result.reason).not.toBe('我来说');
+  });
+
+  it('超时单独记成 timeout，不是 unparsable', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: hangingLlm(), timeoutMs: 30 });
+    expect(result.join).toBe(false);
+    expect(result.reason).toBe('timeout');
   });
 
   it('模型说不要就闭嘴', async () => {

@@ -84,6 +84,16 @@ export interface InteractiveActionEvent {
  */
 export declare function getInteractiveAction(message: InboundMessage): InteractiveActionEvent | undefined;
 /**
+ * 取交互回调的载荷本体。
+ *
+ * 线上实测（2026-11-04）：回调被包在 `body.data.message` 里——
+ * `{data:{message:{msgid, user, sender, conversation, action:[{value}]}}}`，
+ * 而 SDK 的 `TuituiInteractiveCallbackMessage` 类型是平铺的。照类型读会得到一堆
+ * undefined：msgid 退化成事件 cid、按钮 value 读不出来，点击在 dispatch 里无人
+ * 认领而静默丢弃——表现就是"卡片能点，但点完什么都不发生"。
+ */
+export declare function interactivePayloadOf(raw: unknown): Record<string, unknown> | undefined;
+/**
  * 构建单行按钮：推推的 action 是一维数组，
  * name 是稳定的按钮标识（重放回调时可核对），text 是用户看到的文案。
  */

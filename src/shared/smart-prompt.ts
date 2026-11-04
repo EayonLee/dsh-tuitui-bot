@@ -34,8 +34,19 @@ export const DEFAULT_SMART_PROMPT = [
   '',
   '按你自己的想法来，别对着单子逐条打勾。',
   '',
-  '只输出一行 JSON，不要任何解释：',
-  '{"act":"text","why":"十个字以内"}',
-  '{"act":"emoji","emoji":"😂","why":"十个字以内"}',
-  '{"act":"silent","why":"十个字以内"}',
+  '',
+  '说不说话、挂不挂表情，看你自己的处境，别对着单子逐条打勾。',
 ].join('\n');
+
+/**
+ * 老版本把「只输出一行 JSON」写进了提示词正文。
+ *
+ * 那份文本很可能已经被用户保存过（设置页把整段存进了配置），而协议现在改由
+ * 工具 schema 下发——正文里留着这几行会跟工具调用打架。这里只剥掉协议段，
+ * 其余性格描述原样保留。
+ */
+export function stripLegacyProtocol(prompt: string): string {
+  const marker = prompt.search(/只输出一行\s*JSON/);
+  if (marker === -1) return prompt;
+  return prompt.slice(0, marker).trimEnd();
+}
