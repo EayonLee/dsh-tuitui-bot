@@ -17,7 +17,7 @@
  * shared/bind-protocol.ts 的 ConfigPatchWire 完全一致。
  */
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
+import { BIND_CONFIG_PATH, TEST_MODEL_PATH, type ConfigPatchWire } from '../shared/bind-protocol.ts';
 import { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
 import { interpretTestResponse } from '../shared/probe-result.ts';
 import { KNOWN_EMOJI_NAMES } from '../tuitui/emoji.ts';
@@ -31,47 +31,16 @@ type MentionPolicy = 'require' | 'always' | 'smart';
 /** 同一会话忙时的处理方式 */
 type ConcurrencyStrategy = 'queue' | 'abort' | 'drop' | 'merge';
 
-/** GET 回显 / POST 提交的扁平配置（appSecret 已剔除） */
-interface ConfigWire {
-  provider?: string;
-  model?: string;
-  preset?: string;
-  cwd?: string;
+/**
+ * GET 回显 / POST 提交的扁平配置（appSecret 已剔除）。
+ *
+ * 键必须跟服务端的 `ConfigPatchWire` 逐字对齐：以前这里是手抄的一份，
+ * 漏抄 / 抄错一个键（比如视觉那段）编译期看不出来，运行期就成了
+ * 「TEST_MODEL_PATH is not defined」这种鬼故事。直接继承，抄错就编译不过。
+ */
+interface ConfigWire extends ConfigPatchWire {
   /** 服务端回传的工作区候选目录（只读，不提交） */
   workspaceOptions?: string[];
-  requireMention?: boolean;
-  requireMentionInPost?: boolean;
-  streaming?: boolean;
-  showToolResults?: boolean;
-  debug?: boolean;
-  historyLimit?: number;
-  historyMode?: 'window' | 'delta';
-  sessionIdleTimeout?: number;
-  'access.c2cMode'?: AccessMode;
-  'access.groupMode'?: AccessMode;
-  'access.postMode'?: AccessMode;
-  'access.c2cAllow'?: string[];
-  'access.c2cBlock'?: string[];
-  'access.groupAllow'?: string[];
-  'access.groupBlock'?: string[];
-  'access.postAllow'?: string[];
-  'access.postBlock'?: string[];
-  mentionPolicy?: MentionPolicy;
-  'sendFile.restrictPaths'?: boolean;
-  'smartJudge.prompt'?: string;
-  'smartJudge.maxHistory'?: number;
-  'smartJudge.cooldownMs'?: number;
-  'smartJudge.timeoutMs'?: number;
-  'interactive.enabled'?: boolean;
-  'agentSteps.enabled'?: boolean;
-  'concurrency.c2c'?: ConcurrencyStrategy;
-  'concurrency.group'?: ConcurrencyStrategy;
-  'concurrency.post'?: ConcurrencyStrategy;
-  'reactions.enabled'?: boolean;
-  'reactions.inGroup'?: boolean;
-  'reactions.ack'?: string;
-  'reactions.done'?: string;
-  'reactions.fail'?: string;
 }
 
 const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [

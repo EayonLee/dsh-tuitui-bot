@@ -2,6 +2,21 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
+## 0.1.24
+
+修掉「TEST_MODEL_PATH is not defined」，并补上能让这类事故无法出厂的两道闸。
+
+### 修复
+
+- 设置页引用 `TEST_MODEL_PATH` 却没 `import`（根 `tsconfig.json` 不覆盖 `src/client`，所以 `tsc` 全绿、构建照过，点按钮才炸）
+- 客户端扁平配置类型改为 `extends ConfigPatchWire`，不再手抄一份：漏键、抄错键直接编译失败
+
+### 防复发
+
+- `npm run build` 现在先跑客户端类型检查（`tsc -p tsconfig.client.json --noEmit`），构建期就能拦住
+- `scripts/ship.sh` 装包前校验 bundle：路径字面量必须在、`TEST_MODEL_PATH` 有定义才能装
+- 新增 `src/setup/config-panel-imports.test.ts`：钉住「用了就必须 import」「类型必须继承不手抄」
+
 ## 0.1.23
 
 修掉「✗ undefined」，并把测试按钮的状态表达理顺。
