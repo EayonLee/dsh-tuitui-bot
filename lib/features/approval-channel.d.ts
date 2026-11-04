@@ -71,6 +71,8 @@ export interface ApprovalChannelConfigLike {
         enabled?: boolean;
         headBgColor?: string;
         headTextColor?: string;
+        /** 审批等待上限（毫秒，0/缺省 = 不限） */
+        approvalTimeoutMs?: number;
     };
 }
 /** approval/request waterfall 的 answerer handler */
@@ -104,6 +106,14 @@ export declare class ApprovalChannel {
     /** 会话回收时清理其 pending 审批，避免 Promise 悬挂（并把卡片标成已取消） */
     cancelPending(sessionKey: string): void;
     /**
+     * 插件卸载/重载时把该实例上所有 pending 审批按 cancelled 结算。
+     *
+     * 不结算的话，宿主的 `approval/request` waterfall 会一直等这个 Promise：
+     * 插件已经没了，新实例也不认识旧卡片的 nonce，点击只会静默落空，
+     * 依赖审批的那次工具调用就把整个会话吊在那里。
+     */
+    dispose(): void;
+    /**
      * 文本作答（卡片不可用时的兜底）：解析 "1/同意/允许" 与 "2/拒绝"。
      *
      * 返回 false 表示"这句话不是审批决策"，调用方必须继续走常规消息流程——
@@ -117,8 +127,29 @@ export declare class ApprovalChannel {
     answerFromText(ctx: MiddlewareContext): boolean;
     /** 卡片按钮点击：解码 value、校验点击者授权、settle pending 审批并原地改写卡片 */
     handleInteraction(payload: ApprovalInteractionPayload): Promise<boolean>;
+    /**
+     * 按 nonce 找 pending 审批（点击身份字段对不上会话时的兜底路径）。
+     *
+     * 只认"对端一致"的那一条：nonce 虽然在卡片里，但别人也可能点到同一张卡，
+     * 兜底匹配必须自己再核一次点击者，否则等于绕过了会话隔离。
+     */
+    private findByNonceForClicker;
+    /** 点击者是否就是该 pending 审批所属会话的对端 */
+    private isSamePeer;
     /** 走推推通道：发审批卡片 + 挂起 Promise，等待用户决策 */
     private park;
+    /** 审批等待上限（毫秒）；0 / 非法值 = 不限 */
+    private approvalTimeoutMs;
+    /** 给 pending 审批挂超时计时器（unref：别让一个待批审批拖住宿主退出） */
+    private armTimer;
+    private clearTimer;
+    /**
+     * 审批超时：按 cancelled 结算（dsh 协议里只有 allowed-once 是放行），
+     * 把卡片改成作废态，并在会话里留一句话——否则用户只看到卡片，不知道它已经废了。
+     */
+    private onTimeout;
+    /** 审批作废后补一句人话（发送失败只记日志，不影响已经 settle 的审批） */
+    private notifyExpired;
     /**
      * 发送审批请求：卡片优先，卡片失败/被关闭时退回纯文本编号提示。
      *

@@ -106,6 +106,13 @@ export declare class QuestionChannel {
     answerFromText(ctx: MiddlewareContext): Promise<boolean>;
     /** 卡片按钮点击作答：解码选项下标、推进状态机、原地改写卡片 */
     handleInteraction(payload: QuestionInteractionPayload): Promise<boolean>;
+    /**
+     * 按题目 id 找待答问题（点击身份对不上会话时的兜底路径）。
+     *
+     * 和审批一样，兜底必须再核一次点击者对端：题目 id 写在同一张卡片里，
+     * 但别人点到那张卡不能替会话主人作答。
+     */
+    private findByQuestionIdForClicker;
     /** 走推推通道：发送首题 + 挂起 Promise，等待逐题作答 */
     private askViaTuitui;
     /** 推进状态机：收集答案 → 有下一题则发送，否则 resolve 全部答案 */

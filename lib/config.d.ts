@@ -67,6 +67,13 @@ export interface InteractiveConfig {
     headBgColor: string;
     /** 卡片头部文字颜色 */
     headTextColor: string;
+    /**
+     * 审批卡片等待上限（毫秒，0 = 不限）。
+     *
+     * 超时按 `cancelled` 结算并把卡片改写成「⌛ 审批超时已作废」：点击送不回插件时，
+     * 依赖审批的工具调用会一直挂着，整个会话跟着卡死。
+     */
+    approvalTimeoutMs: number;
 }
 /** Agent 执行步骤上报配置（client.agent → 推推客户端原生展示） */
 export interface AgentStepsConfig {

@@ -10,7 +10,7 @@ import type { TuituiInteractiveAction, TuituiOutboundInteractiveMessage } from '
 import type { ApprovalRequest } from './approval-channel.ts';
 import { type CardTheme } from './button-utils.ts';
 /** 审批被点击后落到卡片上的结果文案 */
-export type ApprovalResolution = 'allowed-once' | 'rejected' | 'cancelled';
+export type ApprovalResolution = 'allowed-once' | 'rejected' | 'cancelled' | 'timeout';
 /**
  * 把审批请求渲染成文本。
  *
