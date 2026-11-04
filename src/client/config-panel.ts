@@ -748,6 +748,14 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     setResult(null);
   }, []);
 
+  /**
+   * 连接测试。
+   *
+   * 三点必须成立，否则就是"一直转圈"这种最讨厌的状态：
+   *   1. 无论成功、失败、抛错、超时，按钮都要回到可点状态（finally 统一收口）
+   *   2. 请求本身带超时（AbortController），挂死的网关不会把按钮永久锁住
+   *   3. 服务端没重启（路由不存在 → 404/405）要说人话，而不是给个裸状态码
+   */
   const testEndpoint = useCallback((kind: 'vision' | 'image'): void => {
     if (probeBusy !== null || form === null) return;
     const prefix = kind === 'vision' ? 'vision' : 'imageGeneration';
@@ -762,30 +770,48 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       }));
       return;
     }
+
+    const setResult = (ok: boolean, detail: string): void => {
+      setProbe((current) => ({ ...current, [kind]: { ok, detail } }));
+    };
+
     setProbeBusy(kind);
     setProbe((current) => ({ ...current, [kind]: null }));
-    void fetch(TEST_MODEL_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        kind,
-        baseUrl: form[`${prefix}.baseUrl` as keyof ConfigWire] ?? '',
-        model: form[`${prefix}.model` as keyof ConfigWire] ?? '',
-        // 密钥框是空的就交给服务端用已保存的那份
-        apiKey: form[`${prefix}.apiKey` as keyof ConfigWire] ?? '',
-      }),
-    })
-      .then(async (res) => {
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => { controller.abort(); }, 25_000);
+
+    void (async () => {
+      try {
+        const res = await fetch(TEST_MODEL_PATH, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            kind,
+            baseUrl: form[`${prefix}.baseUrl` as keyof ConfigWire] ?? '',
+            model: form[`${prefix}.model` as keyof ConfigWire] ?? '',
+            // 密钥框是空的就交给服务端用已保存的那份
+            apiKey: form[`${prefix}.apiKey` as keyof ConfigWire] ?? '',
+          }),
+        });
+        if (res.status === 404 || res.status === 405) {
+          setResult(false, '这个接口不存在——服务端插件还是旧进程，先跑 ~/bin/dsh-restart');
+          return;
+        }
         const body = (await res.json().catch(() => ({}))) as { ok?: boolean; detail?: string; error?: string };
-        setProbe((current) => ({
-          ...current,
-          [kind]: { ok: body.ok === true, detail: body.detail ?? body.error ?? 'HTTP ' + res.status },
-        }));
-      })
-      .catch((err: unknown) => {
-        setProbe((current) => ({ ...current, [kind]: { ok: false, detail: err instanceof Error ? err.message : String(err) } }));
-      })
-      .finally(() => { setProbeBusy(null); });
+        setResult(body.ok === true, body.detail ?? body.error ?? `服务端返回 ${res.status}`);
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          setResult(false, '测试超时（25 秒）：网关没响应，检查地址是否可达');
+        } else {
+          setResult(false, err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        clearTimeout(timer);
+        setProbeBusy(null);
+      }
+    })();
   }, [form, probeBusy]);
 
   const submit = useCallback((event: FormEvent): void => {
