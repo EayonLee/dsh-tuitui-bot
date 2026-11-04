@@ -111,7 +111,7 @@ describe('中间件链编排（集成）', () => {
 
   it('smart 模式：模型没判要说话时沉默（不再有「出现某个词就回」的规则）', async () => {
     const config = makeConfig({ mentionPolicy: 'smart' });
-    const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, content: '憨包 今天几号', atMe: false }));
+    const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, content: '小助手 今天几号', atMe: false }));
 
     expect(await runChain(config, ctx)).toBe('mention');
   });

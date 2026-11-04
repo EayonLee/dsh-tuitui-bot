@@ -3,12 +3,12 @@ import { extractMentions, mergeMentions } from './mention-parse.ts';
 
 describe('extractMentions', () => {
   it('认出中文昵称，包括带括号的', () => {
-    expect(extractMentions('@规矩要立正 你听见没')).toEqual(['规矩要立正']);
-    expect(extractMentions('@憨包（正泰的小秘） 说话')).toEqual(['憨包（正泰的小秘）']);
+    expect(extractMentions('@另一个机器人 你听见没')).toEqual(['另一个机器人']);
+    expect(extractMentions('@小助手（研发组） 说话')).toEqual(['小助手（研发组）']);
   });
 
   it('句尾标点不粘进名字', () => {
-    expect(extractMentions('行吧 @规矩要立正。')).toEqual(['规矩要立正']);
+    expect(extractMentions('行吧 @另一个机器人。')).toEqual(['另一个机器人']);
     expect(extractMentions('@A、@B 都来')).toEqual(['A', 'B']);
   });
 
@@ -24,7 +24,7 @@ describe('extractMentions', () => {
 
   it('@all 这类不算，自己的名字也不算', () => {
     expect(extractMentions('@all 集合')).toEqual([]);
-    expect(extractMentions('@憨包 自言自语', { self: '憨包' })).toEqual([]);
+    expect(extractMentions('@小助手 自言自语', { self: '小助手' })).toEqual([]);
   });
 
   it('去重并限流', () => {

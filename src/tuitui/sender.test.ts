@@ -124,11 +124,11 @@ describe('sendMarkdown', () => {
   it('正文里的 @昵称 会变成 at 元数据（不然对方收不到通知）', async () => {
     const { sender, calls } = setup();
 
-    await sender.sendMarkdown(group, '@规矩要立正 你那三条依据自己拆了一半');
+    await sender.sendMarkdown(group, '@另一个机器人 你那三条依据自己拆了一半');
 
     expect(calls[0]?.args).toMatchObject({
       to: { groupId: 'g-1' },
-      at: ['规矩要立正'],
+      at: ['另一个机器人'],
     });
   });
 

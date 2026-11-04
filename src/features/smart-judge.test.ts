@@ -56,7 +56,7 @@ function throwingLlm() {
 const base = {
   route: { provider: 'p', model: 'm' },
   history: [{ sender: '张三', text: '今天天气不错' }],
-  message: { sender: '李四', text: '憨包，帮我看下这个报错' },
+  message: { sender: '李四', text: '小助手，帮我看下这个报错' },
 } as const;
 
 afterEach(() => {
