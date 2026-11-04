@@ -26,6 +26,7 @@ import { buildCommandList } from '../commands/index.ts';
 import { startMediaCleanup } from '../media/media-cleaner.ts';
 import { ensureVisionInputModal, registerDescribeImageTool } from '../media/vision-tool.ts';
 import { registerSendFileTool } from '../media/send-file-tool.ts';
+import { registerGroupTool } from '../tuitui/group-tool.ts';
 import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
 import { getScopePeer, PLUGIN_HOME } from '../shared/index.ts';
@@ -329,6 +330,9 @@ export async function bootstrapGateway(
 
   // ── 附件发送工具注册（tuitui_send_file） ──
   runOptional(logger, 'send-file tool', () => registerSendFileTool(ctx, sender, manager, config, logger));
+
+  // ── 群管理工具注册（tuitui_group：查群/成员随便问，建群拉人踢人要 confirm） ──
+  runOptional(logger, 'group tool', () => registerGroupTool(ctx, client, logger));
 
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void }).effect(() => {
