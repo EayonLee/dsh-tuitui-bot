@@ -6,3 +6,4 @@ export { getScopePeer } from './scope.ts';
 export { PLUGIN_HOME, MEDIA_DIR, resolveAgentCwd } from './dirs.ts';
 export { sendMarkdownChunked } from './send-helper.ts';
 export { withFileLog } from './log-file.ts';
+export { resolveScopeStrategy } from './concurrency.ts';

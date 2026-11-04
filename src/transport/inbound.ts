@@ -33,7 +33,7 @@ import type {
   ProcessedAttachment,
   ReplyTarget,
 } from '../types.ts';
-import { getScopePeer } from '../shared/index.ts';
+import { getScopePeer, resolveScopeStrategy } from '../shared/index.ts';
 import {
   classifyContentType,
   isVoiceContentType,
@@ -93,6 +93,29 @@ export async function handleInbound(
     content,
     source: { kind: 'user' as const },
   });
+
+  /**
+   * 并发策略必须在 turn 这一层执行。
+   *
+   * 中间件链跑完就 release 了，turn 还在飞——只靠链上的并发守卫，私聊配了
+   * 「打断」照样会排到前一轮后面。这里按作用域再判一次：abort 先取消在飞的
+   * 那一轮再投递，drop 忙时直接丢。
+   */
+  const strategy = resolveScopeStrategy(config, scope);
+  if ((strategy === 'abort' || strategy === 'drop') && record.agent.status === 'running') {
+    if (strategy === 'drop') {
+      logger.info(`[concurrency] 忙时丢弃: scope=${scope} peer=${peerId}`);
+      return;
+    }
+    logger.info(`[concurrency] 打断在飞回合，直接接新话: scope=${scope} peer=${peerId}`);
+    record.agent.cancel({ kind: 'user' });
+    // 等旧回合真正收敛再投递，否则 followup 会追加到被取消的那一轮尾巴上
+    try {
+      await record.agent.whenIdle();
+    } catch (err) {
+      logger.warn(`cancel 后等待收敛失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   record.agent.followup(message);
   logger.info(`→ followup sent: key=${scope}:${peerId}`);

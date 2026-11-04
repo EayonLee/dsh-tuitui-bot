@@ -17,7 +17,10 @@ vi.mock('../features/history-store.ts', () => ({ clearGroupHistory: vi.fn() }));
 import { clearGroupHistory } from '../features/history-store.ts';
 
 const logger: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-const config = { appId: 'app-1' } as unknown as ImTuituiConfig;
+const config = {
+  appId: 'app-1',
+  concurrency: { c2c: 'abort', group: 'queue', post: 'queue' },
+} as unknown as ImTuituiConfig;
 
 function createMessage(over: Partial<InboundMessage> = {}): InboundMessage {
   return {
@@ -52,12 +55,22 @@ function createCtx(
 }
 
 interface FakeRecord {
-  agent: { followup: ReturnType<typeof vi.fn>; whenIdle: ReturnType<typeof vi.fn> };
+  agent: {
+    followup: ReturnType<typeof vi.fn>;
+    whenIdle: ReturnType<typeof vi.fn>;
+    status: string;
+    cancel: ReturnType<typeof vi.fn>;
+  };
 }
 
-function createManager(over?: { fails?: boolean }): { manager: SessionManager; record: FakeRecord; getOrCreate: ReturnType<typeof vi.fn> } {
+function createManager(over?: { fails?: boolean; busy?: boolean }): { manager: SessionManager; record: FakeRecord; getOrCreate: ReturnType<typeof vi.fn> } {
   const record: FakeRecord = {
-    agent: { followup: vi.fn(), whenIdle: vi.fn().mockResolvedValue(undefined) },
+    agent: {
+      followup: vi.fn(),
+      whenIdle: vi.fn().mockResolvedValue(undefined),
+      status: over?.busy === true ? 'running' : 'idle',
+      cancel: vi.fn(),
+    },
   };
   const getOrCreate = over?.fails === true
     ? vi.fn().mockRejectedValue(new Error('boom'))
@@ -73,6 +86,44 @@ function followedText(record: FakeRecord): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('handleInbound: 并发策略在 turn 这一层生效', () => {
+  it('单聊配 abort 且上一轮在飞：先 cancel 再 followup', async () => {
+    const { manager, record, getOrCreate } = createManager({ busy: true });
+    await handleInbound(createCtx(createMessage()), manager, config, logger);
+    expect(getOrCreate).toHaveBeenCalled();
+    expect(record.agent.cancel).toHaveBeenCalledWith({ kind: 'user' });
+    expect(record.agent.followup).toHaveBeenCalled();
+    // 顺序：cancel 必须在 followup 之前
+    const cancelOrder = record.agent.cancel.mock.invocationCallOrder[0];
+    const followOrder = record.agent.followup.mock.invocationCallOrder[0];
+    expect(cancelOrder).toBeLessThan(followOrder);
+  });
+
+  it('群聊配 queue 且上一轮在飞：不取消，照常排队', async () => {
+    const { manager, record } = createManager({ busy: true });
+    await handleInbound(createCtx(createMessage({ kind: 'group', groupId: 'g-1' })), manager, config, logger);
+    expect(record.agent.cancel).not.toHaveBeenCalled();
+    expect(record.agent.followup).toHaveBeenCalled();
+  });
+
+  it('配 drop 且忙：直接丢弃，不 followup', async () => {
+    const dropConfig = {
+      appId: 'app-1',
+      concurrency: { c2c: 'drop', group: 'queue', post: 'queue' },
+    } as unknown as ImTuituiConfig;
+    const { manager, record } = createManager({ busy: true });
+    await handleInbound(createCtx(createMessage()), manager, dropConfig, logger);
+    expect(record.agent.followup).not.toHaveBeenCalled();
+  });
+
+  it('空闲时不取消任何东西', async () => {
+    const { manager, record } = createManager();
+    await handleInbound(createCtx(createMessage()), manager, config, logger);
+    expect(record.agent.cancel).not.toHaveBeenCalled();
+    expect(record.agent.followup).toHaveBeenCalled();
+  });
 });
 
 describe('handleInbound: 会话流转', () => {

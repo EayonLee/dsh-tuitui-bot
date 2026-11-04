@@ -12,7 +12,7 @@ import type { SessionManager } from '../session/index.ts';
 import type { CommandEntry } from '../commands/index.ts';
 import { getHistoryStore, historyGroupKey } from '../features/history-store.ts';
 import { judgeShouldJoin, type JudgeLine } from '../features/smart-judge.ts';
-import { getScopePeer } from '../shared/index.ts';
+import { getScopePeer, resolveScopeStrategy } from '../shared/index.ts';
 import {
   MiddlewareKernel,
   errorHandler,
@@ -207,12 +207,7 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
   // 9. 并发串行 + 消息合并（同 peer 排队，避免 session 冲突）
   kernel.use(concurrencyGuard({
     // 群聊排队一条条来，私聊直接打断——按作用域分开配
-    strategyFor: (mctx) => {
-      const kind = mctx.message.kind;
-      return kind === 'c2c' ? config.concurrency.c2c
-        : kind === 'post' ? config.concurrency.post
-          : config.concurrency.group;
-    },
+    strategyFor: (mctx) => resolveScopeStrategy(config, mctx.message.kind),
     maxQueue: config.maxQueue,
     maxProcessingMs: config.processingTimeoutMs,
     // 超时中断：光停中间件链不够，正在飞的模型调用/工具执行必须真正取消，
