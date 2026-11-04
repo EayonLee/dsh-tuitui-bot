@@ -40,7 +40,7 @@ import {
   mediaFilename,
   type MediaKind,
 } from './attachment.ts';
-import { clearGroupHistory } from '../features/history-store.ts';
+import { getHistoryDelivered, markHistoryDelivered, undeliveredHistory } from '../features/history-store.ts';
 
 /**
  * 等这一轮收敛的上限。
@@ -105,7 +105,7 @@ export async function handleInbound(
   const replyTarget: ReplyTarget = ctx.replyTarget;
 
   // ── 组装 agentBody（下载结果经 state.downloadedFiles 提供） ──
-  const agentBody = assembleAgentBody(msg, state, scope, logger);
+  const agentBody = assembleAgentBody(msg, state, scope, logger, config.appId);
 
   if (!agentBody) return;
 
@@ -184,11 +184,12 @@ export async function handleInbound(
   record.agent.followup(message);
   logger.info(`→ followup sent: key=${scope}:${peerId}`);
 
-  // 群聊/帖子回复后清空历史缓存（避免下次 @ 时重复组包）。
-  // 历史键与 middleware-setup 的 groupKey 完全一致，否则清不到同一份缓冲。
+  // 投递成功才推进水位线：这一条之后的群聊消息，下次才会再灌给模型。
+  // 清空整桶的老做法已经去掉——那会让「50 条上下文」永远凑不满。
   const historyKey = historyKeyOf(msg, scope);
-  if (historyKey !== undefined) {
-    clearGroupHistory(config.appId, historyKey);
+  const lastHistory = state.history?.[state.history.length - 1];
+  if (historyKey !== undefined && lastHistory !== undefined) {
+    markHistoryDelivered(config.appId, historyKey, lastHistory.messageId);
   }
 
   await waitIdle(record.agent, logger, `${scope}:${peerId}`);
@@ -215,6 +216,7 @@ function assembleAgentBody(
   state: MiddlewareState,
   scope: ChatScope,
   logger: Logger,
+  appId: string,
 ): string | null {
   const multiUser = scope !== 'c2c';
   const wasMentioned = state.mention?.wasMentioned ?? false;
@@ -229,7 +231,15 @@ function assembleAgentBody(
   const dynamicCtx = buildDynamicCtx(msg, state);
 
   const base = dynamicCtx ? `${dynamicCtx}${userMessage}` : userMessage;
-  return buildAgentBody(base, state.history, multiUser, wasMentioned);
+
+  // 只取水位线之后的新消息：缓冲滚动保留最近 N 条，但同一批内容只灌一次。
+  const historyKey = historyKeyOf(msg, scope);
+  const pending = historyKey === undefined
+    ? state.history
+    : undeliveredHistory(state.history ?? [], getHistoryDelivered(appId, historyKey));
+  // 回写给 state：投递完成后 markHistoryDelivered 要用它算新的水位线
+  state.history = pending;
+  return buildAgentBody(base, pending, multiUser, wasMentioned);
 }
 
 /**

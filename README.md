@@ -135,7 +135,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `drop` | 忙时直接丢弃，只记日志 | 那条消息不会被回答 |
 | `reactions.enabled` | `true` | 收到消息先挂表情回执（在算 / 好了 / 出错） |
 | `reactions.inGroup` | `true` | 群聊里也挂回执 |
-| `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | 三个阶段的表情；留空表示不挂 |
+| `reactions.ack` / `done` / `fail` | `微笑` / `OK` / `委屈` | 三个阶段的表情**名**（推推只认内置名：微笑 / 强 / OK / 奶茶…；传 unicode 会被服务端拒）；留空表示不挂 |
 | `smartJudge.timeoutMs` | `20000` | 判定超时（超时视为不插嘴；思考型模型 8 秒经常卡在推理里） |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
@@ -151,7 +151,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `maxQueue` | `20` | 同 peer 消息队列上限 |
 | `processingTimeoutMs` | `1800000` | 单轮处理超时（ms） |
 | `askTimeoutMs` | `300000` | 待答问题超时（ms） |
-| `historyLimit` | `50` | 群/帖子历史缓冲条数 |
+| `historyLimit` | `50` | 群 / 帖子历史缓冲条数（滚动保留，回复后不清空，只补没投递过的新消息） |
 | `showToolResults` | `false` | 是否展示工具成功结果（错误始终展示） |
 
 ### 访问控制

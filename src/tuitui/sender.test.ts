@@ -457,9 +457,10 @@ describe('recall / emojiReaction', () => {
 
     await sender.emojiReaction(group, 'm-4', '👍', true);
 
+    // unicode 会被翻译成推推认的表情名（👍 → 强）
     expect(calls[0]).toEqual({
       api: 'im.emojiReaction',
-      args: { to: { groupId: 'g-1' }, messageId: 'm-4', emoji: '👍', cancel: true },
+      args: { to: { groupId: 'g-1' }, messageId: 'm-4', emoji: '强', cancel: true },
     });
   });
 
@@ -481,18 +482,37 @@ describe('recall / emojiReaction', () => {
       teamId: 't-1',
       channelId: 'ch-1',
       postId: 'p-4',
-      emoji: '🎉',
+      emoji: '庆祝',
     });
   });
 
-  it('emoji 失败不影响主流程，只记 debug', async () => {
+  it('emoji 失败不影响主流程，但要留 warn 线索', async () => {
     const { sender, logger } = setup({
       handlers: { 'im.emojiReaction': () => { throw apiError('emoji boom'); } },
     });
 
     await expect(sender.emojiReaction(group, 'm-4', '👍')).resolves.toBeUndefined();
-    expect(String(logger.debug.mock.calls[0]?.[0])).toContain('emojiReaction failed');
-    expect(logger.warn).not.toHaveBeenCalled();
+    // 以前是 debug，info 级日志里查不到，"回执没效果"根本无从排查
+    const warnText = logger.warn.mock.calls.map((c) => String(c[0])).join(' ');
+    expect(warnText).toContain('emojiReaction failed');
+    expect(warnText).toContain('emoji=强');
+  });
+
+  it('认不出来的 emoji 直接跳过，不发请求', async () => {
+    const { sender, calls, logger } = setup();
+
+    await sender.emojiReaction(group, 'm-4', '🦄');
+
+    expect(calls).toHaveLength(0);
+    expect(logger.warn.mock.calls.map((c) => String(c[0])).join(' ')).toContain('推推不认这个表情');
+  });
+
+  it('空表情等于不挂', async () => {
+    const { sender, calls } = setup();
+
+    await sender.emojiReaction(group, 'm-4', '   ');
+
+    expect(calls).toHaveLength(0);
   });
 });
 

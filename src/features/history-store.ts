@@ -60,6 +60,16 @@ export class MemoryHistoryStore implements HistoryStore {
 let _store: HistoryStore | null = null;
 let _judgeStore: HistoryStore | null = null;
 
+/**
+ * 「已经交给模型看过」的水位线：会话键 → 最后一条已投递的 messageId。
+ *
+ * 为什么要有它：以前的做法是回复完把整桶历史清掉，结果每次 @ 只能看到
+ * 上次回复之后的那几条（实测 0~19 条），设置里的 50 条永远凑不满。
+ * 改成水位线后缓冲一直滚动保留最近 N 条，注入时只取水位线之后的新消息——
+ * 既不会重复灌旧内容，又能真的看到一整窗上下文。
+ */
+const delivered = new Map<string, string>();
+
 /** 获取共享历史存储（单例：中间件与出站清理必须看到同一份数据） */
 export function getHistoryStore(): HistoryStore {
   if (!_store) _store = new MemoryHistoryStore();
@@ -82,6 +92,7 @@ export function getJudgeHistoryStore(): HistoryStore {
 export function resetHistoryStores(): void {
   _store = null;
   _judgeStore = null;
+  delivered.clear();
 }
 
 /**
@@ -93,7 +104,34 @@ export function historyGroupKey(appId: string, peerId: string): string {
   return `${appId}:${peerId}`;
 }
 
-/** 清空某个会话的历史（回复后调用，避免下次 @ 时重复组包） */
+/** 清空某个会话的历史（保留给测试与手动运维；正常流程已改用水位线） */
 export function clearGroupHistory(appId: string, peerId: string): void {
   _store?.clear(historyGroupKey(appId, peerId));
+  delivered.delete(historyGroupKey(appId, peerId));
+}
+
+/** 记下「这条以及之前的都已经给模型看过了」 */
+export function markHistoryDelivered(appId: string, peerId: string, messageId: string): void {
+  delivered.set(historyGroupKey(appId, peerId), messageId);
+}
+
+/** 取水位线（没投递过返回 undefined） */
+export function getHistoryDelivered(appId: string, peerId: string): string | undefined {
+  return delivered.get(historyGroupKey(appId, peerId));
+}
+
+/**
+ * 从缓冲里挑出「还没投递过」的那一段。
+ *
+ * 水位线那条消息本身也算已投递（它是上一次注入的最后一条），所以从它之后开始截。
+ * 水位线已经滚出缓冲（说明聊了很久）时，按整窗返回。
+ */
+export function undeliveredHistory(
+  entries: HistoryEntry[],
+  watermark: string | undefined,
+): HistoryEntry[] {
+  if (watermark === undefined) return entries;
+  const index = entries.findIndex((entry) => entry.messageId === watermark);
+  if (index === -1) return entries;
+  return entries.slice(index + 1);
 }

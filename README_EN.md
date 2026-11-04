@@ -118,7 +118,7 @@ All four strategies act at the **turn** level, not just in the middleware chain:
 | `concurrency.post` | `queue` | Team posts: process one at a time |
 | `reactions.enabled` | `true` | React on receipt (working / done / failed) |
 | `reactions.inGroup` | `true` | Also react in groups |
-| `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | Emoji per stage; empty disables it |
+| `reactions.ack` / `done` / `fail` | `微笑` / `OK` / `委屈` | Emoji **name** per stage — Tuitui only accepts its built-in names (微笑 / 强 / OK / 奶茶…); unicode is rejected. Empty disables it |
 | `smartJudge.timeoutMs` | `20000` | Judgement timeout (timeout = do not join; thinking models often need more than 8s) |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
@@ -135,7 +135,7 @@ All four strategies act at the **turn** level, not just in the middleware chain:
 | `maxQueue` | `20` | Per-peer queue limit |
 | `processingTimeoutMs` | `1800000` | Turn timeout (ms) |
 | `askTimeoutMs` | `300000` | Pending question timeout (ms) |
-| `historyLimit` | `50` | Group/post history buffer size |
+| `historyLimit` | `50` | Group/post history buffer size (rolling window; nothing is cleared after a reply, only undelivered messages are added) |
 | `showToolResults` | `false` | Show successful tool output (errors always shown) |
 
 ### Access control

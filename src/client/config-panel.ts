@@ -321,6 +321,8 @@ const PANEL_CSS: readonly string[] = [
   /* ── 说明走 tooltip：虚线下划线提示「这里可以看」 ── */
   '.imqb2-has-tip { cursor: help; border-bottom: 1px dashed var(--dsw-alias-border-secondary); }',
   '.imqb2-input--text { width: 76px; text-align: center; }',
+  // 地址 / 模型 ID / 密钥这类长串：撑满控件区，别让人在 76px 的框里看 URL
+  '.imqb2-input--wide { width: 100%; min-width: 220px; max-width: 460px; text-align: left; }',
 ];
 
 /** 注入配置面板样式（挂载时注入、卸载时移除） */
@@ -415,14 +417,14 @@ function Row({ label, sub, help, inline = false, children }: {
 }
 
 /** 单行文本输入（表情、短串） */
-function TextRow({ label, sub, help, value, placeholder, maxLength, onChange }: {
+function TextRow({ label, sub, help, value, placeholder, maxLength, wide = false, onChange }: {
   label: string; sub?: string; help?: string; value: string;
-  placeholder?: string; maxLength?: number; onChange: (next: string) => void;
+  placeholder?: string; maxLength?: number; wide?: boolean; onChange: (next: string) => void;
 }): ReactNode {
   return createElement(Row, { label, sub, help, inline: true },
     createElement('input', {
       type: 'text',
-      className: 'imqb2-input imqb2-input--text',
+      className: 'imqb2-input ' + (wide ? 'imqb2-input--wide' : 'imqb2-input--text'),
       value,
       placeholder,
       maxLength,
@@ -447,7 +449,7 @@ function SecretRow({ label, sub, help, isSet, value, placeholder, onChange }: {
     createElement('div', { className: 'imqb2-secret' },
       createElement('input', {
         type: 'password',
-        className: 'imqb2-input imqb2-input--text',
+        className: 'imqb2-input imqb2-input--wide',
         value,
         placeholder: isSet ? '已设置（留空不改）' : (placeholder ?? '未设置'),
         spellCheck: false,
@@ -932,21 +934,21 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('reactions.inGroup', v); },
       }),
       createElement(TextRow, {
-        label: '在算', value: form['reactions.ack'] ?? '👀',
-        placeholder: '👀', maxLength: 8,
-        help: '收到消息时挂的表情。留空 = 不挂。',
+        label: '在算', value: form['reactions.ack'] ?? '微笑',
+        placeholder: '微笑', maxLength: 10,
+        help: '填表情名：微笑 / OK / 抱拳 / 玫瑰。推推只认名字，填 👀 这种 unicode 会被服务端拒掉。留空 = 不挂。',
         onChange: (v) => { patch('reactions.ack', v); },
       }),
       createElement(TextRow, {
-        label: '完成', value: form['reactions.done'] ?? '✅',
-        placeholder: '✅', maxLength: 8,
-        help: '处理完把「在算」换成这个。留空 = 只撤不换。',
+        label: '完成', value: form['reactions.done'] ?? 'OK',
+        placeholder: 'OK', maxLength: 10,
+        help: '处理完把「在算」换成这个，同样是表情名（OK / 强 / 鼓掌）。留空 = 只撤不换。',
         onChange: (v) => { patch('reactions.done', v); },
       }),
       createElement(TextRow, {
-        label: '出错', value: form['reactions.fail'] ?? '😵',
-        placeholder: '😵', maxLength: 8,
-        help: '处理失败时换成这个。留空 = 只撤不换。',
+        label: '出错', value: form['reactions.fail'] ?? '委屈',
+        placeholder: '委屈', maxLength: 10,
+        help: '处理失败时换成这个（委屈 / 心碎 / 疑问）。留空 = 只撤不换。',
         onChange: (v) => { patch('reactions.fail', v); },
       }),
     ),
@@ -1008,7 +1010,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     },
       createElement(NumberRow, {
         label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
-        help: '被叫到时附带最近 N 条群消息；0 表示不带。私聊靠会话自身记忆，不受影响。',
+        help: '被叫到时附带最近 N 条群消息（滚动保留，回完不清空，只补没给模型看过的新消息）；0 表示不带。私聊靠会话自身记忆，不受影响。',
         onChange: (v) => { patch('historyLimit', v); },
       }),
       createElement(NumberRow, {
@@ -1047,7 +1049,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     createElement(Section, {
       id: 'image',
       title: '图像理解与生成',
-      desc: '两套独立配置，都是「地址 + 密钥 + 模型 id」三样。理解用来看图和 OCR，生成用来画图；密钥只存服务端，页面上永远不回显。',
+      desc: '两套独立配置，都是「地址 + 密钥 + 模型ID」三样。理解用来看图和 OCR，生成用来画图；密钥只存服务端，页面上永远不回显。',
     },
       createElement('div', { className: 'imqb2-subhead' }, '① 图像理解（看图 / OCR / 截图分析）'),
       createElement(SwitchRow, {
@@ -1056,13 +1058,13 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('vision.enabled', v); },
       }),
       createElement(TextRow, {
-        label: '地址', value: form['vision.baseUrl'] ?? '',
+        label: '地址', wide: true, value: form['vision.baseUrl'] ?? '',
         placeholder: 'https://llm.api.zyuncs.com/v1',
         help: 'OpenAI 兼容 base url，一般以 /v1 结尾。',
         onChange: (v) => { patch('vision.baseUrl', v); },
       }),
       createElement(TextRow, {
-        label: '模型 id', value: form['vision.model'] ?? '',
+        label: '模型ID', wide: true, value: form['vision.model'] ?? '',
         placeholder: 'qwen/qwen3-vl-30b-a3b-instruct',
         help: '必须是视觉模型（能收图的那种）。',
         onChange: (v) => { patch('vision.model', v); },
@@ -1086,22 +1088,16 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('imageGeneration.enabled', v); },
       }),
       createElement(TextRow, {
-        label: '地址', value: form['imageGeneration.baseUrl'] ?? '',
+        label: '地址', wide: true, value: form['imageGeneration.baseUrl'] ?? '',
         placeholder: 'https://llm.api.zyuncs.com/v1',
         help: 'OpenAI 兼容 base url，一般以 /v1 结尾。',
         onChange: (v) => { patch('imageGeneration.baseUrl', v); },
       }),
       createElement(TextRow, {
-        label: '模型 id', value: form['imageGeneration.model'] ?? '',
+        label: '模型ID', wide: true, value: form['imageGeneration.model'] ?? '',
         placeholder: 'qwen/qwen-image-2512',
-        help: '文生图模型 id。',
+        help: '文生图模型 id。尺寸按模型默认走，不另外配。',
         onChange: (v) => { patch('imageGeneration.model', v); },
-      }),
-      createElement(TextRow, {
-        label: '尺寸', value: form['imageGeneration.size'] ?? '',
-        placeholder: '1024x1024',
-        help: '留空用服务端默认；模型支持哪些尺寸以它自己的文档为准。',
-        onChange: (v) => { patch('imageGeneration.size', v); },
       }),
       createElement(SecretRow, {
         label: '密钥', isSet: form['imageGeneration.apiKeySet'] === true, value: form['imageGeneration.apiKey'] ?? '',

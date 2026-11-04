@@ -254,9 +254,9 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   reactions: Schema.object({
     enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),
     inGroup: Schema.boolean().default(true).description('群聊里也挂表情回执（默认给，省得以为机器人卡死）'),
-    ack: Schema.string().default('👀').description('收到时挂的表情（留空 = 不挂）'),
-    done: Schema.string().default('✅').description('处理完换成的表情（留空 = 只撤不换）'),
-    fail: Schema.string().default('😵').description('出错换成的表情（留空 = 只撤不换）'),
+    ack: Schema.string().default('微笑').description('收到时挂的表情名（微笑 / OK / 抱拳；推推不认 👀 这种 unicode，留空 = 不挂）'),
+    done: Schema.string().default('OK').description('处理完换成的表情名（留空 = 只撤不换）'),
+    fail: Schema.string().default('委屈').description('出错换成的表情名（留空 = 只撤不换）'),
   }).description('表情回执'),
   groupPrompt: Schema.string().description('群聊额外system prompt'),
   directPrompt: Schema.string().description('私聊额外system prompt'),
