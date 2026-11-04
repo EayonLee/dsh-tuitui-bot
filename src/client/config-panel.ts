@@ -82,8 +82,8 @@ const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
 
 /** 历史注入方式：默认「最近 N 条」，跟别的机器人一致，最直观 */
 const HISTORY_MODE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'delta', label: '只补没看过的（默认，省 token）' },
   { value: 'window', label: '最近 N 条（每次都被叫到都带一整窗）' },
-  { value: 'delta', label: '只补没看过的（省 token，不重复）' },
 ];
 
 const CONCURRENCY_OPTIONS: ReadonlyArray<{ value: ConcurrencyStrategy; label: string }> = [
@@ -203,6 +203,24 @@ const PANEL_CSS: readonly string[] = [
   '.imqb2-secret { display: flex; align-items: center; gap: 8px; }',
   '.imqb2-secret-flag { font-size: 12px; line-height: 16px; white-space: nowrap; color: var(--dsw-alias-label-tertiary); }',
   '.imqb2-secret-flag--on { color: var(--dsw-alias-label-success, #2f9e44); }',
+  // 连接测试按钮：跟随密钥框，绿色描边，成功填绿、失败转红
+  '.imqb2-secret-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; }',
+  '.imqb2-probe-btn {',
+  '  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px;',
+  '  border-radius: 6px; border: 1px solid var(--dsw-alias-label-success, #2f9e44);',
+  '  background: transparent; color: var(--dsw-alias-label-success, #2f9e44);',
+  '  font-size: 12px; line-height: 16px; white-space: nowrap; cursor: pointer;',
+  '  transition: background .15s ease, color .15s ease, border-color .15s ease;',
+  '}',
+  '.imqb2-probe-btn:hover:not(:disabled) { background: rgba(47, 158, 68, .10); }',
+  '.imqb2-probe-btn:disabled { opacity: .55; cursor: default; }',
+  '.imqb2-probe-btn--ok { background: var(--dsw-alias-label-success, #2f9e44); color: #fff; }',
+  '.imqb2-probe-btn--ok:hover:not(:disabled) { background: var(--dsw-alias-label-success, #2f9e44); }',
+  '.imqb2-probe-btn--bad { border-color: var(--dsw-alias-label-danger, #e03131); color: var(--dsw-alias-label-danger, #e03131); }',
+  '.imqb2-probe-btn--bad:hover:not(:disabled) { background: rgba(224, 49, 49, .10); }',
+  '.imqb2-secret-note { font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary); }',
+  '.imqb2-secret-note--ok { color: var(--dsw-alias-label-success, #2f9e44); }',
+  '.imqb2-secret-note--bad { color: var(--dsw-alias-label-danger, #e03131); }',
   '.imqb2-probe { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }',
   '.imqb2-probe-result { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }',
   '.imqb2-probe-result--ok { color: var(--dsw-alias-label-success, #2f9e44); }',
@@ -449,48 +467,56 @@ function TextRow({ label, sub, help, value, placeholder, maxLength, wide = false
  * 为什么不做"回显成 ****"：星号长度会泄露密钥长度，而且用户没法判断自己看到的是
  * 占位符还是真值。这里只显示"已设置 / 未设置"，留空提交 = 不改动。
  */
-function SecretRow({ label, sub, help, isSet, value, placeholder, onChange }: {
+function SecretRow({ label, sub, help, isSet, value, placeholder, right, note, onChange }: {
   label: string; sub?: string; help?: string; isSet: boolean; value: string;
-  placeholder?: string; onChange: (next: string) => void;
+  placeholder?: string; right?: ReactNode; note?: { ok: boolean; text: string } | null;
+  onChange: (next: string) => void;
 }): ReactNode {
   return createElement(Row, { label, sub, help, inline: true },
-    createElement('div', { className: 'imqb2-secret' },
-      createElement('input', {
-        type: 'password',
-        className: 'imqb2-input imqb2-input--wide',
-        value,
-        placeholder: isSet ? '已设置（留空不改）' : (placeholder ?? '未设置'),
-        spellCheck: false,
-        autoComplete: 'new-password',
-        onChange: (event: ChangeEvent<HTMLInputElement>) => { onChange(event.currentTarget.value); },
-      }),
-      createElement('span', {
-        className: 'imqb2-secret-flag' + (isSet ? ' imqb2-secret-flag--on' : ''),
-      }, isSet ? '已设置' : '未设置'),
+    createElement('div', { className: 'imqb2-secret-wrap' },
+      createElement('div', { className: 'imqb2-secret' },
+        createElement('input', {
+          type: 'password',
+          className: 'imqb2-input imqb2-input--wide',
+          value,
+          placeholder: isSet ? '已设置（留空不改）' : (placeholder ?? '未设置'),
+          spellCheck: false,
+          autoComplete: 'new-password',
+          onChange: (event: ChangeEvent<HTMLInputElement>) => { onChange(event.currentTarget.value); },
+        }),
+        createElement('span', {
+          className: 'imqb2-secret-flag' + (isSet ? ' imqb2-secret-flag--on' : ''),
+        }, isSet ? '已设置' : '未设置'),
+        right ?? null,
+      ),
+      note === null || note === undefined
+        ? null
+        : createElement('span', {
+            className: 'imqb2-secret-note' + (note.ok ? ' imqb2-secret-note--ok' : ' imqb2-secret-note--bad'),
+          }, (note.ok ? '✓ ' : '✗ ') + note.text),
     ),
   );
 }
 
-/** 连接测试行：一个按钮 + 一行结论 */
-function ProbeRow({ label, help, state, busy, onTest }: {
-  label: string; help?: string; state?: { ok: boolean; detail: string } | null;
-  busy: boolean; onTest: () => void;
+/**
+ * 连接测试按钮（挂在密钥框右边）。
+ *
+ * 三态一体：没测过是绿色描边「测试」，测通了填绿「成功」，失败了转红「失败」，
+ * 结论文字走下面那行小字 + title，不再单独占一行。
+ */
+function ProbeButton({ state, busy, onTest }: {
+  state?: { ok: boolean; detail: string } | null; busy: boolean; onTest: () => void;
 }): ReactNode {
-  return createElement(Row, { label, help, inline: true },
-    createElement('div', { className: 'imqb2-probe' },
-      createElement('button', {
-        type: 'button',
-        className: 'imqb2-inline-btn',
-        disabled: busy,
-        onClick: onTest,
-      }, busy ? '测试中…' : '测试连接'),
-      state === null || state === undefined
-        ? null
-        : createElement('span', {
-            className: 'imqb2-probe-result' + (state.ok ? ' imqb2-probe-result--ok' : ' imqb2-probe-result--bad'),
-          }, (state.ok ? '✓ ' : '✗ ') + state.detail),
-    ),
-  );
+  const cls = 'imqb2-probe-btn'
+    + (busy ? '' : state === null || state === undefined ? '' : state.ok ? ' imqb2-probe-btn--ok' : ' imqb2-probe-btn--bad');
+  const label = busy ? '测试中…' : state === null || state === undefined ? '测试' : state.ok ? '成功' : '失败';
+  return createElement('button', {
+    type: 'button',
+    className: cls,
+    disabled: busy,
+    title: state === null || state === undefined ? '只验证地址和密钥能不能通，不跑看图、不生成图片' : state.detail,
+    onClick: onTest,
+  }, label);
 }
 
 function Section({ id, title, desc, children }: {
@@ -725,6 +751,17 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   const testEndpoint = useCallback((kind: 'vision' | 'image'): void => {
     if (probeBusy !== null || form === null) return;
     const prefix = kind === 'vision' ? 'vision' : 'imageGeneration';
+    const baseUrl = String(form[`${prefix}.baseUrl` as keyof ConfigWire] ?? '').trim();
+    const model = String(form[`${prefix}.model` as keyof ConfigWire] ?? '').trim();
+    // 没填全就别测了：空地址去探活只会得到一句没用的报错。
+    // 密钥是例外——留空表示"用已保存的那把"。
+    if (baseUrl === '' || model === '') {
+      setProbe((current) => ({
+        ...current,
+        [kind]: { ok: false, detail: '地址和模型ID都要填上再测试（密钥可以留空，表示用已保存的）' },
+      }));
+      return;
+    }
     setProbeBusy(kind);
     setProbe((current) => ({ ...current, [kind]: null }));
     void fetch(TEST_MODEL_PATH, {
@@ -1041,8 +1078,8 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('historyLimit', v); },
       }),
       createElement(SelectRow, {
-        label: '怎么带历史', value: form.historyMode ?? 'window', options: HISTORY_MODE_OPTIONS,
-        help: '「最近 N 条」= 每次被叫到都带一整窗，最直观；「只补没看过的」= 同一批消息只灌一次，省 token 但有时看不到前面几句。',
+        label: '怎么带历史', value: form.historyMode ?? 'delta', options: HISTORY_MODE_OPTIONS,
+        help: '默认「只补没看过的」：同一批消息只灌一次，省 token，也不丢上下文（缓冲滚动保留，旧内容由会话自身记忆兜着）。',
         onChange: (v) => { patch('historyMode', v as 'window' | 'delta'); },
       }),
       createElement(NumberRow, {
@@ -1105,12 +1142,12 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         label: '密钥', isSet: form['vision.apiKeySet'] === true, value: form['vision.apiKey'] ?? '',
         placeholder: '粘贴密钥',
         help: '保存后不再显示；留空保存 = 不改动已存的密钥。',
+        right: createElement(ProbeButton, {
+          state: probe.vision, busy: probeBusy === 'vision',
+          onTest: () => { testEndpoint('vision'); },
+        }),
+        note: probe.vision,
         onChange: (v) => { patch('vision.apiKey', v); },
-      }),
-      createElement(ProbeRow, {
-        label: '连接测试', state: probe.vision, busy: probeBusy === 'vision',
-        help: '只探 /models，不生成内容、不花钱；用表单里当前填的值，没填密钥就用已保存的。',
-        onTest: () => { testEndpoint('vision'); },
       }),
 
       createElement('div', { className: 'imqb2-subhead' }, '② 图像生成（画图）'),
@@ -1135,12 +1172,12 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         label: '密钥', isSet: form['imageGeneration.apiKeySet'] === true, value: form['imageGeneration.apiKey'] ?? '',
         placeholder: '粘贴密钥',
         help: '和上面的理解密钥是两份，可以填同一个也可以填不同的。',
+        right: createElement(ProbeButton, {
+          state: probe.image, busy: probeBusy === 'image',
+          onTest: () => { testEndpoint('image'); },
+        }),
+        note: probe.image,
         onChange: (v) => { patch('imageGeneration.apiKey', v); },
-      }),
-      createElement(ProbeRow, {
-        label: '连接测试', state: probe.image, busy: probeBusy === 'image',
-        help: '只探 /models；出图是否可用，保存后让它真画一张最准。',
-        onTest: () => { testEndpoint('image'); },
       }),
     ),
 
