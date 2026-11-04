@@ -32,6 +32,7 @@ import { registerFileTool } from '../tuitui/file-tool.ts';
 import { registerSendTool } from '../tuitui/message-tool.ts';
 import { registerBotTool } from '../tuitui/bot-tool.ts';
 import { getJudgeHistoryStore, historyGroupKey } from '../features/history-store.ts';
+import { settleReceipt } from '../features/receipt-registry.ts';
 import { describeGroupEvent, recordGroupEvent } from '../tuitui/group-events.ts';
 import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter, toSdkTarget } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
@@ -300,7 +301,13 @@ export async function bootstrapGateway(
     if (config.debug) {
       logger.debug(`← message (post-middleware): ${JSON.stringify(message).slice(0, 500)}`);
     }
-    await handleInbound(mwCtx, manager, config, logger);
+    try {
+      await handleInbound(mwCtx, manager, config, logger);
+    } finally {
+      // 这一轮收尾：回复已经发出去的话，回执在 sender 里就兑现了；
+      // 没说话（判定为不插嘴 / 被拦下）就把「在算」撤掉，别让人以为它还在算。
+      void settleReceipt(replyTarget, 'none');
+    }
   };
 
   // ── 出站：dsh session/event → 推推消息 ──
