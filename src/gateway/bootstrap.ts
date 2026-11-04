@@ -219,7 +219,11 @@ export async function bootstrapGateway(
       render: (data) => client.event.renderMessageBody(data),
     });
     if (!message) {
-      if (config.debug) logger.debug(`ignored event: ${String((body as { event?: unknown }).event)}`);
+      // 排查"点了没反应"时这几行是唯一的路标：用 info 而不是 debug，
+      // 因为插件的文件日志默认从 info 起记。
+      if (config.debug) {
+        logger.info(`ignored event: ${String((body as { event?: unknown }).event)}`);
+      }
       return;
     }
 
@@ -228,7 +232,21 @@ export async function bootstrapGateway(
     // 交互回调：不进中间件链（没有会话上下文），直接路由到通道
     if (message.eventType === 'interactive_action') {
       try {
-        await dispatchInteraction({ message, replyTarget, bot: sender }, questionChannel, approvalChannel, logger);
+        // 点击到底有没有到、按钮值解不解得出来、通道认不认领——一条日志说清
+        const rawClick = getInteractiveAction(message);
+        const claimed = await dispatchInteraction(
+          { message, replyTarget, bot: sender },
+          questionChannel,
+          approvalChannel,
+          logger,
+        );
+        if (config.debug) {
+          logger.info(
+            `interactive_action arrived: claimed=${claimed} msgid=${message.messageId} ` +
+              `acct=${message.senderAccount} kind=${message.kind} ` +
+              `value=${JSON.stringify(rawClick?.value) ?? 'undecodable'} target=${rawClick?.targetId ?? '-'}`,
+          );
+        }
       } catch (error) {
         logger.warn(`interaction dispatch failed: ${error instanceof Error ? error.message : String(error)}`);
       }
