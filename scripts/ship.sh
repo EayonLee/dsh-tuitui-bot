@@ -28,6 +28,16 @@ npx vitest run --reporter=dot 2>&1 | tail -3
 echo "▶ 构建 $VERSION"
 npm run build 2>&1 | tail -2
 
+echo "▶ 校验客户端 bundle"
+# 这类事故靠肉眼发现不了：常量没被打进去，运行期才炸成 "X is not defined"
+for literal in "im-tuitui/test-model" "测试中…"; do
+  grep -q "$literal" lib/client.js || { echo "✗ bundle 里找不到 $literal（客户端构建不完整）"; exit 1; }
+done
+if grep -q "TEST_MODEL_PATH" lib/client.js && ! grep -q 'const TEST_MODEL_PATH = "' lib/client.js; then
+  echo "✗ bundle 里用了 TEST_MODEL_PATH 却没有定义（点了就会报 is not defined）"
+  exit 1
+fi
+
 # 每次换一个目录：pnpm 按「包名 + file: 路径」记 lockfile，路径不变就跳过重装
 STAMP=$(date +%H%M%S)
 OUT="/tmp/tuitui-ship-$STAMP"

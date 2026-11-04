@@ -1,6 +1,6 @@
 {
   "name": "@eayonlee/dsh-tuitui-bot",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "icon": "./assets/icons/tuitui.jpg",
   "description": "在推推（Tuitui）单聊、群聊与团队频道里直接对话 DeepSeek Harness。 Chat with DeepSeek Harness in Tuitui IM.",
   "author": "EayonLee",
@@ -35,7 +35,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && tsdown --config tsdown.client.config.ts",
+    "build": "tsc && tsc -p tsconfig.client.json --noEmit && tsdown --config tsdown.client.config.ts",
     "build:client": "tsdown --config tsdown.client.config.ts",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
