@@ -38,8 +38,8 @@ describe('commandAllowlistAuth（#5：命令白名单鉴权，复用审批名单
   });
 
   it('推推双身份：域账号命中名单也放行（名单里两种写法都合法）', () => {
-    const auth = commandAllowlistAuth({ access: { c2cMode: 'allowlist', c2cAllow: ['lizhengtai'] } });
-    expect(auth(makeCtx('uid-9', 'lizhengtai'))).toBe(true);
+    const auth = commandAllowlistAuth({ access: { c2cMode: 'allowlist', c2cAllow: ['zhangsan'] } });
+    expect(auth(makeCtx('uid-9', 'zhangsan'))).toBe(true);
   });
 
   it('推推双身份：两个标识都不在名单时拒绝', () => {

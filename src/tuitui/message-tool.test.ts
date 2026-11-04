@@ -21,7 +21,7 @@ function setup() {
 
 describe('parseSendTarget', () => {
   it('解析 c2c 与 group', () => {
-    expect(parseSendTarget('c2c:lizhengtai')).toEqual({ uids: ['lizhengtai'] });
+    expect(parseSendTarget('c2c:zhangsan')).toEqual({ uids: ['zhangsan'] });
     expect(parseSendTarget('group:g-1')).toEqual({ groupId: 'g-1' });
   });
 

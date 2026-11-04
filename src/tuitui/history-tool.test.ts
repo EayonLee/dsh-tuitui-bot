@@ -27,8 +27,8 @@ describe('tuitui_history', () => {
 
   it('私聊记录用 account 目标', async () => {
     const { tool, im } = setup();
-    await tool.execute({ action: 'private', account: 'lizhengtai' });
-    expect(im.getHistory).toHaveBeenCalledWith({ uids: ['lizhengtai'] }, expect.anything());
+    await tool.execute({ action: 'private', account: 'zhangsan' });
+    expect(im.getHistory).toHaveBeenCalledWith({ uids: ['zhangsan'] }, expect.anything());
   });
 
   it('limit 夹在 1 到 100 之间', async () => {
