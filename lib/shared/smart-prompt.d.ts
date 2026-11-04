@@ -6,6 +6,7 @@
  *
  * 写法上刻意不给「判断清单」：一旦写成规则，它就是个按表格打勾的机器人。
  * 这里给的是处境和动机——兴趣、情绪、无聊、手上有东西——让它自己拿主意。
+ * 回话方式也给三档：说话 / 挂表情 / 不理，别让「不回」变成唯一的沉默选项。
  */
 export declare const DEFAULT_SMART_PROMPT: string;
 //# sourceMappingURL=smart-prompt.d.ts.map

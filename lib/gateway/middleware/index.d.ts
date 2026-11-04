@@ -26,7 +26,7 @@
  * **交互**
  * - {@link slashCommand} — 斜杠命令派发
  * - {@link questionAnswer} — 待答问题截获
- * - {@link typingIndicator} — 收消息回执（emoji reaction）
+ * - {@link receiptReactions} — 收消息回执（emoji reaction：在算 / 好了 / 出错）
  *
  * **兜底**
  * - {@link errorHandler} — 捕获下游异常并回执
@@ -54,7 +54,7 @@ export { slashCommand } from './slash-command.ts';
 export type { CommandEntry, ParsedCommand, SlashCommandHandlerContext, SlashCommandMiddleware, SlashCommandOptions, SlashCommandResult, } from './slash-command.ts';
 export { questionAnswer } from './question-answer.ts';
 export type { QuestionAnswerHost, QuestionAnswerOptions, QuestionChannelLike, } from './question-answer.ts';
-export { typingIndicator } from './typing-indicator.ts';
+export { receiptReactions, typingIndicator } from './typing-indicator.ts';
 export type { TypingIndicatorOptions } from './typing-indicator.ts';
 export { quoteRef, MemoryRefIndexStore } from './quote-ref.ts';
 export type { QuoteRefOptions, RefEntry, RefIndexStore, ResolvedQuote } from './quote-ref.ts';

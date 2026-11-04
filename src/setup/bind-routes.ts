@@ -141,6 +141,14 @@ function stringListSchema(value: unknown, name: string): unknown {
 }
 
 /** smart 竞态判定用的三个值 */
+/** 表情：允许空串（表示不挂），最多 8 个字符（一个 emoji 可能占多个 UTF-16 单元） */
+function emojiSchema(value: unknown, name: string): unknown {
+  if (typeof value !== 'string') throw new TypeError(`${name} 必须是字符串`);
+  const trimmed = value.trim();
+  if (trimmed.length > 8) throw new TypeError(`${name} 最多 8 个字符`);
+  return trimmed;
+}
+
 function mentionPolicySchema(value: unknown): unknown {
   if (value !== 'require' && value !== 'always' && value !== 'smart') {
     throw new TypeError('mentionPolicy 必须是 require / always / smart');
@@ -169,6 +177,7 @@ const EDITABLE_CONFIG_KEYS = [
   'smartJudge.prompt', 'smartJudge.maxHistory',
   'smartJudge.cooldownMs', 'smartJudge.timeoutMs',
   'interactive.enabled', 'agentSteps.enabled',
+  'reactions.enabled', 'reactions.inGroup', 'reactions.ack', 'reactions.done', 'reactions.fail',
   'sendFile.restrictPaths',
 ] as const;
 
@@ -205,6 +214,11 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'smartJudge.maxHistory': numberSchema('smartJudge.maxHistory', 0, 50),
   'smartJudge.cooldownMs': numberSchema('smartJudge.cooldownMs', 0, 60 * 60 * 1000),
   'smartJudge.timeoutMs': numberSchema('smartJudge.timeoutMs', 1000, 120000),
+  'reactions.enabled': (v) => booleanSchema(v, 'reactions.enabled'),
+  'reactions.inGroup': (v) => booleanSchema(v, 'reactions.inGroup'),
+  'reactions.ack': (v) => emojiSchema(v, 'reactions.ack'),
+  'reactions.done': (v) => emojiSchema(v, 'reactions.done'),
+  'reactions.fail': (v) => emojiSchema(v, 'reactions.fail'),
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
   'sendFile.restrictPaths': (v) => booleanSchema(v, 'sendFile.restrictPaths'),

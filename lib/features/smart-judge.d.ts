@@ -37,11 +37,17 @@ export interface SmartJudgeOptions {
     cooldownMs?: number;
     logger?: Logger;
 }
+/** 模型的回话方式：说句话 / 挂个表情 / 什么都不做 */
+export type SmartJudgeAct = 'text' | 'emoji' | 'silent';
 export interface SmartJudgeResult {
-    /** true=插嘴，false=不插嘴 */
+    /** true=说话（文本回复），false=不用文本回复 */
     join: boolean;
-    /** 模型给的一句话理由（调试/日志用） */
+    /** 模型给的一句话理由（日志用） */
     reason?: string;
+    /** 回话方式；缺省按 join 推断 */
+    act?: SmartJudgeAct;
+    /** act=emoji 时挂的表情 */
+    emoji?: string;
 }
 /** 清空冷却表（测试 / 重载时用） */
 export declare function clearSmartJudgeCooldowns(): void;

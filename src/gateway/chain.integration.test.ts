@@ -31,6 +31,7 @@ function makeConfig(overrides: Record<string, unknown> = {}): ImTuituiConfig {
     maxQueue: 4,
     processingTimeoutMs: 60_000,
     interactive: { enabled: false },
+    reactions: { enabled: false, inGroup: true, ack: '👀', done: '✅', fail: '😵' },
     access: {
       c2cMode: 'open', c2cAllow: [], c2cBlock: [],
       groupMode: 'open', groupAllow: [], groupBlock: [],

@@ -58,6 +58,11 @@ interface ConfigWire {
   'smartJudge.timeoutMs'?: number;
   'interactive.enabled'?: boolean;
   'agentSteps.enabled'?: boolean;
+  'reactions.enabled'?: boolean;
+  'reactions.inGroup'?: boolean;
+  'reactions.ack'?: string;
+  'reactions.done'?: string;
+  'reactions.fail'?: string;
 }
 
 const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
@@ -249,6 +254,47 @@ const PANEL_CSS: readonly string[] = [
   '}',
   '.imqb2-save:disabled { opacity: 0.4; cursor: default; }',
   '.imqb2-save:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }',
+
+  /* ── 模块卡片：一块一个主题，背景分开 ── */
+  '.imqb2-card {',
+  '  display: flex; flex-direction: column; gap: 4px;',
+  '  padding: 14px 16px 8px; margin-bottom: 14px;',
+  '  border: 1px solid var(--dsw-alias-border-secondary);',
+  '  border-radius: 12px;',
+  '  background: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-layer-1));',
+  '  scroll-margin-top: 8px;',
+  '}',
+  '.imqb2-card-head { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }',
+  '.imqb2-card-title { margin: 0; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--dsw-alias-label-primary); }',
+  '.imqb2-card-tip {',
+  '  display: inline-flex; align-items: center; justify-content: center;',
+  '  width: 15px; height: 15px; border-radius: 50%;',
+  '  border: 1px solid var(--dsw-alias-border-secondary);',
+  '  font-size: 10px; line-height: 1; color: var(--dsw-alias-label-tertiary);',
+  '  cursor: help; user-select: none;',
+  '}',
+
+  /* ── 模块导航 ── */
+  '.imqb2-nav {',
+  '  position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px;',
+  '  padding: 8px 0 10px; margin-bottom: 4px;',
+  '  background: linear-gradient(to bottom, var(--dsw-alias-bg-layer-1) 78%, transparent);',
+  '}',
+  '.imqb2-nav-item {',
+  '  appearance: none; border: 1px solid var(--dsw-alias-border-secondary);',
+  '  border-radius: 999px; padding: 3px 10px;',
+  '  font: inherit; font-size: 12px; line-height: 1.5; cursor: pointer;',
+  '  background: transparent; color: var(--dsw-alias-label-secondary);',
+  '}',
+  '.imqb2-nav-item:hover { color: var(--dsw-alias-label-primary); }',
+  '.imqb2-nav-item.is-active {',
+  '  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-bg-layer-1);',
+  '  border-color: transparent;',
+  '}',
+
+  /* ── 说明走 tooltip：虚线下划线提示「这里可以看」 ── */
+  '.imqb2-has-tip { cursor: help; border-bottom: 1px dashed var(--dsw-alias-border-secondary); }',
+  '.imqb2-input--text { width: 76px; text-align: center; }',
 ];
 
 /** 注入配置面板样式（挂载时注入、卸载时移除） */
@@ -319,29 +365,75 @@ function Segmented({ value, options, onChange, label }: {
   );
 }
 
-/** 统一行容器：左 label（可带副标题）右控件，help 挂在控件下方 */
+/**
+ * 统一行容器：左 label（可带副标题）右控件。
+ *
+ * 说明一律进 tooltip（label 上的 title + 虚线下划线），不再往页面里塞段落——
+ * 一屏塞十几条解释，人是要骂人的。
+ */
 function Row({ label, sub, help, inline = false, children }: {
   label: string; sub?: string; help?: string; inline?: boolean; children?: ReactNode;
 }): ReactNode {
   return createElement('div', { className: 'imqb2-row' },
     createElement('div', { className: 'imqb2-row-label' },
-      createElement('span', null, label),
+      createElement('span', {
+        className: help === undefined ? undefined : 'imqb2-has-tip',
+        title: help,
+      }, label),
       sub === undefined ? null : createElement('span', { className: 'imqb2-row-label-sub' }, sub),
     ),
     createElement('div', { className: 'imqb2-row-control' + (inline ? ' imqb2-row-control--inline' : '') },
       children,
-      help === undefined ? null : createElement('p', { className: 'imqb2-help' }, help),
     ),
   );
 }
 
-function Section({ title, desc, children }: { title: string; desc?: string; children?: ReactNode }): ReactNode {
-  return createElement('section', { className: 'imqb2-section' },
-    createElement('div', { className: 'imqb2-section-head' },
-      createElement('h3', { className: 'imqb2-section-title' }, title),
-      desc === undefined ? null : createElement('p', { className: 'imqb2-section-desc' }, desc),
+/** 单行文本输入（表情、短串） */
+function TextRow({ label, sub, help, value, placeholder, maxLength, onChange }: {
+  label: string; sub?: string; help?: string; value: string;
+  placeholder?: string; maxLength?: number; onChange: (next: string) => void;
+}): ReactNode {
+  return createElement(Row, { label, sub, help, inline: true },
+    createElement('input', {
+      type: 'text',
+      className: 'imqb2-input imqb2-input--text',
+      value,
+      placeholder,
+      maxLength,
+      spellCheck: false,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => { onChange(event.currentTarget.value); },
+    }),
+  );
+}
+
+/** 模块卡片：一个主题 = 一块独立背景，标题上的问号挂说明 */
+function Section({ id, title, desc, children }: {
+  id: string; title: string; desc?: string; children?: ReactNode;
+}): ReactNode {
+  return createElement('section', { className: 'imqb2-card', id: 'imqb2-mod-' + id },
+    createElement('div', { className: 'imqb2-card-head' },
+      createElement('h3', { className: 'imqb2-card-title' }, title),
+      desc === undefined ? null : createElement('span', {
+        className: 'imqb2-card-tip', title: desc, 'aria-label': desc,
+      }, '?'),
     ),
     createElement('div', { className: 'imqb2-rows' }, children),
+  );
+}
+
+/** 模块导航：点一下滚到那块，当前项高亮 */
+function ModuleNav({ items, active, onPick }: {
+  items: ReadonlyArray<{ id: string; label: string }>;
+  active: string;
+  onPick: (id: string) => void;
+}): ReactNode {
+  return createElement('nav', { className: 'imqb2-nav', 'aria-label': '配置模块' },
+    items.map((item) => createElement('button', {
+      key: item.id, type: 'button',
+      className: 'imqb2-nav-item' + (item.id === active ? ' is-active' : ''),
+      'aria-current': item.id === active ? 'true' : 'false',
+      onClick: () => { onPick(item.id); },
+    }, item.label)),
   );
 }
 
@@ -494,6 +586,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeModule, setActiveModule] = useState('scope');
   const bindPhase = props?.bindPhase;
 
   useEffect(() => {
@@ -569,11 +662,30 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ...(cwd !== '' && !workspaceOptions.includes(cwd) ? [{ value: cwd, label: cwd + '（当前）' }] : []),
   ];
 
+  const modules = [
+    { id: 'scope', label: '服务范围' },
+    { id: 'reply', label: '回话方式' },
+    ...(policy === 'smart' ? [{ id: 'smart', label: '智能判断' }] : []),
+    { id: 'reaction', label: '表情回执' },
+    { id: 'context', label: '上下文' },
+    { id: 'workspace', label: '工作区' },
+    { id: 'native', label: '原生能力' },
+    { id: 'output', label: '输出调试' },
+  ];
+  const jumpTo = (id: string): void => {
+    setActiveModule(id);
+    const target = typeof document === 'undefined' ? null : document.getElementById('imqb2-mod-' + id);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return createElement('form', { className: 'imqb2-form', onSubmit: submit },
 
+    createElement(ModuleNav, { items: modules, active: activeModule, onPick: jumpTo }),
+
     createElement(Section, {
+      id: 'scope',
       title: '服务范围',
-      desc: '机器人愿意在哪些会话里工作。三个范围各自独立设置，模式没选到的那份名单不会显示，也不会生效。',
+      desc: '机器人愿意在哪些会话里工作；每块的模式决定名单怎么用。',
     },
       createElement(ScopeCard, {
         title: '单聊', desc: '同事私聊机器人', mode: form['access.c2cMode'] ?? 'open', options: MODE_OPTIONS,
@@ -655,24 +767,61 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
-      title: '什么时候回话',
-      desc: '群聊与团队频道里，机器人该在什么时候开口。私聊始终直接对话。',
+      id: 'reply',
+      title: '回话方式',
+      desc: '群聊与团队频道里什么时候开口；私聊始终直接对话。',
     },
       createElement(SegmentedRow, {
         label: '触发方式', value: policy, options: POLICY_OPTIONS,
         help: policy === 'require'
-          ? '只有 @ 机器人才会回应。'
+          ? '只有 @ 机器人才回应。'
           : policy === 'smart'
-            ? '不 @ 也会看上下文自己判断：感兴趣就说，没兴趣就闭嘴，不看名字。'
-            : '群里每条消息都会回应——只建议专用小群使用。',
+            ? '不 @ 也不看名字：模型读上下文，自己决定说话、挂个表情、还是一声不吭。'
+            : '群里每条消息都回——建议只用在专用小群。',
         onChange: (v) => { patch('mentionPolicy', v as MentionPolicy); },
+      }),
+    ),
+
+    createElement(Section, {
+      id: 'reaction',
+      title: '表情回执',
+      desc: '收到消息先挂表情表示「在算」，处理完或出错再换一个；也是智能模式里更轻的回话方式。',
+    },
+      createElement(SwitchRow, {
+        label: '收到就先挂一个', checked: form['reactions.enabled'] ?? true,
+        help: '打开后，机器人收到的消息会立刻被挂上「在算」表情，不用干等着以为它卡死了。',
+        onChange: (v) => { patch('reactions.enabled', v); },
+      }),
+      createElement(SwitchRow, {
+        label: '群聊也挂', checked: form['reactions.inGroup'] ?? true,
+        help: '群聊里同样给回执。群里人多、消息快，这个反馈更有用。',
+        onChange: (v) => { patch('reactions.inGroup', v); },
+      }),
+      createElement(TextRow, {
+        label: '在算', value: form['reactions.ack'] ?? '👀',
+        placeholder: '👀', maxLength: 8,
+        help: '收到消息时挂的表情。留空 = 不挂。',
+        onChange: (v) => { patch('reactions.ack', v); },
+      }),
+      createElement(TextRow, {
+        label: '完成', value: form['reactions.done'] ?? '✅',
+        placeholder: '✅', maxLength: 8,
+        help: '处理完把「在算」换成这个。留空 = 只撤不换。',
+        onChange: (v) => { patch('reactions.done', v); },
+      }),
+      createElement(TextRow, {
+        label: '出错', value: form['reactions.fail'] ?? '😵',
+        placeholder: '😵', maxLength: 8,
+        help: '处理失败时换成这个。留空 = 只撤不换。',
+        onChange: (v) => { patch('reactions.fail', v); },
       }),
     ),
 
     policy === 'smart'
       ? createElement(Section, {
+          id: 'smart',
           title: '智能判断',
-          desc: '机器人要不要插嘴，一律由模型读上下文决定——没有名字匹配之类的规则。提示词可以整段改，改成你群里需要的那个人。',
+          desc: '要不要说话、挂个表情还是不理，全由模型读上下文决定；没有名字匹配之类的规则。',
         },
           createElement(TextAreaRow, {
             label: '判定提示词',
@@ -702,8 +851,9 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       : null,
 
     createElement(Section, {
+      id: 'context',
       title: '上下文与会话',
-      desc: '机器人每次回话时能看到多少群消息，以及会话在内存里保留多久。',
+      desc: '回话时能看到多少群消息，会话在内存里保留多久。',
     },
       createElement(NumberRow, {
         label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
@@ -719,8 +869,9 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
+      id: 'workspace',
       title: '工作区',
-      desc: '机器人在哪个目录里读写文件、执行命令。所有会话共用这一个目录。',
+      desc: '机器人在哪个目录里读写文件、执行命令；所有会话共用。',
     },
       createElement(SelectRow, {
         label: 'Agent 工作目录', value: cwd, options: selectOptions,
@@ -730,8 +881,9 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
+      id: 'native',
       title: '推推原生能力',
-      desc: '推推这边特有的交互能力，关掉会退化成纯文本。',
+      desc: '推推特有的交互能力，关掉会退化成纯文本。',
     },
       createElement(SwitchRow, {
         label: '交互卡片', checked: form['interactive.enabled'] ?? true,
@@ -746,6 +898,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
+      id: 'output',
       title: '输出与调试',
       desc: '回复怎么送到推推，以及排查问题时要看多少细节。',
     },

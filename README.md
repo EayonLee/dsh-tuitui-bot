@@ -120,7 +120,10 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `mentionPolicy` | `'smart'` | `smart` / `require` / `always`：按人格与上下文自主判断（默认）/ 仅 @ / 全部 |
 | `smartJudge.prompt` | 内置文案 | **判定提示词，可整段改写**（设置页可视化编辑，留空恢复默认） |
 | `smartJudge.maxHistory` | `50` | 判定时交给模型的历史消息条数 |
-| `smartJudge.cooldownMs` | `20000` | 同一会话两次判定的最小间隔，防止每条消息都调模型 |
+| `smartJudge.cooldownMs` | `5000` | 同一会话两次判定的最小间隔，防止每条消息都调模型 |
+| `reactions.enabled` | `true` | 收到消息先挂表情回执（在算 / 好了 / 出错） |
+| `reactions.inGroup` | `true` | 群聊里也挂回执 |
+| `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | 三个阶段的表情；留空表示不挂 |
 | `smartJudge.timeoutMs` | `8000` | 判定超时（超时视为不插嘴） |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
@@ -207,7 +210,9 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 1. **冷却**：同一会话 `smartJudge.cooldownMs` 内只判一次，超出的消息直接按「不插嘴」处理，不烧 token。
 2. **取上下文**：从历史缓冲拿最近 `smartJudge.maxHistory` 条（带说话人，机器人自己标 `[你]`）。
 3. **问模型**：用该会话当前生效的模型，把 `smartJudge.prompt` + 历史 + 新消息发过去，
-   要求只回一行 JSON：`{"join":true,"why":"十个字以内"}`。
+   要求只回一行 JSON——三种动作任选：`{"act":"text","why":"…"}` 说句话、
+   `{"act":"emoji","emoji":"😂","why":"…"}` 挂个表情、`{"act":"silent","why":"…"}` 不理。
+   （旧的 `{"join":true|false}` 写法仍然认，老配置不会失效。）
 4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
    宁可漏答一句，也不在群里刷屏。
 5. **没有确定性兜底**：既不看名字，也不看「刚聊过的人接着说话」。判定不可用 = 不插嘴。

@@ -108,6 +108,19 @@ export interface ImTuituiConfig {
         /** 判定提示词（设置页可编辑，出厂值见 DEFAULT_SMART_PROMPT） */
         prompt: string;
     };
+    /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
+    reactions: {
+        /** 总开关 */
+        enabled: boolean;
+        /** 群聊里也给回执 */
+        inGroup: boolean;
+        /** 收到时挂的表情（空串 = 不挂） */
+        ack: string;
+        /** 处理完换成的表情（空串 = 只撤不换） */
+        done: string;
+        /** 出错换成的表情（空串 = 只撤不换） */
+        fail: string;
+    };
     /** 群聊额外 system prompt */
     groupPrompt?: string;
     /** 私聊额外 system prompt */

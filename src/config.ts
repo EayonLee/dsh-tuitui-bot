@@ -118,6 +118,19 @@ export interface ImTuituiConfig {
     /** 判定提示词（设置页可编辑，出厂值见 DEFAULT_SMART_PROMPT） */
     prompt: string;
   };
+  /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
+  reactions: {
+    /** 总开关 */
+    enabled: boolean;
+    /** 群聊里也给回执 */
+    inGroup: boolean;
+    /** 收到时挂的表情（空串 = 不挂） */
+    ack: string;
+    /** 处理完换成的表情（空串 = 只撤不换） */
+    done: string;
+    /** 出错换成的表情（空串 = 只撤不换） */
+    fail: string;
+  };
   /** 群聊额外 system prompt */
   groupPrompt?: string;
   /** 私聊额外 system prompt */
@@ -192,6 +205,13 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     cooldownMs: Schema.number().default(5000).description('同一会话两次判定的最小间隔(ms)'),
     prompt: Schema.string().default(DEFAULT_SMART_PROMPT).description('智能插话判定的提示词（设置页可编辑）'),
   }).description('智能插话判定参数（smart 触发方式专用）'),
+  reactions: Schema.object({
+    enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),
+    inGroup: Schema.boolean().default(true).description('群聊里也挂表情回执（默认给，省得以为机器人卡死）'),
+    ack: Schema.string().default('👀').description('收到时挂的表情（留空 = 不挂）'),
+    done: Schema.string().default('✅').description('处理完换成的表情（留空 = 只撤不换）'),
+    fail: Schema.string().default('😵').description('出错换成的表情（留空 = 只撤不换）'),
+  }).description('表情回执'),
   groupPrompt: Schema.string().description('群聊额外system prompt'),
   directPrompt: Schema.string().description('私聊额外system prompt'),
   postPrompt: Schema.string().description('团队帖子额外system prompt'),

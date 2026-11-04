@@ -47,6 +47,31 @@ describe('judgeShouldJoin', () => {
     expect(result.reason).toBe('在叫我');
   });
 
+  it('新协议：act=text 视为说话', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"act":"text","why":"想插一句"}') });
+    expect(result.join).toBe(true);
+    expect(result.act).toBe('text');
+  });
+
+  it('新协议：act=emoji 时带回表情、不要求文本回复', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"act":"emoji","emoji":"😂","why":"好笑"}') });
+    expect(result.join).toBe(false);
+    expect(result.act).toBe('emoji');
+    expect(result.emoji).toBe('😂');
+  });
+
+  it('新协议：act=silent 就是不理', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"act":"silent","why":"没我事"}') });
+    expect(result.join).toBe(false);
+    expect(result.act).toBe('silent');
+  });
+
+  it('act=emoji 但没给表情时按不理处理', async () => {
+    const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"act":"emoji","why":"懒得打字"}') });
+    expect(result.join).toBe(false);
+    expect(result.act).toBe('silent');
+  });
+
   it('模型说不要就闭嘴', async () => {
     const result = await judgeShouldJoin({ ...base, llm: fakeLlm('{"join":false,"why":"别人在聊"}') });
     expect(result.join).toBe(false);

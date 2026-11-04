@@ -25,7 +25,7 @@ import {
   slashCommand,
   questionAnswer,
   concurrencyGuard,
-  typingIndicator,
+  receiptReactions,
   quoteRef,
   attachmentProcessor,
   envelopeFormatter,
@@ -123,6 +123,19 @@ async function smartReplyProbe(
     logger,
   });
 
+  // 挂个表情也算回话：比发文字轻，也不会刷屏
+  if (verdict.act === 'emoji' && verdict.emoji !== undefined && verdict.emoji !== '') {
+    const msgId = ctx.replyTarget.msgId;
+    if (msgId !== undefined && msgId !== '') {
+      void ctx.bot
+        .emojiReaction(ctx.replyTarget, msgId, verdict.emoji)
+        .catch((err: unknown) => {
+          logger.debug('[tuitui/smart] 表情回复失败: ' + (err instanceof Error ? err.message : String(err)));
+        });
+      return say(false, 'emoji:' + verdict.emoji, ` model=${route.provider}/${route.model} ${Date.now() - startedAt}ms`);
+    }
+  }
+
   const elapsedMs = Date.now() - startedAt;
   return say(
     verdict.join,
@@ -209,8 +222,15 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
     logger,
   }));
 
-  // 10. 单聊输入状态指示（推推用 emoji reaction 作为收消息回执）
-  kernel.use(typingIndicator());
+  // 10. 表情回执：先挂「在算」，处理完换「好了」，出错换「不太对」
+  kernel.use(receiptReactions({
+    enabled: config.reactions.enabled,
+    inGroup: config.reactions.inGroup,
+    ack: config.reactions.ack,
+    done: config.reactions.done,
+    fail: config.reactions.fail,
+    logger,
+  }));
 
   // 11. 引用消息解析（记录 + 解析被引用原文）
   kernel.use(quoteRef({ maxSize: 500, preferMsgElements: true }));

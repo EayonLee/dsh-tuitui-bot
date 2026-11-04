@@ -108,7 +108,10 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `mentionPolicy` | `'smart'` | `smart` / `require` / `always`: persona-driven judgement (default) / @ only / everything |
 | `smartJudge.prompt` | built-in | **Judging prompt, fully editable** (Settings UI; empty restores default) |
 | `smartJudge.maxHistory` | `50` | History messages handed to the model |
-| `smartJudge.cooldownMs` | `20000` | Minimum gap between judgements per conversation |
+| `smartJudge.cooldownMs` | `5000` | Minimum gap between judgements per conversation |
+| `reactions.enabled` | `true` | React on receipt (working / done / failed) |
+| `reactions.inGroup` | `true` | Also react in groups |
+| `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | Emoji per stage; empty disables it |
 | `smartJudge.timeoutMs` | `8000` | Judgement timeout (a timeout means "do not join") |
 | `requireMentionInPost` | boolean | `true` | Require @bot in team posts |
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
@@ -166,7 +169,7 @@ With `mentionPolicy: 'smart'`, every group message (mentioned or not) goes throu
 
 1. **Cooldown** — at most one judgement per `smartJudge.cooldownMs` per conversation; the rest are treated as "do not join" without spending tokens.
 2. **Context** — the last `smartJudge.maxHistory` entries from the history buffer (with speakers; the bot's own lines are tagged `[you]`).
-3. **Ask the model** — using the conversation's effective model, send `smartJudge.prompt` + history + the new message, and require a single JSON line: `{"join":true,"why":"..."}`.
+3. **Ask the model** — using the conversation's effective model, send `smartJudge.prompt` + history + the new message, and require one JSON line with one of three actions: `{"act":"text","why":"…"}`, `{"act":"emoji","emoji":"😂","why":"…"}`, or `{"act":"silent","why":"…"}`. The older `{"join":true|false}` form still parses.
 4. **Fail closed** — timeouts, unparsable output, model errors, missing service: all mean `join:false`. Missing a reply beats spamming the room.
 5. **No deterministic fallback** — no name matching, no "someone the bot just talked to keeps going". If judgement is unavailable, the bot stays quiet.
 

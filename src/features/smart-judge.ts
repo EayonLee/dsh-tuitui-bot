@@ -49,11 +49,18 @@ export interface SmartJudgeOptions {
   logger?: Logger;
 }
 
+/** 模型的回话方式：说句话 / 挂个表情 / 什么都不做 */
+export type SmartJudgeAct = 'text' | 'emoji' | 'silent';
+
 export interface SmartJudgeResult {
-  /** true=插嘴，false=不插嘴 */
+  /** true=说话（文本回复），false=不用文本回复 */
   join: boolean;
-  /** 模型给的一句话理由（调试/日志用） */
+  /** 模型给的一句话理由（日志用） */
   reason?: string;
+  /** 回话方式；缺省按 join 推断 */
+  act?: SmartJudgeAct;
+  /** act=emoji 时挂的表情 */
+  emoji?: string;
 }
 
 /** 冷却表：key → 上次判定时间戳（进程内，与会话生命周期同量级，无需持久化） */
@@ -90,21 +97,35 @@ function renderPrompt(options: SmartJudgeOptions): string {
   ].join('\n');
 }
 
-/** 从模型输出里抠出 JSON（容忍代码块与多余文字） */
+/**
+ * 从模型输出里抠出 JSON（容忍代码块与多余文字）。
+ *
+ * 认两种写法：
+ *   新：{"act":"text|emoji|silent","emoji":"😂","why":"..."}
+ *   旧：{"join":true|false,"why":"..."}（还有老提示词/老配置在用，别让它们失效）
+ */
 function parseVerdict(text: string): SmartJudgeResult | undefined {
   const match = /\{[^{}]*\}/.exec(text);
   if (match === null) {
     // 退路：模型只回了 join/true 之类的单词
     const lowered = text.toLowerCase();
     if (/\bjoin\b|\btrue\b|\byes\b/.test(lowered) && !/\bfalse\b|\bskip\b/.test(lowered)) {
-      return { join: true, reason: 'fallback-text' };
+      return { join: true, act: 'text', reason: 'fallback-text' };
     }
     return undefined;
   }
   try {
-    const parsed = JSON.parse(match[0]) as { join?: unknown; why?: unknown };
+    const parsed = JSON.parse(match[0]) as { act?: unknown; join?: unknown; why?: unknown; emoji?: unknown };
+    const reason = typeof parsed.why === 'string' ? parsed.why.slice(0, 60) : undefined;
+    const emoji = typeof parsed.emoji === 'string' ? parsed.emoji.trim().slice(0, 8) : undefined;
+
+    const act = typeof parsed.act === 'string' ? parsed.act.trim().toLowerCase() : undefined;
+    if (act === 'emoji' && emoji !== undefined && emoji !== '') return { join: false, act: 'emoji', emoji, ...(reason === undefined ? {} : { reason }) };
+    if (act === 'text') return { join: true, act: 'text', ...(reason === undefined ? {} : { reason }) };
+    if (act === 'silent' || act === 'none' || act === 'skip') return { join: false, act: 'silent', ...(reason === undefined ? {} : { reason }) };
+
     const join = parsed.join === true || parsed.join === 'true';
-    return { join, reason: typeof parsed.why === 'string' ? parsed.why.slice(0, 60) : undefined };
+    return { join, act: join ? 'text' : 'silent', ...(reason === undefined ? {} : { reason }) };
   } catch {
     return undefined;
   }
