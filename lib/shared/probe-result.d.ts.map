@@ -1,0 +1,1 @@
+{"version":3,"file":"probe-result.d.ts","sourceRoot":"","sources":["../../src/shared/probe-result.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,YAAY;IAC3B,EAAE,EAAE,OAAO,CAAC;IACZ,mCAAmC;IACnC,MAAM,EAAE,MAAM,CAAC;CAChB;AAeD,wBAAgB,qBAAqB,CAAC,MAAM,EAAE,MAAM,EAAE,IAAI,EAAE,OAAO,GAAG,YAAY,CAiBjF"}

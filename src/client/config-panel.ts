@@ -19,6 +19,7 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
 import { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
+import { interpretTestResponse } from '../shared/probe-result.ts';
 import { KNOWN_EMOJI_NAMES } from '../tuitui/emoji.ts';
 
 /** 访问模式四值（与 src/config.ts 的 AccessControlConfig 一致） */
@@ -469,7 +470,7 @@ function TextRow({ label, sub, help, value, placeholder, maxLength, wide = false
  */
 function SecretRow({ label, sub, help, isSet, value, placeholder, right, note, onChange }: {
   label: string; sub?: string; help?: string; isSet: boolean; value: string;
-  placeholder?: string; right?: ReactNode; note?: { ok: boolean; text: string } | null;
+  placeholder?: string; right?: ReactNode; note?: { ok: boolean; detail: string } | null;
   onChange: (next: string) => void;
 }): ReactNode {
   return createElement(Row, { label, sub, help, inline: true },
@@ -493,7 +494,7 @@ function SecretRow({ label, sub, help, isSet, value, placeholder, right, note, o
         ? null
         : createElement('span', {
             className: 'imqb2-secret-note' + (note.ok ? ' imqb2-secret-note--ok' : ' imqb2-secret-note--bad'),
-          }, (note.ok ? '✓ ' : '✗ ') + note.text),
+          }, (note.ok ? '✓ ' : '✗ ') + note.detail),
     ),
   );
 }
@@ -507,14 +508,18 @@ function SecretRow({ label, sub, help, isSet, value, placeholder, right, note, o
 function ProbeButton({ state, busy, onTest }: {
   state?: { ok: boolean; detail: string } | null; busy: boolean; onTest: () => void;
 }): ReactNode {
+  // 文字只表达"能点"：永远是「测试」。状态全靠颜色，失败也照样能再点 ——
+  // 把按钮写成「失败」，人第一反应就是"这按钮废了"，还得刷新页面才能重来。
   const cls = 'imqb2-probe-btn'
-    + (busy ? '' : state === null || state === undefined ? '' : state.ok ? ' imqb2-probe-btn--ok' : ' imqb2-probe-btn--bad');
-  const label = busy ? '测试中…' : state === null || state === undefined ? '测试' : state.ok ? '成功' : '失败';
+    + (busy || state === null || state === undefined ? '' : state.ok ? ' imqb2-probe-btn--ok' : ' imqb2-probe-btn--bad');
+  const label = busy ? '测试中…' : '测试';
   return createElement('button', {
     type: 'button',
     className: cls,
     disabled: busy,
-    title: state === null || state === undefined ? '只验证地址和密钥能不能通，不跑看图、不生成图片' : state.detail,
+    title: state === null || state === undefined
+      ? '只验证地址和密钥能不能通，不跑看图、不生成图片'
+      : state.detail,
     onClick: onTest,
   }, label);
 }
@@ -795,12 +800,9 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             apiKey: form[`${prefix}.apiKey` as keyof ConfigWire] ?? '',
           }),
         });
-        if (res.status === 404 || res.status === 405) {
-          setResult(false, '这个接口不存在——服务端插件还是旧进程，先跑 ~/bin/dsh-restart');
-          return;
-        }
-        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; detail?: string; error?: string };
-        setResult(body.ok === true, body.detail ?? body.error ?? `服务端返回 ${res.status}`);
+        const body: unknown = await res.json().catch(() => undefined);
+        const outcome = interpretTestResponse(res.status, body);
+        setResult(outcome.ok, outcome.detail);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           setResult(false, '测试超时（25 秒）：网关没响应，检查地址是否可达');
