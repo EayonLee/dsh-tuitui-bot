@@ -15,5 +15,6 @@ export function resolveScopeStrategy(
 ): ConcurrencyStrategy {
   const configured = config.concurrency?.[scope];
   if (configured !== undefined) return configured;
-  return scope === 'c2c' ? 'abort' : 'queue';
+  // 兜底与 config 默认值保持一致：单聊 / 群聊攒着合并，帖子仍是排队
+  return scope === 'post' ? 'queue' : 'merge';
 }
