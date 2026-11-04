@@ -83,10 +83,20 @@ async function smartReplyProbe(
   logger: Logger,
 ): Promise<boolean> {
   const message = ctx.message;
-  if (deps === undefined) return false;
+  // 每一条判定都留一行（info 级）：为什么回、为什么不回，事后能查。
+  // 以前只在 debug 下打，出了「明明该回却没回」根本无从下手。
+  const scopePeer = getScopePeer(message);
+  const who = scopePeer.scope + ':' + scopePeer.peerId;
+  const text = message.content.replace(/\s+/g, ' ').slice(0, 40);
+  const say = (join: boolean, why: string, extra = ''): boolean => {
+    logger.info(`[tuitui/smart] ${who} join=${join} why=${why} text="${text}"${extra}`);
+    return join;
+  };
+
+  if (deps === undefined) return say(false, 'no-judge-deps', ' hint=llm服务未注入');
 
   const route = deps.resolveRoute(ctx);
-  if (route === undefined) return false;
+  if (route === undefined) return say(false, 'no-route', ' hint=该会话没有可用模型');
 
   const key = probeHistoryKey(ctx, config);
   const recent = key === undefined ? [] : getHistoryStore().list(key, deps.settings.maxHistory);
@@ -96,6 +106,7 @@ async function smartReplyProbe(
     self: entry.senderId === config.appId,
   }));
 
+  const startedAt = Date.now();
   const verdict = await judgeShouldJoin({
     llm: deps.llm as { stream: (options: never) => AsyncIterable<never> } | undefined,
     route,
@@ -112,10 +123,12 @@ async function smartReplyProbe(
     logger,
   });
 
-  if (config.debug) {
-    logger.debug('[smart-judge] join=' + String(verdict.join) + ' reason=' + String(verdict.reason));
-  }
-  return verdict.join;
+  const elapsedMs = Date.now() - startedAt;
+  return say(
+    verdict.join,
+    verdict.reason ?? (verdict.join ? 'model-yes' : 'model-no'),
+    ` model=${route.provider}/${route.model} history=${history.length} ${elapsedMs}ms`,
+  );
 }
 
 /** 组装中间件链（顺序与上游逐条对应，见函数体注释编号） */
@@ -135,8 +148,9 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
     c2c: { mode: config.access.c2cMode, allow: config.access.c2cAllow, deny: config.access.c2cBlock },
     group: { mode: config.access.groupMode, allow: config.access.groupAllow, deny: config.access.groupBlock },
     post: { mode: config.access.postMode, allow: config.access.postAllow, deny: config.access.postBlock },
-    onBlock: (_ctx, reason) => {
-      if (config.debug) logger.debug(`Access blocked: ${reason}`);
+    onBlock: (mctx, reason) => {
+      const { scope, peerId } = getScopePeer(mctx.message);
+      logger.info(`[tuitui/access] ${scope}:${peerId} blocked=${reason}`);
     },
   }));
 
