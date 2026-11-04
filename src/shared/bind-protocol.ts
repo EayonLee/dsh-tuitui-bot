@@ -90,6 +90,7 @@ export interface ConfigPatchWire {
   processingTimeoutMs?: number;
   askTimeoutMs?: number;
   historyLimit?: number;
+  historyMode?: 'window' | 'delta';
   showToolResults?: boolean;
   debug?: boolean;
   'access.c2cMode'?: 'open' | 'allowlist' | 'blocklist' | 'disabled';

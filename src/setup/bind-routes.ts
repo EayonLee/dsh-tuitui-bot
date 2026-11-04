@@ -179,7 +179,7 @@ const EDITABLE_CONFIG_KEYS = [
   'provider', 'model', 'preset', 'cwd',
   'requireMention', 'requireMentionInPost',
   'textChunkLimit', 'streaming',
-  'sessionIdleTimeout', 'maxQueue', 'processingTimeoutMs', 'askTimeoutMs', 'historyLimit',
+  'sessionIdleTimeout', 'maxQueue', 'processingTimeoutMs', 'askTimeoutMs', 'historyLimit', 'historyMode',
   'showToolResults', 'debug',
   'access.c2cMode', 'access.groupMode', 'access.postMode',
   'access.c2cAllow', 'access.c2cBlock',
@@ -214,6 +214,10 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   processingTimeoutMs: numberSchema('processingTimeoutMs', 1000, 24 * 60 * 60 * 1000),
   askTimeoutMs: numberSchema('askTimeoutMs', 1000, 24 * 60 * 60 * 1000),
   historyLimit: numberSchema('historyLimit', 0, 1000),
+  historyMode: (v) => {
+    if (v === 'window' || v === 'delta') return v;
+    throw new Error('historyMode 只能是 window 或 delta');
+  },
   showToolResults: (v) => booleanSchema(v, 'showToolResults'),
   debug: (v) => booleanSchema(v, 'debug'),
   'access.c2cMode': accessModeSchema('access.c2cMode'),

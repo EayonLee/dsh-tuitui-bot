@@ -19,6 +19,7 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { BIND_CONFIG_PATH } from '../shared/bind-protocol.ts';
 import { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
+import { KNOWN_EMOJI_NAMES } from '../tuitui/emoji.ts';
 
 /** 访问模式四值（与 src/config.ts 的 AccessControlConfig 一致） */
 type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
@@ -43,6 +44,7 @@ interface ConfigWire {
   showToolResults?: boolean;
   debug?: boolean;
   historyLimit?: number;
+  historyMode?: 'window' | 'delta';
   sessionIdleTimeout?: number;
   'access.c2cMode'?: AccessMode;
   'access.groupMode'?: AccessMode;
@@ -76,6 +78,12 @@ const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
   { value: 'allowlist', label: '白名单' },
   { value: 'blocklist', label: '黑名单' },
   { value: 'disabled', label: '禁用' },
+];
+
+/** 历史注入方式：默认「最近 N 条」，跟别的机器人一致，最直观 */
+const HISTORY_MODE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'window', label: '最近 N 条（每次都被叫到都带一整窗）' },
+  { value: 'delta', label: '只补没看过的（省 token，不重复）' },
 ];
 
 const CONCURRENCY_OPTIONS: ReadonlyArray<{ value: ConcurrencyStrategy; label: string }> = [
@@ -572,6 +580,28 @@ function TextAreaRow({ label, sub, help, value, rows, placeholder, onChange, act
   );
 }
 
+/**
+ * 表情回执的下拉选项。
+ *
+ * 为什么是下拉而不是输入框：推推只认内置表情名（微笑 / 强 / 奶茶…），而且这个
+ * 集合很小、QQ 那套名字（难过、偷笑）在这里全是非法的。让人手打等于让人踩雷，
+ * 填错之后服务端只回一句"不合法的emoji表情"，根本不知道错在哪。
+ *
+ * `current` 是存量的值：如果它不在列表里（老配置里写过 `👀` 之类），补一项进去，
+ * 否则下拉框会显示成空白，看着像配置丢了。
+ */
+function emojiOptions(current: string | undefined, fallback: string): ReadonlyArray<{ value: string; label: string }> {
+  const list: Array<{ value: string; label: string }> = [
+    { value: '', label: '不挂' },
+    ...KNOWN_EMOJI_NAMES.map((name) => ({ value: name as string, label: name as string })),
+  ];
+  const value = current ?? fallback;
+  if (value !== '' && !list.some((option) => option.value === value)) {
+    list.push({ value, label: value + '（自定义）' });
+  }
+  return list;
+}
+
 function SelectRow({ label, sub, help, value, options, onChange }: {
   label: string; sub?: string; help?: string; value: string;
   options: ReadonlyArray<{ value: string; label: string }>; onChange: (next: string) => void;
@@ -933,22 +963,19 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         help: '群聊里同样给回执。群里人多、消息快，这个反馈更有用。',
         onChange: (v) => { patch('reactions.inGroup', v); },
       }),
-      createElement(TextRow, {
-        label: '在算', value: form['reactions.ack'] ?? '微笑',
-        placeholder: '微笑', maxLength: 10,
-        help: '填表情名：微笑 / OK / 抱拳 / 玫瑰。推推只认名字，填 👀 这种 unicode 会被服务端拒掉。留空 = 不挂。',
+      createElement(SelectRow, {
+        label: '在算', value: form['reactions.ack'] ?? '微笑', options: emojiOptions(form['reactions.ack'], '微笑'),
+        help: '收到消息时挂的表情。推推只认它内置的表情名，所以这里只能从列表里选，不用手打。',
         onChange: (v) => { patch('reactions.ack', v); },
       }),
-      createElement(TextRow, {
-        label: '完成', value: form['reactions.done'] ?? 'OK',
-        placeholder: 'OK', maxLength: 10,
-        help: '处理完把「在算」换成这个，同样是表情名（OK / 强 / 鼓掌）。留空 = 只撤不换。',
+      createElement(SelectRow, {
+        label: '完成', value: form['reactions.done'] ?? 'OK', options: emojiOptions(form['reactions.done'], 'OK'),
+        help: '处理完把「在算」换成这个；选「不挂」就只把上一个表情撤掉。',
         onChange: (v) => { patch('reactions.done', v); },
       }),
-      createElement(TextRow, {
-        label: '出错', value: form['reactions.fail'] ?? '委屈',
-        placeholder: '委屈', maxLength: 10,
-        help: '处理失败时换成这个（委屈 / 心碎 / 疑问）。留空 = 只撤不换。',
+      createElement(SelectRow, {
+        label: '出错', value: form['reactions.fail'] ?? '委屈', options: emojiOptions(form['reactions.fail'], '委屈'),
+        help: '处理失败时换成这个；选「不挂」就只撤上一个表情。',
         onChange: (v) => { patch('reactions.fail', v); },
       }),
     ),
@@ -1010,8 +1037,13 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     },
       createElement(NumberRow, {
         label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
-        help: '被叫到时附带最近 N 条群消息（滚动保留，回完不清空，只补没给模型看过的新消息）；0 表示不带。私聊靠会话自身记忆，不受影响。',
+        help: '被叫到时附带最近 N 条群消息；0 表示不带。私聊靠会话自身记忆，不受影响。',
         onChange: (v) => { patch('historyLimit', v); },
+      }),
+      createElement(SelectRow, {
+        label: '怎么带历史', value: form.historyMode ?? 'window', options: HISTORY_MODE_OPTIONS,
+        help: '「最近 N 条」= 每次被叫到都带一整窗，最直观；「只补没看过的」= 同一批消息只灌一次，省 token 但有时看不到前面几句。',
+        onChange: (v) => { patch('historyMode', v as 'window' | 'delta'); },
       }),
       createElement(NumberRow, {
         label: '闲置回收', value: Math.round((form.sessionIdleTimeout ?? 1800000) / 60000),

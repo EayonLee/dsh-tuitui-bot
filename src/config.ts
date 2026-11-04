@@ -192,6 +192,8 @@ export interface ImTuituiConfig {
   askTimeoutMs: number;
   /** 群历史缓冲条数 */
   historyLimit: number;
+  /** 历史注入方式：window=每次带最近 N 条（别人家那种，直观）；delta=只补没投递过的新消息（省 token） */
+  historyMode: 'window' | 'delta';
   /** 访问控制 */
   access: AccessControlConfig;
   /** 是否展示工具调用成功结果（工具错误始终展示） */
@@ -269,6 +271,7 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
   processingTimeoutMs: Schema.number().default(30 * 60 * 1000).description('处理超时(ms)，超时中断当前 LLM 调用'),
   askTimeoutMs: Schema.number().default(5 * 60 * 1000).description('待答问题超时(ms)，超时自动拒绝并提示'),
   historyLimit: Schema.number().default(50).description('群历史缓冲条数'),
+  historyMode: Schema.union(['window', 'delta']).default('window').description('历史注入方式：window=每次带最近 N 条（默认，直观）；delta=只补没给模型看过的新消息（省 token）'),
   access: AccessControlSchema.default({
     c2cMode: 'open',
     c2cAllow: [],

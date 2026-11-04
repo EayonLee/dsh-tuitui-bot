@@ -105,7 +105,7 @@ export async function handleInbound(
   const replyTarget: ReplyTarget = ctx.replyTarget;
 
   // ── 组装 agentBody（下载结果经 state.downloadedFiles 提供） ──
-  const agentBody = assembleAgentBody(msg, state, scope, logger, config.appId);
+  const agentBody = assembleAgentBody(msg, state, scope, logger, config.appId, config.historyMode ?? 'window');
 
   if (!agentBody) return;
 
@@ -217,6 +217,7 @@ function assembleAgentBody(
   scope: ChatScope,
   logger: Logger,
   appId: string,
+  historyMode: 'window' | 'delta',
 ): string | null {
   const multiUser = scope !== 'c2c';
   const wasMentioned = state.mention?.wasMentioned ?? false;
@@ -232,9 +233,11 @@ function assembleAgentBody(
 
   const base = dynamicCtx ? `${dynamicCtx}${userMessage}` : userMessage;
 
-  // 只取水位线之后的新消息：缓冲滚动保留最近 N 条，但同一批内容只灌一次。
+  // 两种注入方式：
+  //   window —— 每次带上最近 N 条，跟别的机器人一样直观（也允许同一句在会话记忆里再出现一次）
+  //   delta  —— 只补水位线之后的新消息，省 token、不重复
   const historyKey = historyKeyOf(msg, scope);
-  const pending = historyKey === undefined
+  const pending = historyKey === undefined || historyMode === 'window'
     ? state.history
     : undeliveredHistory(state.history ?? [], getHistoryDelivered(appId, historyKey));
   // 回写给 state：投递完成后 markHistoryDelivered 要用它算新的水位线
