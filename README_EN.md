@@ -110,6 +110,10 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `smartJudge.maxHistory` | `50` | History messages handed to the model |
 | `smartJudge.cooldownMs` | `5000` | Minimum gap between judgements per conversation |
 | `concurrency.c2c` | `abort` | Direct chats: interrupt the running turn and take the new message (queue / drop / merge also available) |
+| `concurrency.group` | `queue` | Groups: queue one at a time |
+| `concurrency.post` | `queue` | Team posts: queue |
+
+All four strategies act at the **turn** level, not just in the middleware chain: `queue` waits, `abort` cancels the in-flight turn (its answer gets truncated), `merge` buffers while busy and sends one combined message afterwards, `drop` discards (logged).
 | `concurrency.group` | `queue` | Groups: process one at a time |
 | `concurrency.post` | `queue` | Team posts: process one at a time |
 | `reactions.enabled` | `true` | React on receipt (working / done / failed) |
@@ -189,6 +193,9 @@ clearing the box restores the factory default ([source](./src/shared/smart-promp
 | Long-task protection | Sessions whose agent is not idle are never evicted, so long runs are not cut in half |
 | Serial per peer | Messages from one peer queue up (`maxQueue`); different peers do not block each other |
 | Quote resolution | The replied-to message travels along as a quote, so "what it said earlier" style references still resolve |
+| Inbound dedupe | Handled msgids persist to `~/.dsh/tuitui-bot/tuitui-seen.json` (FIFO, 1000), so a reconnect/restart that replays recent messages never double-answers |
+| Zombie connection self-healing | Connected but zero events for 30 minutes ⇒ treated as stale and resubscribed; a `[tuitui/watch]` status line every 5 minutes (uptime / last event / last error / rebuild count) |
+| Turn ceiling | Waiting for a turn to settle is capped at 15 minutes, then logged and released, so one hung turn cannot block a conversation forever |
 
 ## Refresh / uninstall
 

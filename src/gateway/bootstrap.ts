@@ -15,6 +15,8 @@ import { SessionManager, type DshAgentRegistry } from '../session/index.ts';
 import { handleInbound, createOutboundHandler } from '../transport/index.ts';
 import { parseStreamFrame } from '../transport/events.ts';
 import { cacheMsgId } from '../transport/msgid-cache.ts';
+import { ConnectionWatch } from '../tuitui/connection-watch.ts';
+import { InboundDedupe } from '../tuitui/inbound-dedupe.ts';
 import type { ToolsRegistryLike } from '../transport/tool-presenter.ts';
 import { DeliverablesDeliverer } from '../transport/deliverables.ts';
 import { QuestionChannel } from '../features/question-channel.ts';
@@ -26,7 +28,8 @@ import { ensureVisionInputModal, registerDescribeImageTool } from '../media/visi
 import { registerSendFileTool } from '../media/send-file-tool.ts';
 import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
-import { getScopePeer } from '../shared/index.ts';
+import { getScopePeer, PLUGIN_HOME } from '../shared/index.ts';
+import { join } from 'node:path';
 import type { ImTuituiConfig } from '../config.ts';
 import type { InboundMessage, Logger, MiddlewareContext, ReplyTarget, TuituiSender } from '../types.ts';
 
@@ -214,6 +217,12 @@ export async function bootstrapGateway(
   }
 
   // ── 入站：事件 → 归一化 → 中间件 → dsh agent ──
+  // 跨重启去重：SDK 的去重只在内存里，重启后推推会把最近消息再推一遍
+  const dedupe = new InboundDedupe({
+    path: join(PLUGIN_HOME, 'tuitui-seen.json'),
+    onError: (message) => logger.warn(`[tuitui/dedupe] ${message}`),
+  });
+
   const handleEvent = async (body: TuituiEventBody): Promise<void> => {
     const message = normalizeEvent(body, {
       render: (data) => client.event.renderMessageBody(data),
@@ -224,6 +233,13 @@ export async function bootstrapGateway(
       if (config.debug) {
         logger.info(`ignored event: ${String((body as { event?: unknown }).event)}`);
       }
+      return;
+    }
+
+    // 同一条 msgid 只处理一次：重启/重连后推推会把最近消息再推一遍，
+    // 不去重就会把同一句话答两遍
+    if (!dedupe.claim(message.messageId)) {
+      logger.info(`[tuitui/dedupe] 重复消息已跳过 msgid=${message.messageId}`);
       return;
     }
 
@@ -327,17 +343,45 @@ export async function bootstrapGateway(
     // 快捷指令同步（推推客户端输入框的指令面板）
     void syncShortcutCommands(client, DEFAULT_SHORTCUTS, logger);
 
-    const subscription = client.event.subscribe({
-      onConnected: () => logger.info('tuitui websocket connected'),
-      onEvent: (body: TuituiEventBody) => handleEvent(body),
-      onDisconnected: (reason: unknown) =>
-        logger.warn(`tuitui websocket disconnected (auto-reconnecting): ${reason instanceof Error ? reason.message : String(reason)}`),
-      onError: (error: unknown) =>
-        logger.warn(`tuitui websocket error (auto-reconnecting): ${error instanceof Error ? error.message : String(error)}`),
+    // 订阅参数单独拎出来：僵死重建时要原样再来一遍
+    const subscribeOptions = (): Parameters<typeof client.event.subscribe>[0] => ({
+      onConnected: () => {
+        watch.markConnected();
+        logger.info('tuitui websocket connected');
+      },
+      onEvent: (body: TuituiEventBody) => {
+        watch.markEvent();
+        return handleEvent(body);
+      },
+      onDisconnected: (reason: unknown) => {
+        watch.markDisconnected(reason);
+        logger.warn(`tuitui websocket disconnected (auto-reconnecting): ${reason instanceof Error ? reason.message : String(reason)}`);
+      },
+      onError: (error: unknown) => {
+        watch.markError(error);
+        logger.warn(`tuitui websocket error (auto-reconnecting): ${error instanceof Error ? error.message : String(error)}`);
+      },
     });
+
+    // 僵尸连接自愈：SDK 心跳只管链路，管不了「连着但不来消息」
+    let subscription: ReturnType<typeof client.event.subscribe>;
+    const watch = new ConnectionWatch({
+      logger,
+      rebuild: () => {
+        try {
+          subscription.unsubscribe();
+        } catch (error) {
+          logger.warn(`stale rebuild unsubscribe failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        subscription = client.event.subscribe(subscribeOptions());
+      },
+    });
+    subscription = client.event.subscribe(subscribeOptions());
+    watch.start();
 
     return async () => {
       logger.info('Shutting down');
+      watch.stop();
       subscription.unsubscribe();
       // 先结算挂起的审批/问答：宿主正在等这些 Promise，拖到进程没了就是永久悬挂
       approvalChannel.dispose();

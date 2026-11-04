@@ -42,6 +42,46 @@ import {
 } from './attachment.ts';
 import { clearGroupHistory } from '../features/history-store.ts';
 
+/**
+ * 等这一轮收敛的上限。
+ *
+ * whenIdle() 本身没有超时：一旦某个 turn 卡死（模型挂住、工具不返回），
+ * 这个 await 就永远不 resolve，会话的并发槽位也就永远占着——后面所有消息
+ * 都会排队排到天荒地老。给个天花板，超了就记一笔放行，宁可多投一条也不能
+ * 把整个会话锁死。
+ */
+const IDLE_TIMEOUT_MS = 15 * 60_000;
+
+async function waitIdle(
+  agent: { whenIdle(): Promise<void> },
+  logger: Logger,
+  label: string,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), IDLE_TIMEOUT_MS);
+    timer.unref?.();
+  });
+  try {
+    const outcome = await Promise.race([agent.whenIdle().then(() => 'idle' as const), timeout]);
+    if (outcome === 'timeout') {
+      logger.warn(`[concurrency] 等回合收敛超过 ${Math.round(IDLE_TIMEOUT_MS / 60_000)} 分钟，先放行: ${label}`);
+    }
+  } catch (err) {
+    logger.warn(`whenIdle rejected (${label}): ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** merge 策略的攒话缓冲：key = scope:peerId → 待合并的消息正文 */
+const mergeBuffers = new Map<string, string[]>();
+
+/** 单测用：清空攒话缓冲，避免用例之间互相污染 */
+export function resetMergeBuffers(): void {
+  mergeBuffers.clear();
+}
+
 // ── 主处理函数 ──
 
 /**
@@ -101,7 +141,35 @@ export async function handleInbound(
    * 「打断」照样会排到前一轮后面。这里按作用域再判一次：abort 先取消在飞的
    * 那一轮再投递，drop 忙时直接丢。
    */
+  const mergeKey = `${scope}:${peerId}`;
   const strategy = resolveScopeStrategy(config, scope);
+
+  /**
+   * merge：忙的时候先攒着，等这一轮完了合并成一条投出去。
+   *
+   * 以前 merge 和 queue 是一个行为（都 followup），等于配置项骗人。真正的合并
+   * 语义要求「攒 + 一次性投递」，所以这里需要一块按会话的缓冲。
+   */
+  if (strategy === 'merge' && record.agent.status === 'running') {
+    const buffer = mergeBuffers.get(mergeKey) ?? [];
+    buffer.push(agentBody);
+    mergeBuffers.set(mergeKey, buffer);
+    logger.info(`[concurrency] 攒话中(${buffer.length}条并一条): scope=${scope} peer=${peerId}`);
+    await waitIdle(record.agent, logger, `merge ${mergeKey}`);
+    // 谁先醒谁负责投递；投完就删，别让后醒的再投一遍
+    const pending = mergeBuffers.get(mergeKey);
+    if (pending !== undefined && pending.length > 0) {
+      mergeBuffers.delete(mergeKey);
+      const merged = createUserMessage({
+        content: [{ type: 'text' as const, text: pending.join('\n\n---\n\n') }],
+        source: { kind: 'user' as const },
+      });
+      record.agent.followup(merged);
+      logger.info(`[concurrency] 合并投递(${pending.length}条): scope=${scope} peer=${peerId}`);
+    }
+    return;
+  }
+
   if ((strategy === 'abort' || strategy === 'drop') && record.agent.status === 'running') {
     if (strategy === 'drop') {
       logger.info(`[concurrency] 忙时丢弃: scope=${scope} peer=${peerId}`);
@@ -110,11 +178,7 @@ export async function handleInbound(
     logger.info(`[concurrency] 打断在飞回合，直接接新话: scope=${scope} peer=${peerId}`);
     record.agent.cancel({ kind: 'user' });
     // 等旧回合真正收敛再投递，否则 followup 会追加到被取消的那一轮尾巴上
-    try {
-      await record.agent.whenIdle();
-    } catch (err) {
-      logger.warn(`cancel 后等待收敛失败: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    await waitIdle(record.agent, logger, `abort ${scope}:${peerId}`);
   }
 
   record.agent.followup(message);
@@ -127,11 +191,7 @@ export async function handleInbound(
     clearGroupHistory(config.appId, historyKey);
   }
 
-  try {
-    await record.agent.whenIdle();
-  } catch (err) {
-    logger.warn(`whenIdle rejected: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  await waitIdle(record.agent, logger, `${scope}:${peerId}`);
 }
 
 /** 历史缓冲键：群聊用 group_id，帖子用 teamId/channelId（与 middleware-setup 对齐） */

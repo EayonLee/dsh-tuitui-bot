@@ -1,6 +1,8 @@
 import type { SessionManager } from '../session/index.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type { Logger, MiddlewareContext } from '../types.ts';
+/** 单测用：清空攒话缓冲，避免用例之间互相污染 */
+export declare function resetMergeBuffers(): void;
 /**
  * 处理推推入站消息（已经过中间件链）
  *

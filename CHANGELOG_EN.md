@@ -24,6 +24,10 @@ First release: an implementation of a dsh bot channel plugin for 360 Tuitui IM.
 
 - **Smart interjection (`src/features/smart-judge.ts`)**: in `smart` mode a model reads the group context and decides whether to speak; the judging prompt is fully editable in Settings (default: `src/shared/smart-prompt.ts`), with per-conversation cooldown, timeout, and a fail-closed fallback
 - **Settings page rework (`src/client/config-panel.ts`)**: section cards plus a two-column field grid that collapses on narrow screens; allow/deny lists and aliases are chip inputs (Enter commits, Backspace removes, × deletes one); workspace is a server-fed dropdown; smart mode reveals the prompt editor; model selection removed
+- **All four concurrency strategies now act at the turn level**: `merge` used to behave like `queue` (the setting lied); it now really buffers while busy and sends one combined message afterwards
+- **Inbound dedupe survives restarts**: msgids persist (FIFO 1000), so replays after a restart are not answered twice
+- **Zombie connection self-healing**: connected with zero events for 30 minutes ⇒ resubscribe; a `[tuitui/watch]` status line every 5 minutes
+- **Turn settle ceiling of 15 minutes**: a hung turn no longer blocks the conversation forever
 - **Verdict now goes through a tool schema**: the `join_decision` JSON Schema is sent with the request and its arguments are read as the verdict; the prompt no longer carries the "output one JSON line" protocol
 - **Judgement timeout 8s → 20s**, `maxTokens` 400 → 800: thinking models were getting cut off mid-reasoning (`why=unparsable`)
 - **Timeouts log `why=timeout`** instead of blending into parse failures

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleInbound } from './inbound.ts';
+import { handleInbound, resetMergeBuffers } from './inbound.ts';
 import type { SessionManager } from '../session/index.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type {
@@ -116,6 +116,28 @@ describe('handleInbound: 并发策略在 turn 这一层生效', () => {
     const { manager, record } = createManager({ busy: true });
     await handleInbound(createCtx(createMessage()), manager, dropConfig, logger);
     expect(record.agent.followup).not.toHaveBeenCalled();
+  });
+
+  it('merge 且忙：攒着，等这一轮完了一次性合并投递', async () => {
+    resetMergeBuffers();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const { manager, record } = createManager({ busy: true });
+    record.agent.whenIdle.mockImplementation(() => gate);
+    const mergeConfig = {
+      appId: 'app-1',
+      concurrency: { c2c: 'merge', group: 'queue', post: 'queue' },
+    } as unknown as ImTuituiConfig;
+
+    const first = handleInbound(createCtx(createMessage({ messageId: 'm-1', content: '第一句' })), manager, mergeConfig, logger);
+    const second = handleInbound(createCtx(createMessage({ messageId: 'm-2', content: '第二句' })), manager, mergeConfig, logger);
+    // 忙的时候一条都不该投
+    await new Promise((r) => setTimeout(r, 0));
+    expect(record.agent.followup).not.toHaveBeenCalled();
+    release();
+    await Promise.all([first, second]);
+    // 两条攒成一条投出去
+    expect(record.agent.followup).toHaveBeenCalledTimes(1);
   });
 
   it('空闲时不取消任何东西', async () => {
