@@ -24,6 +24,7 @@ First release: an implementation of a dsh bot channel plugin for 360 Tuitui IM.
 
 - **Smart interjection (`src/features/smart-judge.ts`)**: in `smart` mode a model reads the group context and decides whether to speak; the judging prompt is fully editable in Settings (default: `src/shared/smart-prompt.ts`), with per-conversation cooldown, timeout, and a fail-closed fallback
 - **Settings page rework (`src/client/config-panel.ts`)**: section cards plus a two-column field grid that collapses on narrow screens; allow/deny lists and aliases are chip inputs (Enter commits, Backspace removes, × deletes one); workspace is a server-fed dropdown; smart mode reveals the prompt editor; model selection removed
+- **The factory persona now lives in the plugin**: `DEFAULT_SMART_PROMPT` is a full 憨包 persona (identity, temper, barbed by default, plain wording without abbreviations, the boss clause, real `@` for other bots, when to keep quiet, when to look things up) — "restore default" in settings yields exactly this
 - **Outbound `@name` becomes a real mention**: parsed into Tuitui `at` metadata (code blocks / e-mails / `@all` excluded, merged with explicit `at`). Previously it was plain text, so other bots never got notified
 - **All four concurrency strategies now act at the turn level**: `merge` used to behave like `queue` (the setting lied); it now really buffers while busy and sends one combined message afterwards
 - **Inbound dedupe survives restarts**: msgids persist (FIFO 1000), so replays after a restart are not answered twice
