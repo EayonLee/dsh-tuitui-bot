@@ -17,8 +17,8 @@ import type { ImTuituiConfig } from '../config.ts';
 import type { Logger } from '../types.ts';
 import type { BindingService, VerifyOutcome } from './binding-service.ts';
 import { type SetupCredentials } from './persist.ts';
-import { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH, type BindStateWire } from '../shared/bind-protocol.ts';
-export { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH };
+import { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH, TEST_MODEL_PATH, type BindStateWire } from '../shared/bind-protocol.ts';
+export { BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_STATE_PATH, BIND_UNBIND_PATH, BIND_VERIFY_PATH, TEST_MODEL_PATH };
 export type { BindStateWire };
 /** dsh-host-webserver 的具名路由注册形状（局部投影，避免硬依赖） */
 export interface WebRoute {

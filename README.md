@@ -174,8 +174,12 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `media.enabled` | `true` | 是否下载并理解富媒体 |
 | `media.maxMB` | `200` | 单文件上限（MB） |
 | `media.ttlHours` | `24` | 媒体保留时长，0 = 永久 |
-| `vision.enabled` | `false` | 启用 `tuitui_describe_image` 工具 |
-| `vision.provider` / `vision.model` | - | 视觉模型路由 |
+| `vision.enabled` | `false` | 启用图像理解（`tuitui_describe_image` 工具） |
+| `vision.baseUrl` / `vision.apiKey` / `vision.model` | - | 图像理解端点（任意 OpenAI 兼容网关）。密钥只存服务端，设置页与接口都不回显 |
+| `vision.provider` | `''` | 旧字段：dsh llm adapter 名；配了 `baseUrl` 后不再使用 |
+| `imageGeneration.enabled` | `false` | 启用图像生成（`tuitui_draw` 工具） |
+| `imageGeneration.baseUrl` / `apiKey` / `model` | - | 图像生成端点，与理解各配一套 |
+| `imageGeneration.size` | `1024x1024` | 出图尺寸，留空用服务端默认 |
 | `sendFile.restrictPaths` | `false` | 是否限制可发送的文件路径；默认放开，打开后只允许 media + cwd + extraRoots |
 | `sendFile.extraRoots` | `[]` | 额外允许发送的目录 |
 | `sendFile.sendPresentedFiles` | `true` | 轮末投递 `present` 声明的文件 |
@@ -213,7 +217,8 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | 工具 | 说明 |
 | --- | --- |
 | `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话；默认不限制路径，想发什么发什么 |
-| `tuitui_describe_image` | 视觉理解（需 `vision.enabled`，复用 dsh llm + attachments） |
+| `tuitui_describe_image` | 图像理解（需 `vision.enabled`）：配了 `vision.baseUrl` 就走自己的端点，否则退回 dsh llm |
+| `tuitui_draw` | 图像生成（需 `imageGeneration.enabled`）：出图并直接发到当前会话，返回本地文件路径 |
 | `tuitui_group` | 群管理：`info` / `members` / `robot_in` / `user_is_in` 只读；`create` / `member_add` / `member_remove` 要 `confirm=true` |
 | `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
 | `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
