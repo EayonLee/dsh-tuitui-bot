@@ -162,14 +162,30 @@ export function getInteractiveAction(message: InboundMessage): InteractiveAction
  * data 类型是开放 Record，个别网关版本会把字段平铺到 body 上，所以两处都看。
  */
 function interactiveValueOf(message: InboundMessage): unknown {
-  const body = isRecord(message.raw) ? message.raw : undefined;
-  const data = (body && isRecord(body.data) ? body.data : body) ?? undefined;
+  const data = interactivePayloadOf(message.raw);
   if (!data) return undefined;
 
   const action = Array.isArray(data.action) ? data.action[0] : undefined;
   const fromAction = isRecord(action) ? action.value : undefined;
   if (fromAction !== undefined) return fromAction;
   return data.value;
+}
+
+/**
+ * 取交互回调的载荷本体。
+ *
+ * 线上实测（2026-11-04）：回调被包在 `body.data.message` 里——
+ * `{data:{message:{msgid, user, sender, conversation, action:[{value}]}}}`，
+ * 而 SDK 的 `TuituiInteractiveCallbackMessage` 类型是平铺的。照类型读会得到一堆
+ * undefined：msgid 退化成事件 cid、按钮 value 读不出来，点击在 dispatch 里无人
+ * 认领而静默丢弃——表现就是"卡片能点，但点完什么都不发生"。
+ */
+export function interactivePayloadOf(raw: unknown): Record<string, unknown> | undefined {
+  const body = isRecord(raw) ? raw : undefined;
+  if (!body) return undefined;
+  const data = isRecord(body.data) ? body.data : body;
+  const nested = isRecord(data.message) ? data.message : undefined;
+  return nested ?? data;
 }
 
 /**

@@ -7,6 +7,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
+import { getInteractiveAction } from '../features/button-utils.ts';
 import { classifyMime, isMessageEvent, normalizeEvent } from './inbound.ts';
 
 /** 构造一个基础事件体（推推保证这些字段存在，缺字段用例再单独覆盖） */
@@ -538,5 +539,49 @@ describe('classifyMime', () => {
     expect(classifyMime('text/plain')).toBe('file');
     expect(classifyMime(undefined)).toBe('file');
     expect(classifyMime('')).toBe('file');
+  });
+});
+
+describe('normalizeEvent：interactive_action（线上真实回调形状）', () => {
+  // 2026-11-04 线上抓包：卡片信息包在 body.data.message 里，
+  // 而 SDK 的 TuituiInteractiveCallbackMessage 类型是平铺的。
+  const rawEvent = {
+    cid: '7652669648797797',
+    uid: '7652738368427950',
+    user_account: 'lizhengtai',
+    user_name: '李正泰',
+    is_me: false,
+    user_is_bot: false,
+    timestamp: '1793758777',
+    event: 'interactive_action',
+    bot_name: '憨包',
+    data: {
+      message: {
+        msgid: '7704135227344309517',
+        user: { uid: '7652738368427950', cid: '7652669648797797', name: '李正泰', account: 'lizhengtai' },
+        sender: { uid: '7652738368553025', cid: '7652669648797797', name: '憨包', account: '' },
+        conversation: { type: 'single', targeted: '7652738368553025' },
+        appid: '7652669649120958',
+        id: '',
+        value: '',
+        fields: [],
+        action: [{ name: 'probe', text: '点我', value: { t: 'probe' }, type: '' }],
+      },
+    },
+  };
+
+  it('必须下钻 body.data.message：msgid 与点击者都不能丢', () => {
+    const message = normalizeEvent(rawEvent as never, options())!;
+    expect(message.eventType).toBe('interactive_action');
+    expect(message.kind).toBe('c2c');
+    expect(message.messageId).toBe('7704135227344309517');
+    expect(message.senderAccount).toBe('lizhengtai');
+  });
+
+  it('按钮 value 能被 getInteractiveAction 解出来（点击能否结算的命门）', () => {
+    const click = getInteractiveAction(normalizeEvent(rawEvent as never, options())!);
+    expect(click).toBeDefined();
+    expect(click!.targetId).toBe('lizhengtai');
+    expect(click!.value).toEqual({ t: 'probe' });
   });
 });

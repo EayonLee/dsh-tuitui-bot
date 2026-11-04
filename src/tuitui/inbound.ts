@@ -126,7 +126,11 @@ function normalizePost(body: TuituiEventTeamsPost): InboundMessage {
  * content 仅用于日志与文本兜底解析。
  */
 function normalizeInteractive(body: TuituiEventBody): InboundMessage {
-  const data = (body.data ?? {}) as TuituiInteractiveCallbackMessage & Record<string, unknown>;
+  // 线上回调把卡片信息包在 body.data.message 里（SDK 类型写的是平铺），两种都认；
+  // 不下钻会丢掉卡片 msgid 和按钮 value，点击等于没发生。
+  const outer = (body.data ?? {}) as Record<string, unknown>;
+  const data = (isRecord(outer.message) ? outer.message : outer) as TuituiInteractiveCallbackMessage &
+    Record<string, unknown>;
   const user = (data.user ?? data.sender ?? {}) as { uid?: string; account?: string; name?: string };
   const messageId = firstString(data.msgid, body.cid) ?? `interactive:${body.timestamp ?? ''}`;
   const actionText = Array.isArray(data.action)
@@ -385,4 +389,8 @@ function stringifyValue(value: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
