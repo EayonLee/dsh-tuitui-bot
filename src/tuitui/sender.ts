@@ -19,30 +19,13 @@ import { extractMessageId, describeApiError } from './client.ts';
 import { mergeMentions } from './mention-parse.ts';
 import { resolveTuituiEmoji } from './emoji.ts';
 import { settleReceipt } from '../features/receipt-registry.ts';
+import { DEFAULT_SEND_RETRY, withSendRetry, type RetryPolicy } from './retry-policy.ts';
+import { SendQueue } from './send-queue.ts';
 
-/**
- * 发送重试。
- *
- * 推推的群聊发送偶尔会返回 `errcode 10503`（"消息发送失败"，多数是服务端瞬时故障
- * 或群里一瞬间发太密），换个时间点再发往往就成功了。以前这里直接抛错，结果就是
- * 模型答完了、用户一个字没看到，而日志里只有一条 warn —— 线上真的丢了 40 多条。
- */
-const RETRYABLE_ERRCODES = new Set([10503]);
-const RETRY_DELAYS_MS = [600, 1800];
-
-function isRetryableSendError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const record = error as Record<string, unknown>;
-  const errcode = record.errcode;
-  if (typeof errcode === 'number' && RETRYABLE_ERRCODES.has(errcode)) return true;
-  const status = record.status;
-  if (typeof status === 'number' && status >= 500) return true;
-  const message = typeof record.message === 'string' ? record.message : '';
-  return /fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|network error/i.test(message);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => { setTimeout(resolve, ms); });
+/** 发送队列的分组键：同一会话串行，不同会话并行 */
+export function sendQueueKey(target: ReplyTarget): string {
+  if (target.scope === 'post') return `post:${target.teamId ?? ''}:${target.channelId ?? ''}`;
+  return `${target.scope}:${target.targetId}`;
 }
 
 /** 发送器构造参数 */
@@ -53,8 +36,10 @@ export interface TuituiSenderOptions {
   streaming: boolean;
   /** 流式刷新节流(ms) */
   streamIntervalMs: number;
-  /** 发送重试间隔（毫秒），测试里传 [1] 避免真等；生产用默认值 */
-  retryDelaysMs?: number[];
+  /** 重试策略（默认 6 次、指数退避 + 抖动、总预算 75s） */
+  retryPolicy?: RetryPolicy;
+  /** 单会话串行发送队列（默认按会话串行、每会话最多积压 20 条） */
+  sendQueue?: SendQueue;
   /** 单条文本上限（超出时由调用方切分，这里只做兜底断言） */
   textChunkLimit: number;
 }
@@ -129,36 +114,19 @@ export class TuituiSenderImpl implements TuituiSender {
   private readonly logger: Logger;
   private readonly streaming: boolean;
   private readonly streamIntervalMs: number;
-  private readonly retryDelaysMs: readonly number[];
+  private readonly retryPolicy: RetryPolicy;
+  private readonly queue: SendQueue;
 
   public constructor(options: TuituiSenderOptions) {
     this.client = options.client;
     this.logger = options.logger;
     this.streaming = options.streaming;
     this.streamIntervalMs = options.streamIntervalMs;
-    this.retryDelaysMs = options.retryDelaysMs ?? RETRY_DELAYS_MS;
-  }
-
-  /**
-   * 可重试的发送：临时故障重试，别把已经生成好的回复直接扔掉。
-   * 只重试"明显是瞬时"的错误，参数/权限类错误重试也是白搭。
-   */
-  private async withRetry<T>(target: ReplyTarget, run: () => Promise<T>): Promise<T> {
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
-      try {
-        return await run();
-      } catch (error) {
-        lastError = error;
-        const delay = this.retryDelaysMs[attempt];
-        if (delay === undefined || !isRetryableSendError(error)) break;
-        this.logger.warn(
-          `send retry ${attempt + 1}/${this.retryDelaysMs.length} in ${delay}ms (scope=${target.scope} target=${target.targetId}): ${describeApiError(error)}`,
-        );
-        await sleep(delay);
-      }
-    }
-    throw lastError;
+    this.retryPolicy = options.retryPolicy ?? DEFAULT_SEND_RETRY;
+    this.queue = options.sendQueue ?? new SendQueue({
+      maxPendingPerKey: 20,
+      onDrop: (key) => { this.logger.warn(`发送队列已满，丢弃一条: key=${key}`); },
+    });
   }
 
   /** 统一失败日志（推推错误必须完整记录，含 trans_id） */
@@ -166,16 +134,32 @@ export class TuituiSenderImpl implements TuituiSender {
     this.logger.warn(`${action} failed (scope=${target.scope} target=${target.targetId}): ${describeApiError(error)}`);
   }
 
+  /**
+   * 发一条文本（里面可以是 markdown）。
+   *
+   * 两层保护：
+   * 1. 按会话串行（SendQueue）：同一会话的消息按顺序发，重试不会把后一条挤到前面去
+   * 2. 单条发送带退避重试（withSendRetry）：10503 / 5xx / 网络错误自动重来
+   */
   public async sendMarkdown(
     target: ReplyTarget,
     content: string,
     opts?: { keyboard?: unknown; at?: string[] },
   ): Promise<SendResult> {
     if (!content.trim()) return {};
+    return this.queue.run(sendQueueKey(target), () => this.sendOnce(target, content, opts));
+  }
+
+  /** 真正调 SDK 的那一层（带重试），队列里一次只跑一条 */
+  private async sendOnce(
+    target: ReplyTarget,
+    content: string,
+    opts?: { keyboard?: unknown; at?: string[] },
+  ): Promise<SendResult> {
     try {
       if (target.scope === 'post') {
         if (!isPostTarget(target)) throw new Error('post target requires teamId/channelId');
-        const response = await this.withRetry(target, () => this.client.teams.sendPost({
+        const response = await this.retry(target, () => this.client.teams.sendPost({
           teamId: target.teamId as string,
           channelId: target.channelId as string,
           text: content,
@@ -188,7 +172,7 @@ export class TuituiSenderImpl implements TuituiSender {
       // 正文里写了 @某某 只算文字，推推要靠 at 元数据才算「真 @」：
       // 不带上 at，对方收不到通知，别的机器人更是完全看不见。
       const mentions = mergeMentions(opts?.at, content);
-      const response = await this.withRetry(target, () => this.client.im.sendText({
+      const response = await this.retry(target, () => this.client.im.sendText({
         to,
         text: content,
         ...(target.msgId ? { referenceMessageId: target.msgId } : {}),
@@ -202,6 +186,17 @@ export class TuituiSenderImpl implements TuituiSender {
       void settleReceipt(target, 'fail', target.msgId);
       throw error;
     }
+  }
+
+  /** 统一的重试入口：日志挂在 onRetry 上，方便以后排查"重了几下才好" */
+  private async retry<T>(target: ReplyTarget, run: () => Promise<T>): Promise<T> {
+    return withSendRetry(run, this.retryPolicy, {
+      onRetry: ({ attempt, delayMs, error }) => {
+        this.logger.warn(
+          `send retry ${attempt}/${this.retryPolicy.attempts - 1} in ${delayMs}ms (scope=${target.scope} target=${target.targetId}): ${describeApiError(error)}`,
+        );
+      },
+    });
   }
 
   public openStream(target: ReplyTarget): StreamSessionLike | null {

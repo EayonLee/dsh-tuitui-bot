@@ -56,8 +56,8 @@ interface SetupOptions {
   streaming?: boolean;
   streamIntervalMs?: number;
   textChunkLimit?: number;
-  /** 重试间隔：测试里给 [1, 1]，免得真等 2.4 秒 */
-  retryDelaysMs?: number[];
+  /** 重试策略：测试里把间隔压到 1ms，免得真等几十秒 */
+  retryAttempts?: number;
 }
 
 function setup(over: SetupOptions = {}) {
@@ -69,7 +69,7 @@ function setup(over: SetupOptions = {}) {
     streaming: over.streaming ?? false,
     streamIntervalMs: over.streamIntervalMs ?? 0,
     textChunkLimit: over.textChunkLimit ?? 4000,
-    retryDelaysMs: over.retryDelaysMs ?? [1, 1],
+    retryPolicy: { attempts: over.retryAttempts ?? 3, minDelayMs: 1, maxDelayMs: 1, factor: 1, totalBudgetMs: 5_000 },
   });
   return { sender, logger, calls };
 }

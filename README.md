@@ -249,6 +249,20 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 提示词是**一等配置**：不同群需要不同的「人设」，在设置页整段改，改完保存即生效；
 清空输入框恢复出厂默认（见 [`src/shared/smart-prompt.ts`](./src/shared/smart-prompt.ts)）。
 
+## 发送可靠性
+
+推推的 `/message/custom/send` 偶尔会回 `errcode 10503`（消息发送失败），绝大多数是服务端瞬时故障或瞬时限流。插件对这条链路做了三层保护：
+
+| 层 | 做法 | 作用 |
+| --- | --- | --- |
+| 重试 | 最多 6 次，指数退避 + Full Jitter（0.5s 起、单次上限 15s、总预算 75s） | 瞬时故障自动恢复，不丢已经生成好的回复 |
+| 分类 | `10503` / `429` / `5xx` / 网络错误才重试；参数、鉴权、权限类错误直接放弃 | 不让人白等 75 秒 |
+| 队列 | 同一会话串行发送，不同会话并行；每会话最多积压 20 条 | 重试期间后一条不会插队，顺序不乱 |
+
+服务端返回 `Retry-After` 时按它的时间等（只受总预算约束）。长文本切成多条时，片与片之间留 250ms，避免密集发送触发限流。
+
+策略放在 [`src/tuitui/retry-policy.ts`](src/tuitui/retry-policy.ts)，队列在 [`src/tuitui/send-queue.ts`](src/tuitui/send-queue.ts)，参考了 [p-retry](https://github.com/sindresorhus/p-retry) 与 AWS 的 [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)。
+
 ## 会话与上下文
 
 | 行为 | 说明 |
