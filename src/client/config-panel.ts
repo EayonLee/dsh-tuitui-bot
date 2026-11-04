@@ -903,6 +903,55 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ),
 
     createElement(Section, {
+      id: 'prompt',
+      title: '额外提示词',
+      desc: '按会话类型追加在机器人人格后面的内容：群里的规矩、私聊的口气、频道里的格式。留空 = 不加。',
+    },
+      createElement(TextAreaRow, {
+        label: '群聊', value: form.groupPrompt ?? '', rows: 4,
+        placeholder: '例如：群里说话短一点，别抢别人的话',
+        help: '只在群聊里追加。',
+        onChange: (v) => { patch('groupPrompt', v); },
+      }),
+      createElement(TextAreaRow, {
+        label: '私聊', value: form.directPrompt ?? '', rows: 4,
+        placeholder: '例如：一对一可以多说两句细节',
+        help: '只在单聊里追加。',
+        onChange: (v) => { patch('directPrompt', v); },
+      }),
+      createElement(TextAreaRow, {
+        label: '团队频道', value: form.postPrompt ?? '', rows: 4,
+        placeholder: '例如：帖子里用条目，别写长段',
+        help: '只在团队频道的帖子里追加。',
+        onChange: (v) => { patch('postPrompt', v); },
+      }),
+    ),
+
+    createElement(Section, {
+      id: 'vision',
+      title: '看图',
+      desc: '群里有人发图时，机器人能自己看明白再回话；用的是 dsh 里注册的视觉模型。',
+    },
+      createElement(SwitchRow, {
+        label: '启用视觉理解', checked: form['vision.enabled'] ?? false,
+        help: '打开后注册 tuitui_describe_image 工具，机器人才有"眼睛"。',
+        onChange: (v) => { patch('vision.enabled', v); },
+      }),
+      createElement(TextRow, {
+        label: '模型 provider', value: form['vision.provider'] ?? '',
+        placeholder: 'pi-ai',
+        help: 'dsh 里注册的 llm adapter 名，留空用默认。',
+        onChange: (v) => { patch('vision.provider', v); },
+      }),
+      createElement(TextRow, {
+        label: '模型 id', value: form['vision.model'] ?? '',
+        placeholder: 'qwen-vl-max',
+        help: '视觉模型 id，留空用默认。',
+        onChange: (v) => { patch('vision.model', v); },
+      }),
+    ),
+
+    createElement(Section, {
       id: 'workspace',
       title: '工作区',
       desc: '机器人在哪个目录里读写文件、执行命令；所有会话共用。',
