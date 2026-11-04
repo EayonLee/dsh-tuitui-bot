@@ -8,6 +8,10 @@
  */
 import type { ToTarget, TuituiBotClient, TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { Logger, MediaSource, ReplyTarget, SendResult, StreamSessionLike, TuituiSender } from '../types.ts';
+import { type RetryPolicy } from './retry-policy.ts';
+import { SendQueue } from './send-queue.ts';
+/** 发送队列的分组键：同一会话串行，不同会话并行 */
+export declare function sendQueueKey(target: ReplyTarget): string;
 /** 发送器构造参数 */
 export interface TuituiSenderOptions {
     client: TuituiBotClient;
@@ -16,8 +20,10 @@ export interface TuituiSenderOptions {
     streaming: boolean;
     /** 流式刷新节流(ms) */
     streamIntervalMs: number;
-    /** 发送重试间隔（毫秒），测试里传 [1] 避免真等；生产用默认值 */
-    retryDelaysMs?: number[];
+    /** 重试策略（默认 6 次、指数退避 + 抖动、总预算 75s） */
+    retryPolicy?: RetryPolicy;
+    /** 单会话串行发送队列（默认按会话串行、每会话最多积压 20 条） */
+    sendQueue?: SendQueue;
     /** 单条文本上限（超出时由调用方切分，这里只做兜底断言） */
     textChunkLimit: number;
 }
@@ -35,19 +41,26 @@ export declare class TuituiSenderImpl implements TuituiSender {
     private readonly logger;
     private readonly streaming;
     private readonly streamIntervalMs;
-    private readonly retryDelaysMs;
+    private readonly retryPolicy;
+    private readonly queue;
     constructor(options: TuituiSenderOptions);
-    /**
-     * 可重试的发送：临时故障重试，别把已经生成好的回复直接扔掉。
-     * 只重试"明显是瞬时"的错误，参数/权限类错误重试也是白搭。
-     */
-    private withRetry;
     /** 统一失败日志（推推错误必须完整记录，含 trans_id） */
     private warnFailure;
+    /**
+     * 发一条文本（里面可以是 markdown）。
+     *
+     * 两层保护：
+     * 1. 按会话串行（SendQueue）：同一会话的消息按顺序发，重试不会把后一条挤到前面去
+     * 2. 单条发送带退避重试（withSendRetry）：10503 / 5xx / 网络错误自动重来
+     */
     sendMarkdown(target: ReplyTarget, content: string, opts?: {
         keyboard?: unknown;
         at?: string[];
     }): Promise<SendResult>;
+    /** 真正调 SDK 的那一层（带重试），队列里一次只跑一条 */
+    private sendOnce;
+    /** 统一的重试入口：日志挂在 onRetry 上，方便以后排查"重了几下才好" */
+    private retry;
     openStream(target: ReplyTarget): StreamSessionLike | null;
     /** 首条发送（流式会话内部使用）：拿到 msgid 才能原地编辑 */
     sendStreamSeed(target: ReplyTarget, content: string): Promise<string | undefined>;
