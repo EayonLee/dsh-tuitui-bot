@@ -168,6 +168,11 @@ for private deployments (also `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`).
 | Tool | Description |
 | --- | --- |
 | `tuitui_send_file` | Send a local file, URL or in-memory payload to the current chat (path allowlist enforced) |
+| `tuitui_group` | Group admin: `info` / `members` / `robot_in` / `user_is_in` read-only; `create` / `member_add` / `member_remove` need `confirm=true` |
+| `tuitui_history` | Read chat records (group or private) with `limit` (1–100), `cursor`, `order_asc`. Read-only |
+| `tuitui_file` | Files: `upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`; space writes need `confirm=true` |
+| `tuitui_send` | Rich messages: `link` / `page` / `mixed`; `recall` / `modify` / `strong_notice` / `phone_alarm` need `confirm=true` |
+| `tuitui_bot` | The bot itself: `info` / `get_shortcuts` read-only; `set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` need `confirm=true` |
 | `tuitui_describe_image` | Vision understanding (requires `vision.enabled`; uses dsh llm + attachments) |
 
 ## How smart interjection works

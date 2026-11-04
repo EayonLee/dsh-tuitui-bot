@@ -214,6 +214,14 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | --- | --- |
 | `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话；默认不限制路径，想发什么发什么 |
 | `tuitui_describe_image` | 视觉理解（需 `vision.enabled`，复用 dsh llm + attachments） |
+| `tuitui_group` | 群管理：`info` / `members` / `robot_in` / `user_is_in` 只读；`create` / `member_add` / `member_remove` 要 `confirm=true` |
+| `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
+| `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
+| `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true` |
+| `tuitui_bot` | 机器人自身：`info` / `get_shortcuts` 只读；`set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` 要 `confirm=true` |
+
+> 写操作统一规则：不带 `confirm=true` 直接报错退回。模型自己不会"顺手"改群、改身份、发强通知——
+> 它得先拿到一句明确的「执行」。
 
 ## 智能插话是怎么工作的
 

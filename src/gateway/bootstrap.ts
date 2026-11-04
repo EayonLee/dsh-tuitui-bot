@@ -11,7 +11,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { TuituiBotClient, TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
-import { SessionManager, type DshAgentRegistry } from '../session/index.ts';
+import { SessionManager, type DshAgent, type DshAgentRegistry } from '../session/index.ts';
 import { handleInbound, createOutboundHandler } from '../transport/index.ts';
 import { parseStreamFrame } from '../transport/events.ts';
 import { cacheMsgId } from '../transport/msgid-cache.ts';
@@ -27,7 +27,13 @@ import { startMediaCleanup } from '../media/media-cleaner.ts';
 import { ensureVisionInputModal, registerDescribeImageTool } from '../media/vision-tool.ts';
 import { registerSendFileTool } from '../media/send-file-tool.ts';
 import { registerGroupTool } from '../tuitui/group-tool.ts';
-import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter } from '../tuitui/index.ts';
+import { registerHistoryTool } from '../tuitui/history-tool.ts';
+import { registerFileTool } from '../tuitui/file-tool.ts';
+import { registerSendTool } from '../tuitui/message-tool.ts';
+import { registerBotTool } from '../tuitui/bot-tool.ts';
+import { getJudgeHistoryStore, historyGroupKey } from '../features/history-store.ts';
+import { describeGroupEvent, recordGroupEvent } from '../tuitui/group-events.ts';
+import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter, toSdkTarget } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
 import { getScopePeer, PLUGIN_HOME } from '../shared/index.ts';
 import { join } from 'node:path';
@@ -229,10 +235,19 @@ export async function bootstrapGateway(
       render: (data) => client.event.renderMessageBody(data),
     });
     if (!message) {
-      // 排查"点了没反应"时这几行是唯一的路标：用 info 而不是 debug，
-      // 因为插件的文件日志默认从 info 起记。
-      if (config.debug) {
-        logger.info(`ignored event: ${String((body as { event?: unknown }).event)}`);
+      // 群事件（建群/被拉/被踢）不是消息，但机器人得知道自己身在何处：
+      // 记一条系统消息进判定历史，下一轮判定就能看见「我刚被拉进了群 X」。
+      const eventName = String((body as { event?: unknown }).event ?? '');
+      const groupEvent = describeGroupEvent(eventName, (body as { data?: unknown }).data);
+      if (groupEvent !== undefined) {
+        logger.info(`[tuitui/group-event] ${eventName} group=${groupEvent.groupId ?? '-'} ${groupEvent.text}`);
+        if (groupEvent.groupId !== undefined) {
+          recordGroupEvent(getJudgeHistoryStore(), historyGroupKey(config.appId, groupEvent.groupId), groupEvent, logger);
+        }
+      } else if (config.debug) {
+        // 排查"点了没反应"时这几行是唯一的路标：用 info 而不是 debug，
+        // 因为插件的文件日志默认从 info 起记。
+        logger.info(`ignored event: ${eventName}`);
       }
       return;
     }
@@ -333,6 +348,22 @@ export async function bootstrapGateway(
 
   // ── 群管理工具注册（tuitui_group：查群/成员随便问，建群拉人踢人要 confirm） ──
   runOptional(logger, 'group tool', () => registerGroupTool(ctx, client, logger));
+
+  // ── 聊天记录拉取（tuitui_history：只读） ──
+  runOptional(logger, 'history tool', () => registerHistoryTool(ctx, client, logger));
+
+  // ── 文件与文件空间（tuitui_file：传/查随便用，空间增删要 confirm） ──
+  runOptional(logger, 'file tool', () => registerFileTool(ctx, client, logger));
+
+  // ── 消息花样（tuitui_send：链接/卡片/富文本随便发，撤回改消息强通知要 confirm） ──
+  runOptional(logger, 'send tool', () => registerSendTool(ctx, client, logger, (agent) => {
+    if (agent === undefined) return undefined;
+    const record = manager.findByAgent(agent as DshAgent);
+    return record === undefined ? undefined : toSdkTarget(record.replyTarget) ?? undefined;
+  }));
+
+  // ── 机器人自身（tuitui_bot：看身份随便问，改名换头像改菜单要 confirm） ──
+  runOptional(logger, 'bot tool', () => registerBotTool(ctx, client, logger));
 
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void }).effect(() => {
