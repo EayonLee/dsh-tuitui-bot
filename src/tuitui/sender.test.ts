@@ -121,6 +121,25 @@ describe('sendMarkdown', () => {
     expect(result).toEqual({ msgId: 'msg-1' });
   });
 
+  it('正文里的 @昵称 会变成 at 元数据（不然对方收不到通知）', async () => {
+    const { sender, calls } = setup();
+
+    await sender.sendMarkdown(group, '@规矩要立正 你那三条依据自己拆了一半');
+
+    expect(calls[0]?.args).toMatchObject({
+      to: { groupId: 'g-1' },
+      at: ['规矩要立正'],
+    });
+  });
+
+  it('正文 @ 与显式 at 合并去重', async () => {
+    const { sender, calls } = setup();
+
+    await sender.sendMarkdown(group, '@lisi @wangwu 都来', { at: ['lisi'] });
+
+    expect(calls[0]?.args).toMatchObject({ at: ['lisi', 'wangwu'] });
+  });
+
   it('群聊发送带 groupId，@ 列表原样透传', async () => {
     const { sender, calls } = setup();
 

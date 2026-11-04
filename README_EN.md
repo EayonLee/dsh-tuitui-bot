@@ -193,6 +193,7 @@ clearing the box restores the factory default ([source](./src/shared/smart-promp
 | Long-task protection | Sessions whose agent is not idle are never evicted, so long runs are not cut in half |
 | Serial per peer | Messages from one peer queue up (`maxQueue`); different peers do not block each other |
 | Quote resolution | The replied-to message travels along as a quote, so "what it said earlier" style references still resolve |
+| Outbound @ resolution | `@name` in the reply text becomes real Tuitui `at` metadata (code blocks, e-mail addresses and `@all` excluded), merged with any explicit `at`; plain text without `at` never notifies the target |
 | Inbound dedupe | Handled msgids persist to `~/.dsh/tuitui-bot/tuitui-seen.json` (FIFO, 1000), so a reconnect/restart that replays recent messages never double-answers |
 | Zombie connection self-healing | Connected but zero events for 30 minutes ⇒ treated as stale and resubscribed; a `[tuitui/watch]` status line every 5 minutes (uptime / last event / last error / rebuild count) |
 | Turn ceiling | Waiting for a turn to settle is capped at 15 minutes, then logged and released, so one hung turn cannot block a conversation forever |

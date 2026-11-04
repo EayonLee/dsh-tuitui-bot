@@ -16,6 +16,7 @@ import type {
   TuituiSender,
 } from '../types.ts';
 import { extractMessageId, describeApiError } from './client.ts';
+import { mergeMentions } from './mention-parse.ts';
 
 /** 发送器构造参数 */
 export interface TuituiSenderOptions {
@@ -131,11 +132,14 @@ export class TuituiSenderImpl implements TuituiSender {
       }
       const to = toSdkTarget(target);
       if (!to) throw new Error(`unsupported target scope: ${target.scope}`);
+      // 正文里写了 @某某 只算文字，推推要靠 at 元数据才算「真 @」：
+      // 不带上 at，对方收不到通知，别的机器人更是完全看不见。
+      const mentions = mergeMentions(opts?.at, content);
       const response = await this.client.im.sendText({
         to,
         text: content,
         ...(target.msgId ? { referenceMessageId: target.msgId } : {}),
-        ...(opts?.at && opts.at.length > 0 ? { at: opts.at } : {}),
+        ...(mentions.length > 0 ? { at: mentions } : {}),
       });
       return { msgId: extractMessageId(response) };
     } catch (error) {
