@@ -687,7 +687,7 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             onChange: (v) => { patch('smartJudge.prompt', v); },
           }),
           createElement(NumberRow, {
-            label: '判定间隔', value: Math.round((form['smartJudge.cooldownMs'] ?? 20000) / 1000),
+            label: '判定间隔', value: Math.round((form['smartJudge.cooldownMs'] ?? 5000) / 1000),
             min: 0, max: 3600, step: 5, suffix: '秒',
             help: '同一会话两次判定的最小间隔，防止每条消息都调模型。',
             onChange: (v) => { patch('smartJudge.cooldownMs', v * 1000); },
