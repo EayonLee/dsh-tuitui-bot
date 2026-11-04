@@ -56,6 +56,8 @@ interface SetupOptions {
   streaming?: boolean;
   streamIntervalMs?: number;
   textChunkLimit?: number;
+  /** 重试间隔：测试里给 [1, 1]，免得真等 2.4 秒 */
+  retryDelaysMs?: number[];
 }
 
 function setup(over: SetupOptions = {}) {
@@ -67,6 +69,7 @@ function setup(over: SetupOptions = {}) {
     streaming: over.streaming ?? false,
     streamIntervalMs: over.streamIntervalMs ?? 0,
     textChunkLimit: over.textChunkLimit ?? 4000,
+    retryDelaysMs: over.retryDelaysMs ?? [1, 1],
   });
   return { sender, logger, calls };
 }
@@ -216,20 +219,21 @@ describe('sendMarkdown', () => {
     expect(calls[0]?.args.referenceMessageId).toBe('m-origin');
   });
 
-  it('SDK 抛错时记录完整错误并重抛', async () => {
+  it('SDK 抛错时记录完整错误并重抛（5xx 会先重试两回）', async () => {
     const { sender, logger, calls } = setup({
       handlers: { 'im.sendText': () => { throw apiError(); } },
     });
 
     await expect(sender.sendMarkdown(c2c, 'hi')).rejects.toThrow('send failed');
 
-    expect(calls).toHaveLength(1);
-    expect(logger.warn).toHaveBeenCalledTimes(1);
-    const warnText = String(logger.warn.mock.calls[0]?.[0]);
-    expect(warnText).toContain('sendMarkdown failed');
-    expect(warnText).toContain('scope=c2c target=zhangsan');
-    expect(warnText).toContain('trans_id=trans-9');
-    expect(warnText).toContain('errcode=1002');
+    // status=500 属于可重试错误：1 次首发 + 2 次重试
+    expect(calls).toHaveLength(3);
+    const warnLines = logger.warn.mock.calls.map((call) => String(call[0]));
+    expect(warnLines.filter((line) => line.includes('send retry'))).toHaveLength(2);
+    const finalLine = warnLines.find((line) => line.includes('sendMarkdown failed')) ?? '';
+    expect(finalLine).toContain('scope=c2c target=zhangsan');
+    expect(finalLine).toContain('trans_id=trans-9');
+    expect(finalLine).toContain('errcode=1002');
   });
 
   it('帖子目标缺 teamId 时抛错且不调用 teams.sendPost', async () => {
@@ -246,7 +250,7 @@ describe('长文本切分（sendMarkdownChunked + 真实发送器）', () => {
   it('空串不产生任何发送', async () => {
     const { sender, calls } = setup();
 
-    await sendMarkdownChunked(sender, c2c, '', 100);
+    await sendMarkdownChunked(sender, c2c, '', 100, 0);
 
     expect(calls).toHaveLength(0);
   });
@@ -263,7 +267,7 @@ describe('长文本切分（sendMarkdownChunked + 真实发送器）', () => {
     const text = lines.join('\n');
     const limit = 60;
 
-    await sendMarkdownChunked(sender, group, text, limit);
+    await sendMarkdownChunked(sender, group, text, limit, 0);
 
     const sent = calls.map((call) => call.args.text as string);
     expect(sent.length).toBeGreaterThan(1);
@@ -661,5 +665,84 @@ describe('openStream / 流式会话', () => {
     await session.complete();
 
     expect(calls).toHaveLength(1);
+  });
+});
+
+
+describe('发送重试（推推瞬时故障）', () => {
+  /** 造一个带 errcode 的推推错误 */
+  function pushApiError(errcode: number) {
+    return Object.assign(new Error(`消息发送失败 (errcode ${errcode})`), {
+      endpoint: '/message/custom/send',
+      errcode,
+      response: { trans_id: 'tx', errmsg: 'failed' },
+    });
+  }
+
+  it('errcode 10503 连挂两次后成功：重试到第三次，回复不丢', async () => {
+    let attempts = 0;
+    const { sender, calls, logger } = setup({
+      handlers: {
+        'im.sendText': () => {
+          attempts += 1;
+          if (attempts < 3) throw pushApiError(10503);
+          return { msgid: 'ok-after-retry' };
+        },
+      },
+    });
+
+    const result = await sender.sendMarkdown(group, '这条必须发出去');
+
+    expect(result.msgId).toBe('ok-after-retry');
+    expect(calls.filter((c) => c.api === 'im.sendText')).toHaveLength(3);
+    expect(logger.warn).toHaveBeenCalledTimes(2);
+    expect(String(logger.warn.mock.calls[0]?.[0])).toContain('10503');
+  });
+
+  it('重试用尽才失败：三次都挂就抛错，且失败回执照挂', async () => {
+    let attempts = 0;
+    const { sender, calls } = setup({
+      handlers: {
+        'im.sendText': () => {
+          attempts += 1;
+          throw pushApiError(10503);
+        },
+      },
+    });
+
+    await expect(sender.sendMarkdown(group, 'hi')).rejects.toThrow();
+    expect(attempts).toBe(3);
+    expect(calls.filter((c) => c.api === 'im.sendText')).toHaveLength(3);
+  });
+
+  it('参数/权限类错误不重试：重试也是白搭', async () => {
+    let attempts = 0;
+    const { sender } = setup({
+      handlers: {
+        'im.sendText': () => {
+          attempts += 1;
+          throw pushApiError(1002);
+        },
+      },
+    });
+
+    await expect(sender.sendMarkdown(group, 'hi')).rejects.toThrow();
+    expect(attempts).toBe(1);
+  });
+
+  it('网络层错误也重试', async () => {
+    let attempts = 0;
+    const { sender } = setup({
+      handlers: {
+        'im.sendText': () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('fetch failed');
+          return { msgid: 'ok' };
+        },
+      },
+    });
+
+    await expect(sender.sendMarkdown(group, 'hi')).resolves.toMatchObject({ msgId: 'ok' });
+    expect(attempts).toBe(2);
   });
 });

@@ -16,6 +16,8 @@ export interface TuituiSenderOptions {
     streaming: boolean;
     /** 流式刷新节流(ms) */
     streamIntervalMs: number;
+    /** 发送重试间隔（毫秒），测试里传 [1] 避免真等；生产用默认值 */
+    retryDelaysMs?: number[];
     /** 单条文本上限（超出时由调用方切分，这里只做兜底断言） */
     textChunkLimit: number;
 }
@@ -33,7 +35,13 @@ export declare class TuituiSenderImpl implements TuituiSender {
     private readonly logger;
     private readonly streaming;
     private readonly streamIntervalMs;
+    private readonly retryDelaysMs;
     constructor(options: TuituiSenderOptions);
+    /**
+     * 可重试的发送：临时故障重试，别把已经生成好的回复直接扔掉。
+     * 只重试"明显是瞬时"的错误，参数/权限类错误重试也是白搭。
+     */
+    private withRetry;
     /** 统一失败日志（推推错误必须完整记录，含 trans_id） */
     private warnFailure;
     sendMarkdown(target: ReplyTarget, content: string, opts?: {
