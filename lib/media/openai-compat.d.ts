@@ -69,6 +69,12 @@ export interface ProbeResult {
  * 连接测试：先探 /models（最轻、不花钱），探不到再对这个端点做一次最小调用。
  * 任何情况下都不回显密钥。
  */
+/**
+ * 探活：只用 `GET /models` 验证「地址通、密钥对」。
+ *
+ * 刻意不碰 `/chat/completions` 和 `/images/generations`：那是要花钱、要跑模型的活，
+ * 一个「测试连接」按钮不该顺手消耗额度，也不该因为模型参数不对而报"连接失败"。
+ */
 export declare function probeEndpoint(config: ImageModelConfig & {
     timeoutMs?: number;
 }, 

@@ -34,13 +34,14 @@ import type {
   ReplyTarget,
 } from '../types.ts';
 import { getScopePeer, resolveScopeStrategy } from '../shared/index.ts';
+import { getHistoryDelivered, markHistoryDelivered, undeliveredHistory } from '../features/history-store.ts';
 import {
   classifyContentType,
   isVoiceContentType,
   mediaFilename,
   type MediaKind,
 } from './attachment.ts';
-import { getHistoryDelivered, markHistoryDelivered, undeliveredHistory } from '../features/history-store.ts';
+
 
 /**
  * 等这一轮收敛的上限。
@@ -105,7 +106,7 @@ export async function handleInbound(
   const replyTarget: ReplyTarget = ctx.replyTarget;
 
   // ── 组装 agentBody（下载结果经 state.downloadedFiles 提供） ──
-  const agentBody = assembleAgentBody(msg, state, scope, logger, config.appId, config.historyMode ?? 'window');
+  const agentBody = assembleAgentBody(msg, state, scope, logger, config.appId, config.historyMode ?? 'delta');
 
   if (!agentBody) return;
 
@@ -184,8 +185,8 @@ export async function handleInbound(
   record.agent.followup(message);
   logger.info(`→ followup sent: key=${scope}:${peerId}`);
 
-  // 投递成功才推进水位线：这一条之后的群聊消息，下次才会再灌给模型。
-  // 清空整桶的老做法已经去掉——那会让「50 条上下文」永远凑不满。
+  // 历史缓冲不清空（清空会让「设置 50 条」永远凑不满，线上实测只有 0~19 条），
+  // 但 delta 模式要把「已经投递过的」记下来，下一轮才不会重复灌同一批。
   const historyKey = historyKeyOf(msg, scope);
   const lastHistory = state.history?.[state.history.length - 1];
   if (historyKey !== undefined && lastHistory !== undefined) {
@@ -233,14 +234,12 @@ function assembleAgentBody(
 
   const base = dynamicCtx ? `${dynamicCtx}${userMessage}` : userMessage;
 
-  // 两种注入方式：
-  //   window —— 每次带上最近 N 条，跟别的机器人一样直观（也允许同一句在会话记忆里再出现一次）
-  //   delta  —— 只补水位线之后的新消息，省 token、不重复
+  // delta（默认）：只补水位线之后的新消息，同一批内容不重复灌；
+  // window：每次带整窗最近 N 条，跟别的机器人一样直观。
   const historyKey = historyKeyOf(msg, scope);
   const pending = historyKey === undefined || historyMode === 'window'
     ? state.history
     : undeliveredHistory(state.history ?? [], getHistoryDelivered(appId, historyKey));
-  // 回写给 state：投递完成后 markHistoryDelivered 要用它算新的水位线
   state.history = pending;
   return buildAgentBody(base, pending, multiUser, wasMentioned);
 }

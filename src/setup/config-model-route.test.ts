@@ -169,6 +169,34 @@ describe('POST /test-model 连接测试', () => {
     expect(auth).toBe('Bearer sk-typed');
   });
 
+  it('没填地址 / 没填也存不到密钥时，直接给出可读的失败原因', async () => {
+    const { call } = harness({ ...saved, vision: { ...saved.vision, baseUrl: '', apiKey: '' } });
+
+    const noUrl = await call(TEST_MODEL_PATH, makeReq('POST', { kind: 'vision', baseUrl: '', model: 'm' }));
+    expect(noUrl.statusCode).toBe(200);
+    expect(noUrl.json()).toMatchObject({ ok: false });
+    expect(noUrl.json().detail).toContain('先填地址');
+
+    const noKey = await call(TEST_MODEL_PATH, makeReq('POST', { kind: 'vision', baseUrl: 'https://x.example/v1', model: 'm', apiKey: '' }));
+    expect(noKey.json()).toMatchObject({ ok: false });
+    expect(noKey.json().detail).toContain('先填密钥');
+  });
+
+  it('只探 /models，不碰 chat 与 images', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(String(url));
+      return { ok: true, status: 200, text: async () => JSON.stringify({ data: [] }) };
+    });
+
+    const { call } = harness(saved);
+    await call(TEST_MODEL_PATH, makeReq('POST', { kind: 'image', baseUrl: 'https://llm.api.zyuncs.com/v1', model: saved.imageGeneration.model }));
+
+    expect(urls).toHaveLength(1);
+    expect(urls[0]?.endsWith('/models')).toBe(true);
+    expect(urls.some((u) => u.includes('images') || u.includes('chat'))).toBe(false);
+  });
+
   it('kind 非法 / 方法不对 / 跨源都拒绝', async () => {
     const { call } = harness(saved);
     expect((await call(TEST_MODEL_PATH, makeReq('POST', { kind: 'audio' }))).statusCode).toBe(400);
