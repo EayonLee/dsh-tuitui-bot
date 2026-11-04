@@ -218,6 +218,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
 | `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
 | `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true` |
+| `tuitui_teams` | 团队频道：`channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` 只读；`send_post` / `edit_post` / `send_file` 要 `confirm=true` |
 | `tuitui_bot` | 机器人自身：`info` / `get_shortcuts` 只读；`set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` 要 `confirm=true` |
 
 > 写操作统一规则：不带 `confirm=true` 直接报错退回。模型自己不会"顺手"改群、改身份、发强通知——

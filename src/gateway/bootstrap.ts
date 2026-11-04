@@ -31,6 +31,7 @@ import { registerHistoryTool } from '../tuitui/history-tool.ts';
 import { registerFileTool } from '../tuitui/file-tool.ts';
 import { registerSendTool } from '../tuitui/message-tool.ts';
 import { registerBotTool } from '../tuitui/bot-tool.ts';
+import { registerTeamsTool } from '../tuitui/teams-tool.ts';
 import { getJudgeHistoryStore, historyGroupKey } from '../features/history-store.ts';
 import { settleReceipt } from '../features/receipt-registry.ts';
 import { describeGroupEvent, recordGroupEvent } from '../tuitui/group-events.ts';
@@ -371,6 +372,9 @@ export async function bootstrapGateway(
 
   // ── 机器人自身（tuitui_bot：看身份随便问，改名换头像改菜单要 confirm） ──
   runOptional(logger, 'bot tool', () => registerBotTool(ctx, client, logger));
+
+  // ── 团队频道（tuitui_teams：频道/帖子/成员只读，发帖改帖传文件要 confirm） ──
+  runOptional(logger, 'teams tool', () => registerTeamsTool(ctx, client, logger));
 
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void }).effect(() => {
