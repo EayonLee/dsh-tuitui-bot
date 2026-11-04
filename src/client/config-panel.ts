@@ -44,6 +44,7 @@ interface ConfigWire {
   showToolResults?: boolean;
   debug?: boolean;
   historyLimit?: number;
+  historyMode?: 'window' | 'delta';
   sessionIdleTimeout?: number;
   'access.c2cMode'?: AccessMode;
   'access.groupMode'?: AccessMode;
@@ -77,6 +78,12 @@ const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
   { value: 'allowlist', label: '白名单' },
   { value: 'blocklist', label: '黑名单' },
   { value: 'disabled', label: '禁用' },
+];
+
+/** 历史注入方式：默认「最近 N 条」，跟别的机器人一致，最直观 */
+const HISTORY_MODE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'window', label: '最近 N 条（每次都被叫到都带一整窗）' },
+  { value: 'delta', label: '只补没看过的（省 token，不重复）' },
 ];
 
 const CONCURRENCY_OPTIONS: ReadonlyArray<{ value: ConcurrencyStrategy; label: string }> = [
@@ -1030,8 +1037,13 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     },
       createElement(NumberRow, {
         label: '群聊上下文条数', value: form.historyLimit ?? 50, min: 0, max: 1000, step: 1, suffix: '条',
-        help: '被叫到时附带最近 N 条群消息（滚动保留，回完不清空，只补没给模型看过的新消息）；0 表示不带。私聊靠会话自身记忆，不受影响。',
+        help: '被叫到时附带最近 N 条群消息；0 表示不带。私聊靠会话自身记忆，不受影响。',
         onChange: (v) => { patch('historyLimit', v); },
+      }),
+      createElement(SelectRow, {
+        label: '怎么带历史', value: form.historyMode ?? 'window', options: HISTORY_MODE_OPTIONS,
+        help: '「最近 N 条」= 每次被叫到都带一整窗，最直观；「只补没看过的」= 同一批消息只灌一次，省 token 但有时看不到前面几句。',
+        onChange: (v) => { patch('historyMode', v as 'window' | 'delta'); },
       }),
       createElement(NumberRow, {
         label: '闲置回收', value: Math.round((form.sessionIdleTimeout ?? 1800000) / 60000),

@@ -20,12 +20,13 @@ vi.mock('../features/history-store.ts', () => ({
   // 单测里水位线默认不生效：原样返回，断言"历史有没有进 prompt"
   undeliveredHistory: vi.fn((entries: unknown[]) => entries),
 }));
-import { clearGroupHistory, markHistoryDelivered } from '../features/history-store.ts';
+import { clearGroupHistory, markHistoryDelivered, undeliveredHistory } from '../features/history-store.ts';
 
 const logger: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 const config = {
   appId: 'app-1',
   concurrency: { c2c: 'abort', group: 'queue', post: 'queue' },
+  historyMode: 'window',
 } as unknown as ImTuituiConfig;
 
 function createMessage(over: Partial<InboundMessage> = {}): InboundMessage {
@@ -255,6 +256,47 @@ describe('handleInbound: 内容组装', () => {
     expect(followedText(record)).toContain('[张三 (zhangsan) · 鱼塘] 看下这个');
     // 没有历史条目可推进，也不该去清缓冲
     expect(clearGroupHistory).not.toHaveBeenCalled();
+  });
+
+  it('window 模式：水位线不影响，历史照带（最近 N 条那种直觉）', async () => {
+    const { manager, record } = createManager();
+    const ctx = createCtx(
+      createMessage({ kind: 'group', groupId: 'g-10', content: '继续' }),
+      {
+        mention: { wasMentioned: true },
+        history: [
+          { senderId: 'u-2', senderName: '李四', content: '甲', timestamp: 1, messageId: 'h1' },
+          { senderId: 'u-3', senderName: '王五', content: '乙', timestamp: 2, messageId: 'h2' },
+        ],
+      },
+    );
+
+    await handleInbound(ctx, manager, config, logger);
+
+    const text = followedText(record);
+    expect(text).toContain('[李四 (u-2)] 甲');
+    expect(text).toContain('[王五 (u-3)] 乙');
+    // window 模式不参与"只补新的"逻辑
+    expect(undeliveredHistory).not.toHaveBeenCalled();
+  });
+
+  it('delta 模式：只取水位线之后的新消息', async () => {
+    const deltaConfig = { ...config, historyMode: 'delta' } as unknown as ImTuituiConfig;
+    const { manager, record } = createManager();
+    const ctx = createCtx(
+      createMessage({ kind: 'group', groupId: 'g-11', content: '继续' }),
+      {
+        mention: { wasMentioned: true },
+        history: [
+          { senderId: 'u-2', senderName: '李四', content: '甲', timestamp: 1, messageId: 'h1' },
+        ],
+      },
+    );
+
+    await handleInbound(ctx, manager, deltaConfig, logger);
+
+    expect(undeliveredHistory).toHaveBeenCalled();
+    expect(followedText(record)).toContain('[李四 (u-2)] 甲');
   });
 
   it('带历史时推进水位线到最后一条历史，避免下次重复灌', async () => {

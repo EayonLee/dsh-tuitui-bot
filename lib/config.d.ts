@@ -180,6 +180,8 @@ export interface ImTuituiConfig {
     askTimeoutMs: number;
     /** 群历史缓冲条数 */
     historyLimit: number;
+    /** 历史注入方式：window=每次带最近 N 条（别人家那种，直观）；delta=只补没投递过的新消息（省 token） */
+    historyMode: 'window' | 'delta';
     /** 访问控制 */
     access: AccessControlConfig;
     /** 是否展示工具调用成功结果（工具错误始终展示） */
