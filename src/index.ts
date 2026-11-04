@@ -12,6 +12,7 @@ import { bootstrapGateway } from './gateway/index.ts';
 import type { DshAgentRegistry } from './session/index.ts';
 import { getProfileDir, resolveEnv } from './shared/index.ts';
 import { ensureCredentials, persistCredentialsToProfile, registerBoundCredentialRoutes } from './setup/index.ts';
+import { withFileLog } from './shared/index.ts';
 import type { Logger } from './types.ts';
 
 // ── Cordis 插件元数据 ──
@@ -28,7 +29,9 @@ export const APP_SECRET_ENV = 'TUITUI_BOT_SECRET';
 // ── 插件主体 ──
 export async function apply(ctx: Context, config: ImTuituiConfig): Promise<void> {
   const agents = (ctx as unknown as Record<string, unknown>).agents as DshAgentRegistry;
-  const logger: Logger = ((ctx as unknown as Record<string, unknown>).logger as Logger) ?? console;
+  // 宿主 logger 转发 + 自己落一份到 ~/.dsh/tuitui.log（排查「为什么没回」靠它）
+  const baseLogger: Logger = ((ctx as unknown as Record<string, unknown>).logger as Logger) ?? console;
+  const logger: Logger = withFileLog(baseLogger);
 
   const appId = resolveEnv(config.appId, APP_ID_ENV);
   const appSecret = resolveEnv(config.appSecret, APP_SECRET_ENV);

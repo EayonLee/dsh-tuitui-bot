@@ -5,4 +5,5 @@ export { getProfileDir, resolveEnv, formatRelativeTime, buildUserAgent, PLUGIN_V
 export { getScopePeer } from './scope.ts';
 export { PLUGIN_HOME, MEDIA_DIR, resolveAgentCwd } from './dirs.ts';
 export { sendMarkdownChunked } from './send-helper.ts';
+export { withFileLog } from './log-file.ts';
 //# sourceMappingURL=index.d.ts.map
