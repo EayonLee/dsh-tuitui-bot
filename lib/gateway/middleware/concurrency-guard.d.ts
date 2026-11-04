@@ -31,6 +31,8 @@ export type ConcurrencyStrategy = 'queue' | 'drop' | 'abort' | 'merge';
 export interface ConcurrencyGuardOptions {
     /** 忙时策略，默认 queue */
     strategy?: ConcurrencyStrategy;
+    /** 按消息挑策略（覆盖 strategy）：比如群聊排队、私聊直接打断 */
+    strategyFor?: (ctx: MiddlewareContext) => ConcurrencyStrategy;
     /**
      * 单条消息最长处理时长(ms)，超时中断并放行队列；0 = 不限（默认 0）。
      * 上限保护的是「模型卡死导致这个 peer 永久占锁」。

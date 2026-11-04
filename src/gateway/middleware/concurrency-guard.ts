@@ -33,6 +33,8 @@ export type ConcurrencyStrategy = 'queue' | 'drop' | 'abort' | 'merge';
 export interface ConcurrencyGuardOptions {
   /** 忙时策略，默认 queue */
   strategy?: ConcurrencyStrategy;
+  /** 按消息挑策略（覆盖 strategy）：比如群聊排队、私聊直接打断 */
+  strategyFor?: (ctx: MiddlewareContext) => ConcurrencyStrategy;
   /**
    * 单条消息最长处理时长(ms)，超时中断并放行队列；0 = 不限（默认 0）。
    * 上限保护的是「模型卡死导致这个 peer 永久占锁」。
@@ -73,7 +75,7 @@ interface TargetState {
 }
 
 export function concurrencyGuard(options: ConcurrencyGuardOptions = {}): Middleware {
-  const strategy = options.strategy ?? 'queue';
+  const defaultStrategy = options.strategy ?? 'queue';
   const maxQueue = options.maxQueue ?? 3;
   const maxProcessingMs = options.maxProcessingMs ?? 0;
   const log = options.logger;
@@ -179,6 +181,8 @@ export function concurrencyGuard(options: ConcurrencyGuardOptions = {}): Middlew
   const guard: Middleware = async (ctx, next) => {
     const key = targetKey(ctx);
     const state = getState(key);
+    // 策略可以按消息挑：群里排队、私聊直接打断——同一个 peer 的策略是稳定的
+    const strategy = options.strategyFor?.(ctx) ?? defaultStrategy;
 
     // ── 空闲：自己就是 owner，直接跑 ──
     if (!state.busy) {

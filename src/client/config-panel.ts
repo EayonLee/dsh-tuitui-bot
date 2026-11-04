@@ -26,6 +26,9 @@ type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
 /** 触发方式三档 */
 type MentionPolicy = 'require' | 'always' | 'smart';
 
+/** 同一会话忙时的处理方式 */
+type ConcurrencyStrategy = 'queue' | 'abort' | 'drop' | 'merge';
+
 /** GET 回显 / POST 提交的扁平配置（appSecret 已剔除） */
 interface ConfigWire {
   provider?: string;
@@ -58,6 +61,9 @@ interface ConfigWire {
   'smartJudge.timeoutMs'?: number;
   'interactive.enabled'?: boolean;
   'agentSteps.enabled'?: boolean;
+  'concurrency.c2c'?: ConcurrencyStrategy;
+  'concurrency.group'?: ConcurrencyStrategy;
+  'concurrency.post'?: ConcurrencyStrategy;
   'reactions.enabled'?: boolean;
   'reactions.inGroup'?: boolean;
   'reactions.ack'?: string;
@@ -70,6 +76,13 @@ const MODE_OPTIONS: ReadonlyArray<{ value: AccessMode; label: string }> = [
   { value: 'allowlist', label: '白名单' },
   { value: 'blocklist', label: '黑名单' },
   { value: 'disabled', label: '禁用' },
+];
+
+const CONCURRENCY_OPTIONS: ReadonlyArray<{ value: ConcurrencyStrategy; label: string }> = [
+  { value: 'queue', label: '排队' },
+  { value: 'abort', label: '打断' },
+  { value: 'merge', label: '合并' },
+  { value: 'drop', label: '丢弃' },
 ];
 
 const POLICY_OPTIONS: ReadonlyArray<{ value: MentionPolicy; label: string }> = [
@@ -779,6 +792,21 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             ? '不 @ 也不看名字：模型读上下文，自己决定说话、挂个表情、还是一声不吭。'
             : '群里每条消息都回——建议只用在专用小群。',
         onChange: (v) => { patch('mentionPolicy', v as MentionPolicy); },
+      }),
+      createElement(SelectRow, {
+        label: '单聊忙时', value: form['concurrency.c2c'] ?? 'abort', options: CONCURRENCY_OPTIONS,
+        help: '私聊正在回上一句时又来一句：打断＝放弃旧的直接接新话，最像真人聊天。',
+        onChange: (v) => { patch('concurrency.c2c', v as ConcurrencyStrategy); },
+      }),
+      createElement(SelectRow, {
+        label: '群聊忙时', value: form['concurrency.group'] ?? 'queue', options: CONCURRENCY_OPTIONS,
+        help: '群里任务多，默认排一条条处理；打断会让正在跑的活白跑。',
+        onChange: (v) => { patch('concurrency.group', v as ConcurrencyStrategy); },
+      }),
+      createElement(SelectRow, {
+        label: '帖子忙时', value: form['concurrency.post'] ?? 'queue', options: CONCURRENCY_OPTIONS,
+        help: '团队频道帖子的处理方式，默认排队。',
+        onChange: (v) => { patch('concurrency.post', v as ConcurrencyStrategy); },
       }),
     ),
 

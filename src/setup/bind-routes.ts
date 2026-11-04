@@ -149,6 +149,15 @@ function emojiSchema(value: unknown, name: string): unknown {
   return trimmed;
 }
 
+const CONCURRENCY_STRATEGIES = ['queue', 'drop', 'abort', 'merge'] as const;
+
+function strategySchema(value: unknown, name: string): unknown {
+  if (typeof value !== 'string' || !(CONCURRENCY_STRATEGIES as readonly string[]).includes(value)) {
+    throw new TypeError(`${name} 必须是 queue / drop / abort / merge`);
+  }
+  return value;
+}
+
 function mentionPolicySchema(value: unknown): unknown {
   if (value !== 'require' && value !== 'always' && value !== 'smart') {
     throw new TypeError('mentionPolicy 必须是 require / always / smart');
@@ -178,6 +187,7 @@ const EDITABLE_CONFIG_KEYS = [
   'smartJudge.cooldownMs', 'smartJudge.timeoutMs',
   'interactive.enabled', 'agentSteps.enabled',
   'reactions.enabled', 'reactions.inGroup', 'reactions.ack', 'reactions.done', 'reactions.fail',
+  'concurrency.c2c', 'concurrency.group', 'concurrency.post',
   'sendFile.restrictPaths',
 ] as const;
 
@@ -214,6 +224,9 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'smartJudge.maxHistory': numberSchema('smartJudge.maxHistory', 0, 50),
   'smartJudge.cooldownMs': numberSchema('smartJudge.cooldownMs', 0, 60 * 60 * 1000),
   'smartJudge.timeoutMs': numberSchema('smartJudge.timeoutMs', 1000, 120000),
+  'concurrency.c2c': (v) => strategySchema(v, 'concurrency.c2c'),
+  'concurrency.group': (v) => strategySchema(v, 'concurrency.group'),
+  'concurrency.post': (v) => strategySchema(v, 'concurrency.post'),
   'reactions.enabled': (v) => booleanSchema(v, 'reactions.enabled'),
   'reactions.inGroup': (v) => booleanSchema(v, 'reactions.inGroup'),
   'reactions.ack': (v) => emojiSchema(v, 'reactions.ack'),

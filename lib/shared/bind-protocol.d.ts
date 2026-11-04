@@ -77,6 +77,9 @@ export interface ConfigPatchWire {
     'access.postAllow'?: string[];
     'access.postBlock'?: string[];
     mentionPolicy?: 'require' | 'always' | 'smart';
+    'concurrency.c2c'?: 'queue' | 'drop' | 'abort' | 'merge';
+    'concurrency.group'?: 'queue' | 'drop' | 'abort' | 'merge';
+    'concurrency.post'?: 'queue' | 'drop' | 'abort' | 'merge';
     'interactive.enabled'?: boolean;
     'agentSteps.enabled'?: boolean;
 }

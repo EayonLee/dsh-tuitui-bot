@@ -16,6 +16,53 @@ function makeRecorder() {
   return { calls, handlerFor };
 }
 
+describe('strategyFor（按作用域分开）', () => {
+  it('群聊走 queue、私聊走 abort：同一时刻两条消息不会被合并', async () => {
+    const guard = concurrencyGuard({
+      strategy: 'merge',
+      strategyFor: (ctx) => (ctx.message.kind === 'c2c' ? 'abort' : 'queue'),
+    });
+    const gate = createGate();
+    const calls: string[] = [];
+
+    const groupCtx = makeCtx(makeMessage({ messageId: 'g1', groupId: 'g-1' }));
+    const runGroup = guard(groupCtx, async () => {
+      calls.push('group-enter');
+      await gate.wait;
+      calls.push('group-exit');
+    });
+
+    // 群里再来一条：排队，不会立刻进下游
+    const groupCtx2 = makeCtx(makeMessage({ messageId: 'g2', groupId: 'g-1', content: '第二条' }));
+    const runGroup2 = guard(groupCtx2, async () => { calls.push('group-2'); });
+    await Promise.resolve();
+    expect(calls).toEqual(['group-enter']);
+
+    gate.open();
+    await Promise.all([runGroup, runGroup2]);
+    expect(calls).toEqual(['group-enter', 'group-exit', 'group-2']);
+  });
+
+  it('私聊用 abort 时，正在跑的那条会被 skip 掉', async () => {
+    const guard = concurrencyGuard({ strategyFor: () => 'abort' });
+    const gate = createGate();
+    const interrupts: string[] = [];
+
+    const first = makeCtx(makeMessage({ kind: 'c2c', eventType: 'c2c_chat', messageId: 'c1', senderId: 'u1' }));
+    const runFirst = guard(first, async () => { await gate.wait; });
+    await Promise.resolve();
+
+    const second = makeCtx(makeMessage({ kind: 'c2c', eventType: 'c2c_chat', messageId: 'c2', senderId: 'u1' }));
+    const runSecond = guard(second, async () => { interrupts.push('second-ran'); });
+    await Promise.resolve();
+
+    expect(first.skipped).toBe('concurrency:abort');
+    gate.open();
+    await Promise.all([runFirst, runSecond]);
+    expect(interrupts).toEqual(['second-ran']);
+  });
+});
+
 describe('concurrencyGuard', () => {
   it('空闲目标立即处理，不缓冲', async () => {
     const guard = concurrencyGuard({ strategy: 'merge' });

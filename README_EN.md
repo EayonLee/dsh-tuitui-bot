@@ -109,6 +109,9 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 | `smartJudge.prompt` | built-in | **Judging prompt, fully editable** (Settings UI; empty restores default) |
 | `smartJudge.maxHistory` | `50` | History messages handed to the model |
 | `smartJudge.cooldownMs` | `5000` | Minimum gap between judgements per conversation |
+| `concurrency.c2c` | `abort` | Direct chats: interrupt the running turn and take the new message (queue / drop / merge also available) |
+| `concurrency.group` | `queue` | Groups: process one at a time |
+| `concurrency.post` | `queue` | Team posts: process one at a time |
 | `reactions.enabled` | `true` | React on receipt (working / done / failed) |
 | `reactions.inGroup` | `true` | Also react in groups |
 | `reactions.ack` / `done` / `fail` | `👀` / `✅` / `😵` | Emoji per stage; empty disables it |

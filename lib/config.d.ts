@@ -5,6 +5,7 @@
  * agent 步骤上报）、以及指向推推服务端的地址覆盖。
  */
 import Schema from '@deepseek-ai/schemastery';
+import type { ConcurrencyStrategy } from './gateway/middleware/concurrency-guard.ts';
 /** 单个作用域的访问模式：开放 / 仅白名单 / 仅排除黑名单 / 全拒 */
 export type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
 export interface AccessControlConfig {
@@ -107,6 +108,15 @@ export interface ImTuituiConfig {
         cooldownMs: number;
         /** 判定提示词（设置页可编辑，出厂值见 DEFAULT_SMART_PROMPT） */
         prompt: string;
+    };
+    /** 同一会话同时来多条消息时的处理方式（按作用域分开） */
+    concurrency: {
+        /** 单聊：默认打断前一条，直接接新话 */
+        c2c: ConcurrencyStrategy;
+        /** 群聊：默认排队，一条条来 */
+        group: ConcurrencyStrategy;
+        /** 团队帖子：默认排队 */
+        post: ConcurrencyStrategy;
     };
     /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
     reactions: {

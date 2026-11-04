@@ -6,6 +6,7 @@
  */
 import Schema from '@deepseek-ai/schemastery';
 import { DEFAULT_SMART_PROMPT } from './shared/smart-prompt.ts';
+import type { ConcurrencyStrategy } from './gateway/middleware/concurrency-guard.ts';
 
 /** 单个作用域的访问模式：开放 / 仅白名单 / 仅排除黑名单 / 全拒 */
 export type AccessMode = 'open' | 'allowlist' | 'blocklist' | 'disabled';
@@ -118,6 +119,15 @@ export interface ImTuituiConfig {
     /** 判定提示词（设置页可编辑，出厂值见 DEFAULT_SMART_PROMPT） */
     prompt: string;
   };
+  /** 同一会话同时来多条消息时的处理方式（按作用域分开） */
+  concurrency: {
+    /** 单聊：默认打断前一条，直接接新话 */
+    c2c: ConcurrencyStrategy;
+    /** 群聊：默认排队，一条条来 */
+    group: ConcurrencyStrategy;
+    /** 团队帖子：默认排队 */
+    post: ConcurrencyStrategy;
+  };
   /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
   reactions: {
     /** 总开关 */
@@ -205,6 +215,11 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     cooldownMs: Schema.number().default(5000).description('同一会话两次判定的最小间隔(ms)'),
     prompt: Schema.string().default(DEFAULT_SMART_PROMPT).description('智能插话判定的提示词（设置页可编辑）'),
   }).description('智能插话判定参数（smart 触发方式专用）'),
+  concurrency: Schema.object({
+    c2c: Schema.union(['queue', 'drop', 'abort', 'merge']).default('abort').description('单聊忙时：默认打断前一条直接接新话'),
+    group: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('群聊忙时：默认排队，一条条来'),
+    post: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('团队帖子忙时：默认排队'),
+  }).description('同一会话多条消息的处理方式'),
   reactions: Schema.object({
     enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),
     inGroup: Schema.boolean().default(true).description('群聊里也挂表情回执（默认给，省得以为机器人卡死）'),
