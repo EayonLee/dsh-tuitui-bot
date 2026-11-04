@@ -63,6 +63,13 @@ export interface HistoryBufferOptions {
   recordOnSkip?: boolean;
   /** 分桶键推导，默认群按 groupId、帖子按 team/channel，单聊不记账 */
   groupKey?: (ctx: MiddlewareContext) => string | undefined;
+  /**
+   * 只加不删的镜像存储。
+   *
+   * 主存储会在回复后被清空（避免下一轮 prompt 重复灌旧消息），但智能判定需要
+   * 一段连续上下文，于是同一条消息再往镜像里记一份，镜像永不清理。
+   */
+  mirrorStore?: HistoryStore;
   logger?: Logger;
 }
 
@@ -110,6 +117,8 @@ export function historyBuffer(options: HistoryBufferOptions = {}): Middleware {
     };
     try {
       await store.append(key, entry, limit);
+      // 镜像照记不误：判定要看连续上下文，且镜像永不被 clear 清掉
+      await options.mirrorStore?.append(key, entry, limit);
     } catch (err) {
       // 记账失败不能阻断消息处理：宁可这轮少点上下文，也别让用户没回应
       log?.error(`[history-buffer] 写入历史失败: ${err instanceof Error ? err.message : String(err)}`);

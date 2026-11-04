@@ -10,7 +10,7 @@ import type { ImTuituiConfig } from '../config.ts';
 import type { Logger, MiddlewareContext } from '../types.ts';
 import type { SessionManager } from '../session/index.ts';
 import type { CommandEntry } from '../commands/index.ts';
-import { getHistoryStore, historyGroupKey } from '../features/history-store.ts';
+import { getHistoryStore, getJudgeHistoryStore, historyGroupKey } from '../features/history-store.ts';
 import { judgeShouldJoin, type JudgeLine } from '../features/smart-judge.ts';
 import { getScopePeer, resolveScopeStrategy } from '../shared/index.ts';
 import {
@@ -99,7 +99,8 @@ async function smartReplyProbe(
   if (route === undefined) return say(false, 'no-route', ' hint=该会话没有可用模型');
 
   const key = probeHistoryKey(ctx, config);
-  const recent = key === undefined ? [] : getHistoryStore().list(key, deps.settings.maxHistory);
+  // 用「只加不删」的判定历史：普通历史回复后会被清空，用它判断瞎子摸象
+  const recent = key === undefined ? [] : getJudgeHistoryStore().list(key, deps.settings.maxHistory);
   const history: JudgeLine[] = recent.map((entry) => ({
     sender: entry.senderName === undefined || entry.senderName === '' ? entry.senderId : entry.senderName,
     text: entry.content,
@@ -171,6 +172,9 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
   kernel.use(historyBuffer({
     limit: config.historyLimit,
     store: getHistoryStore(),
+    // 判定另存一份永不清理的镜像：普通历史回复后就清空了，
+    // 判定拿那份当上下文，等于每轮只看得到上一条消息。
+    mirrorStore: getJudgeHistoryStore(),
     recordOnSkip: true,
     groupKey: (ctx) => {
       if (ctx.message.kind === 'group' && ctx.message.groupId) {

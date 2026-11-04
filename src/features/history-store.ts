@@ -58,11 +58,30 @@ export class MemoryHistoryStore implements HistoryStore {
 }
 
 let _store: HistoryStore | null = null;
+let _judgeStore: HistoryStore | null = null;
 
 /** 获取共享历史存储（单例：中间件与出站清理必须看到同一份数据） */
 export function getHistoryStore(): HistoryStore {
   if (!_store) _store = new MemoryHistoryStore();
   return _store;
+}
+
+/**
+ * 判定专用的历史存储（只加不删）。
+ *
+ * 普通历史在回复完就被 `clearGroupHistory` 清掉——那是为了不让下一轮 prompt
+ * 重复灌一遍旧群聊。但智能判定要看的就是「刚才你们在聊什么」，跟着一起被清空
+ * 的话，每轮判定只能看到上一条消息，判断自然发傻。所以判定单独留一份环形缓冲。
+ */
+export function getJudgeHistoryStore(): HistoryStore {
+  if (!_judgeStore) _judgeStore = new MemoryHistoryStore();
+  return _judgeStore;
+}
+
+/** 测试用：清掉单例，避免用例之间互相污染 */
+export function resetHistoryStores(): void {
+  _store = null;
+  _judgeStore = null;
 }
 
 /**

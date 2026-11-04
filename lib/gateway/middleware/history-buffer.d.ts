@@ -36,6 +36,13 @@ export interface HistoryBufferOptions {
     recordOnSkip?: boolean;
     /** 分桶键推导，默认群按 groupId、帖子按 team/channel，单聊不记账 */
     groupKey?: (ctx: MiddlewareContext) => string | undefined;
+    /**
+     * 只加不删的镜像存储。
+     *
+     * 主存储会在回复后被清空（避免下一轮 prompt 重复灌旧消息），但智能判定需要
+     * 一段连续上下文，于是同一条消息再往镜像里记一份，镜像永不清理。
+     */
+    mirrorStore?: HistoryStore;
     logger?: Logger;
 }
 /**
