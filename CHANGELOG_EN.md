@@ -16,7 +16,9 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   actually installed in the profile (read from disk), and a one-click check against GitHub Release /
   main / jsDelivr taking the highest answer (6 h cache; a failed check reports the failure instead
   of claiming to be up to date).
-- Optional in-place update (#27, config key `selfUpdate.enabled`, off by default): it only accepts
+- The update entry lives at the right end of the "bound" status row (same line as *Change
+  credentials* / *Unbind*), not in its own settings block; enabled by default
+  (`selfUpdate.enabled: false` keeps the check but disables installing). It only accepts
   `dsh-tuitui-bot-<version>.tgz` from this repository's releases, verifies sha256, backs up the
   previous directory, runs `pnpm add`, and re-adds the profile's `dsh.profile.bundles` entry. When
   the host provides `@deepseek-ai/dsh-hmr` it calls `reconcileProfile` to hot-reload the plugin so

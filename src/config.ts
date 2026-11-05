@@ -264,8 +264,8 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     post: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('团队帖子忙时：默认排队'),
   }).description('同一会话多条消息的处理方式'),
   selfUpdate: Schema.object({
-    enabled: Schema.boolean().default(false).description('设置页允许一键更新（下载 Release 包并热重载；默认关）'),
-    channel: Schema.union(['release', 'main']).default('release').description('对比更新的来源：release=GitHub 正式发布 / main=仓库主干'),
+    enabled: Schema.boolean().default(true).description('一键更新开关：装 Release 包并热重载。默认开；设 false 可让设置页只能看版本、不能装'),
+    channel: Schema.union(['release', 'main']).default('release').description('对比更新的来源：release=GitHub 正式发布（默认）/ main=仓库主干'),
   }).description('自更新'),
   reactions: Schema.object({
     enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),

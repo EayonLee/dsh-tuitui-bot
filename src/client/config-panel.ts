@@ -18,16 +18,6 @@
  */
 import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { BIND_CONFIG_PATH, TEST_MODEL_PATH, type ConfigPatchWire } from '../shared/bind-protocol.ts';
-import {
-  ABOUT_PATH,
-  REPO_URL,
-  UPDATE_APPLY_PATH,
-  UPDATE_CHECK_PATH,
-  UPDATE_REQUEST_HEADER,
-  type AboutWire,
-  type UpdateApplyWire,
-  type UpdateStatusWire,
-} from '../shared/about-protocol.ts';
 import { DEFAULT_SMART_PROMPT } from '../shared/smart-prompt.ts';
 import { interpretTestResponse } from '../shared/probe-result.ts';
 import { KNOWN_EMOJI_NAMES } from '../tuitui/emoji.ts';
@@ -81,9 +71,6 @@ const POLICY_OPTIONS: ReadonlyArray<{ value: MentionPolicy; label: string }> = [
 
 /** 样式注入标记（幂等） */
 const STYLE_ID = 'im-tuitui-config-panel-styles';
-
-/** GitHub 徽标路径（官方 mark，16×16）：内联 SVG，不引任何外链资源 */
-const GITHUB_MARK_PATH = 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z';
 
 const PANEL_CSS: readonly string[] = [
   /* ── 容器 ── */
@@ -279,24 +266,6 @@ const PANEL_CSS: readonly string[] = [
   '  background: linear-gradient(to top, var(--dsw-alias-bg-layer-1) 72%, transparent);',
   '}',
   '.imqb2-note { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); }',
-  /* ── 关于（版本 / 仓库 / 更新） ── */
-  '.imqb2-about-repo { display: inline-flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary); text-decoration: none; font-size: 13px; }',
-  '.imqb2-about-repo:hover { color: var(--dsw-alias-label-primary); text-decoration: underline; }',
-  '.imqb2-about-repo svg { flex: none; width: 16px; height: 16px; fill: currentColor; }',
-  '.imqb2-ver { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }',
-  '.imqb2-ver code { font-size: 13px; padding: 1px 6px; border-radius: 5px; background: var(--dsw-alias-bg-secondary, rgba(127,127,127,.12)); }',
-  '.imqb2-ver-tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor; opacity: .85; }',
-  '.imqb2-ver-tag--new { color: var(--dsw-alias-brand-primary, #3b82f6); }',
-  '.imqb2-ver-tag--ahead { color: var(--dsw-alias-label-tertiary); }',
-  '.imqb2-update-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }',
-  '.imqb2-update-btn { appearance: none; border: 1px solid var(--dsw-alias-line-normal, rgba(127,127,127,.35)); background: transparent; color: var(--dsw-alias-label-primary); font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; }',
-  '.imqb2-update-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-secondary, rgba(127,127,127,.1)); }',
-  '.imqb2-update-btn:disabled { opacity: .5; cursor: default; }',
-  '.imqb2-update-btn--primary { border-color: transparent; background: var(--dsw-alias-brand-primary, #3b82f6); color: #fff; }',
-  '.imqb2-update-btn--primary:hover:not(:disabled) { filter: brightness(1.08); }',
-  '.imqb2-update-msg { font-size: 12px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); }',
-  '.imqb2-update-msg--ok { color: var(--dsw-alias-label-secondary); }',
-  '.imqb2-update-msg--error { color: var(--dsw-alias-danger-primary, #dc2626); }',
   '.imqb2-note--error { color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-error)); }',
   '.imqb2-note--ok { color: var(--dsw-alias-label-secondary); }',
   '.imqb2-save {',
@@ -760,12 +729,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
   // 连接测试：kind → 结果 / 进行中。只放本地内存，不参与保存。
   const [probe, setProbe] = useState<Record<string, { ok: boolean; detail: string } | null>>({});
   const [probeBusy, setProbeBusy] = useState<string | null>(null);
-  // 关于/更新：独立于配置表单，不进 dirty diff（更新不是"保存配置"）
-  const [about, setAbout] = useState<AboutWire | null>(null);
-  const [aboutError, setAboutError] = useState<string | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatusWire | null>(null);
-  const [updateBusy, setUpdateBusy] = useState<'check' | 'apply' | null>(null);
-  const [updateNote, setUpdateNote] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -780,23 +743,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       })
       .catch((err: unknown) => {
         if (!stopped) setLoadError(err instanceof Error ? err.message : String(err));
-      });
-    return () => { stopped = true; };
-  }, [bindPhase]);
-
-  // 关于信息：版本必须由宿主读磁盘（构建期内联会和真实安装对不上，0.1.30 见过）
-  useEffect(() => {
-    let stopped = false;
-    void fetch(ABOUT_PATH, { cache: 'no-store' })
-      .then(async (res) => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const body = (await res.json()) as AboutWire;
-        if (stopped) return;
-        setAbout(body);
-        setAboutError(null);
-      })
-      .catch((err: unknown) => {
-        if (!stopped) setAboutError(err instanceof Error ? err.message : String(err));
       });
     return () => { stopped = true; };
   }, [bindPhase]);
@@ -868,70 +814,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
       }
     })();
   }, [form, probeBusy]);
-
-  /** 检查更新：refresh=true 时绕过宿主 6h 缓存 */
-  const checkUpdate = useCallback((refresh: boolean): void => {
-    if (updateBusy !== null) return;
-    setUpdateBusy('check');
-    setUpdateNote(null);
-    void fetch(refresh ? UPDATE_CHECK_PATH + '?refresh=1' : UPDATE_CHECK_PATH, { cache: 'no-store' })
-      .then(async (res) => {
-        const body = (await res.json().catch(() => null)) as UpdateStatusWire | null;
-        if (body === null) throw new Error('HTTP ' + res.status);
-        setUpdateStatus(body);
-        if (!body.ok) setUpdateNote({ ok: false, message: '检查失败：' + (body.error ?? '未知原因') });
-        else if (!body.hasUpdate) setUpdateNote({ ok: true, message: '已是最新版本' });
-      })
-      .catch((err: unknown) => {
-        setUpdateNote({ ok: false, message: '检查失败：' + (err instanceof Error ? err.message : String(err)) });
-      })
-      .finally(() => { setUpdateBusy(null); });
-  }, [updateBusy]);
-
-  /** 一键更新：装完宿主会热重载，进程不重启 */
-  const applyUpdateNow = useCallback((): void => {
-    if (updateBusy !== null) return;
-    setUpdateBusy('apply');
-    setUpdateNote({ ok: true, message: '正在下载、校验并安装…' });
-    void fetch(UPDATE_APPLY_PATH, {
-      method: 'POST',
-      headers: { [UPDATE_REQUEST_HEADER]: '1' },
-    })
-      .then(async (res) => {
-        const body = (await res.json().catch(() => null)) as UpdateApplyWire | null;
-        if (body === null) throw new Error('HTTP ' + res.status);
-        if (!body.ok) {
-          setUpdateNote({ ok: false, message: '更新失败：' + (body.error ?? '未知原因') });
-          return;
-        }
-        if (body.to === null || body.to === body.from) {
-          setUpdateNote({ ok: true, message: body.detail ?? '已是最新版本' });
-          return;
-        }
-        setUpdateNote({
-          ok: true,
-          message: body.hotReload
-            ? '已更新到 v' + body.to + '，正在热重载（不用重启）；几秒后这里会显示新版本'
-            : '已更新到 v' + body.to + '，重启 dsh 后生效',
-        });
-        // 热重载会重载本插件：等它起来再重新读版本
-        if (body.hotReload) {
-          setTimeout(() => {
-            void fetch(ABOUT_PATH, { cache: 'no-store' })
-              .then(async (res) => {
-                const fresh = (await res.json()) as AboutWire;
-                setAbout(fresh);
-                setUpdateStatus(null);
-              })
-              .catch(() => { /* 重载窗口里读不到属正常，保留旧文案 */ });
-          }, 4000);
-        }
-      })
-      .catch((err: unknown) => {
-        setUpdateNote({ ok: false, message: '更新失败：' + (err instanceof Error ? err.message : String(err)) });
-      })
-      .finally(() => { setUpdateBusy(null); });
-  }, [updateBusy]);
 
   const submit = useCallback((event: FormEvent): void => {
     event.preventDefault();
@@ -1006,7 +888,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     { id: 'workspace', label: '工作区' },
     { id: 'native', label: '原生能力' },
     { id: 'output', label: '输出调试' },
-    { id: 'about', label: '关于' },
   ];
   const jumpTo = (id: string): void => {
     setActiveModule(id);
@@ -1387,83 +1268,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         label: '调试日志', checked: form.debug ?? false,
         help: '输出推推 SDK 请求详情（含消息内容），只在排查问题时开。',
         onChange: (v) => { patch('debug', v); },
-      }),
-    ),
-
-    createElement(Section, {
-      id: 'about',
-      title: '关于',
-      desc: '装的是哪一版、线上有没有新版、要更新到哪个版本；点图标去仓库。',
-    },
-      createElement(Row, { label: '仓库', help: '在 GitHub 打开源码仓库', inline: true },
-        createElement('a', {
-          className: 'imqb2-about-repo',
-          href: about?.repoUrl ?? REPO_URL,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          title: '在 GitHub 打开仓库',
-        },
-          createElement('svg', { viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' },
-            createElement('path', { d: GITHUB_MARK_PATH }),
-          ),
-          createElement('span', null, about?.repoSlug ?? 'EayonLee/dsh-tuitui-bot'),
-        ),
-      ),
-      createElement(Row, { label: '版本', help: '读的是真正装进 profile 的 package.json，不是构建期写死的号', inline: true },
-        createElement('div', { className: 'imqb2-ver' },
-          createElement('code', null, about === null ? '…' : 'v' + about.version),
-          aboutError !== null
-            ? createElement('span', { className: 'imqb2-update-msg imqb2-update-msg--error' }, '读取失败：' + aboutError)
-            : null,
-          updateStatus?.hasUpdate === true
-            ? createElement('span', { className: 'imqb2-ver-tag imqb2-ver-tag--new' }, '可更新 v' + (updateStatus.latest ?? '?'))
-            : null,
-          updateStatus !== null && updateStatus.ok && !updateStatus.hasUpdate && !updateStatus.ahead
-            ? createElement('span', { className: 'imqb2-ver-tag' }, '已是最新')
-            : null,
-          updateStatus?.ahead === true
-            ? createElement('span', { className: 'imqb2-ver-tag imqb2-ver-tag--ahead' }, '本地比线上新')
-            : null,
-        ),
-      ),
-      createElement(Row, { label: '更新', help: '检查线上最新版本；开启自更新后可直接安装', inline: true },
-        createElement('div', { className: 'imqb2-update-bar' },
-          createElement('button', {
-            type: 'button',
-            className: 'imqb2-update-btn',
-            disabled: updateBusy !== null,
-            onClick: () => { checkUpdate(true); },
-          }, updateBusy === 'check' ? '检查中…' : '检查更新'),
-          updateStatus?.hasUpdate === true
-            && about?.selfUpdate.enabled === true
-            && about?.runtime.packageManager === true
-            ? createElement('button', {
-                type: 'button',
-                className: 'imqb2-update-btn imqb2-update-btn--primary',
-                disabled: updateBusy !== null,
-                onClick: () => { applyUpdateNow(); },
-              }, updateBusy === 'apply' ? '更新中…' : '更新到 v' + (updateStatus.latest ?? '?'))
-            : null,
-          updateNote !== null
-            ? createElement('span', { className: 'imqb2-update-msg' + (updateNote.ok ? ' imqb2-update-msg--ok' : ' imqb2-update-msg--error') }, updateNote.message)
-            : updateStatus?.source != null
-              ? createElement('span', { className: 'imqb2-update-msg' }, '来源：' + updateStatus.source + (updateStatus.cached ? '（缓存）' : ''))
-              : null,
-        ),
-      ),
-      createElement(SwitchRow, {
-        label: '允许一键更新', checked: form['selfUpdate.enabled'] ?? false,
-        help: about?.selfUpdate.reason ?? '打开后设置页能下载 Release 包并热重载；等于把"装包"的开关放进网页，默认关。改这项会重载插件并重置进行中的会话。',
-        onChange: (v) => { patch('selfUpdate.enabled', v); },
-      }),
-      createElement(SelectRow, {
-        label: '对比来源',
-        value: form['selfUpdate.channel'] ?? 'release',
-        options: [{ value: 'release', label: 'GitHub 正式发布' }, { value: 'main', label: '仓库主干（main）' }],
-        help: about?.selfUpdate.hotReload === true
-          ? '宿主支持热重载：更新完不用重启进程。'
-          : '宿主没有热重载能力（缺 dsh-hmr），更新后需要重启 dsh。',
-        onChange: (v) => { patch('selfUpdate.channel', v as 'release' | 'main'); },
       }),
     ),
 

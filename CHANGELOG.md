@@ -11,7 +11,8 @@
 
 - 设置页新增「关于」区块（#27）：GitHub 图标直达仓库、显示真正装进 profile 的版本号、
   一键检查线上最新版本（Release / 主干 / jsDelivr 多源取最大，6h 缓存，查不到如实报错）。
-- 可选的新版一键更新（#27，配置项 `selfUpdate.enabled`，默认关）：只从本仓库 Release 取
+- 一键更新入口在「已绑定」状态行右侧（跟「更换凭据 / 解绑」同一行），不是独立配置区块；
+  默认开启（`selfUpdate.enabled: false` 可只保留检查、禁用安装）。只从本仓库 Release 取
   `dsh-tuitui-bot-<版本>.tgz`，sha256 校验后备份旧目录再 `pnpm add`，装完补
   `dsh.profile.bundles`；宿主有 `@deepseek-ai/dsh-hmr` 时调 `reconcileProfile` 热重载，
   **进程不重启**；没有 HMR 明确提示需重启；任一步失败自动回滚旧版本。

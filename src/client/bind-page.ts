@@ -20,6 +20,7 @@
  */
 import { createElement, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { TUITUI_ICON_DATA_URI } from './brand-icon.ts';
+import { AboutBar } from './about-bar.ts';
 import {
   BIND_MANUAL_PATH,
   BIND_STATE_PATH,
@@ -462,6 +463,8 @@ function BoundView({ appId, botName, botAccount, fromEnv, recheck }: {
         createElement('p', { className: 'imqb-status-title' }, who === undefined ? '已绑定' : '已绑定 ' + who),
         createElement('p', { className: 'imqb-status-sub imqb-mono' }, 'AppID ' + appId + ' · 单聊 / 群聊 / 团队频道已接入'),
       ),
+      // 版本 / 仓库 / 更新：「我是谁、装的是哪一版」同类信息，放状态行右侧
+      createElement(AboutBar),
     ),
     fromEnv
       ? createElement('p', { className: 'imqb-note' },
