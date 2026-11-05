@@ -70,10 +70,10 @@ describe('parseVersion / compareVersions', () => {
 describe('buildSources', () => {
   const slug = 'EayonLee/dsh-tuitui-bot';
 
-  it('release 通道以 GitHub Release 为主源', () => {
+  it('release 通道只用 Release（不混主干，避免提示一个装不了的版本）', () => {
     const sources = buildSources(slug, 'release');
+    expect(sources).toHaveLength(1);
     expect(sources[0]?.url).toContain('/releases/latest');
-    expect(sources.map((item) => item.label)).toContain('GitHub 主干');
   });
 
   it('main 通道看主干 package.json，jsDelivr 兜底', () => {
@@ -84,24 +84,41 @@ describe('buildSources', () => {
 });
 
 describe('lookupLatest', () => {
-  it('多源取最大版本，并标明来源', async () => {
+  it('release 通道取 Release 的 tag', async () => {
+    const fetchImpl = fakeFetch({ 'api.github.com': { body: { tag_name: 'v0.1.31' } } });
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    expect(result.latest).toBe('0.1.31');
+    expect(result.source).toBe('GitHub Release');
+    expect(result.error).toBeNull();
+  });
+
+  it('main 通道多源取最大，并标明来源', async () => {
     const fetchImpl = fakeFetch({
       'api.github.com': { body: { tag_name: 'v0.1.30' } },
       'raw.githubusercontent.com': { body: { version: '0.1.31' } },
+      'cdn.jsdelivr.net': { body: { version: '0.1.29' } },
     });
-    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'main', fetchImpl);
     expect(result.latest).toBe('0.1.31');
     expect(result.source).toBe('GitHub 主干');
     expect(result.error).toBeNull();
   });
 
-  it('单个源失败不影响其它源', async () => {
-    const fetchImpl = fakeFetch({
-      'api.github.com': { fail: 'throw' },
-      'raw.githubusercontent.com': { body: { version: '0.1.31' } },
-    });
+  it('只有预发布版本时不算有新版（并说明原因）', async () => {
+    const fetchImpl = fakeFetch({ 'api.github.com': { body: { tag_name: 'v0.1.31-beta.1' } } });
     const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    expect(result.latest).toBeNull();
+    expect(result.error).toContain('预发布');
+  });
+
+  it('单个源失败不影响其它源（main 通道）', async () => {
+    const fetchImpl = fakeFetch({
+      'raw.githubusercontent.com': { fail: 'throw' },
+      'cdn.jsdelivr.net': { body: { version: '0.1.31' } },
+    });
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'main', fetchImpl);
     expect(result.latest).toBe('0.1.31');
+    expect(result.source).toBe('jsDelivr');
   });
 
   it('全部失败时 latest=null 且给出各源原因（绝不落到"已是最新"）', async () => {

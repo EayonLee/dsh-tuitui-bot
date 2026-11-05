@@ -13,6 +13,50 @@ export interface InstalledPackage {
 export declare function readVersionAt(dir: string): Promise<string>;
 /** 读已安装的 package.json；读不到抛错（调用方决定降级文案） */
 export declare function readInstalledPackage(): Promise<InstalledPackage>;
+/** 包清单（只看更新要用的字段） */
+export interface PackageManifest {
+    name?: string;
+    version?: string;
+    dsh?: {
+        compatibility?: {
+            dshReleases?: Record<string, string>;
+            note?: string;
+        };
+    };
+}
+/**
+ * 从 .tgz 里直接读 package.json。
+ *
+ * 为什么不用再请求一次 GitHub raw：那样会多一次网络往返和一层 CDN 缓存，
+ * 而且拿到的未必是用户即将安装的那个字节。包里有什么，就看什么。
+ */
+export declare function readManifestFromTarball(buffer: Uint8Array): PackageManifest;
+/**
+ * 当前宿主 dsh 的版本。
+ *
+ * 插件跑在宿主进程里，但 peer 依赖在 pnpm 隔离下解析不到，所以从
+ * process.argv[1]（真正的 dsh 可执行入口）往上找 name='@deepseek-ai/dsh' 的 package.json。
+ * 取不到就返回 null —— 调用方据此跳过兼容校验，而不是瞎猜一个版本。
+ */
+export declare function readHostVersion(): string | null;
+/** 兼容性判定结果 */
+export interface CompatibilityVerdict {
+    /** 是否真的做了判定（false = 信息不足，放行但要在文案里说清） */
+    checked: boolean;
+    ok: boolean;
+    message: string;
+}
+/**
+ * 宿主兼容性校验：目标包的 `dsh.compatibility.dshReleases` 必须认可当前宿主版本。
+ *
+ * 这条是本仓库自己声明的契约：写了「0.2.1-rc.5: compatible」，就表示宿主大版本
+ * 升级后要重新验收。所以：
+ *   · 显式 compatible → 放行
+ *   · 显式其它状态（incompatible / untested…）→ 拒绝
+ *   · 列表里没有当前宿主 → 拒绝（没验证过就是没验证过）
+ *   · 取不到宿主版本 / 目标没声明 → 放行，但在结果里注明"跳过校验"
+ */
+export declare function checkCompatibility(manifest: PackageManifest, hostVersion: string | null): CompatibilityVerdict;
 /** 一个可执行的更新计划 */
 export interface UpdatePlan {
     /** 目标版本 */
@@ -123,11 +167,20 @@ export interface UpdateDeps {
     pnpmCommand?: string;
     /** 临时目录根（默认系统 tmp） */
     tempRoot?: string;
+    /** 宿主版本（默认自己探测；单测注入） */
+    hostVersion?: string | null;
     logger?: {
         info(message: string): void;
         warn(message: string): void;
     };
 }
+/**
+ * 当前是不是「开发软链」安装。
+ *
+ * profile 用 `link:` 指到源码目录时，node_modules 里是软链，pnpm add 会把开发流
+ * 直接换成一份打包产物 —— 那是灾难。遇到就直接拒绝并让人手动处理。
+ */
+export declare function assertMutableInstall(profileDir: string, packageName: string): Promise<void>;
 /** 更新结果 */
 export interface UpdateOutcome {
     ok: boolean;

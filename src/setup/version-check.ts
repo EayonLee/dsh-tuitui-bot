@@ -116,9 +116,11 @@ export function buildSources(slug: string, channel: UpdateChannel): VersionSourc
     label: 'jsDelivr',
     parse: versionFromManifest,
   };
-  return channel === 'release'
-    ? [release, mainRaw]
-    : [mainRaw, mainCdn, release];
+  // release 通道只用 Release：它代表"用户真正能下载到的包"。
+  // 早期版本把主干 raw 混进来取最大，结果是主干改了版本号还没发 Release 时，
+  // 页面提示「可更新 v0.1.32」，点了却因为 Release 里没有这个 asset 而失败。
+  // 宁可查不到，也不报一个装不了的版本。
+  return channel === 'release' ? [release] : [mainRaw, mainCdn, release];
 }
 
 /** 单个源的查询结果 */
@@ -198,8 +200,15 @@ export async function lookupLatest(
   const outcomes = await Promise.all(sources.map((source) => readSource(source, fetchImpl, timeoutMs)));
   let latest: string | null = null;
   let source: string | null = null;
+  let skippedPrerelease = false;
   for (const outcome of outcomes) {
     if (outcome.version === null) continue;
+    // 预发布（0.1.31-beta.1）默认不算「有新版」：它是给验收用的，
+    // 不该让普通用户在设置页点一下就装上去。
+    if (parseVersion(outcome.version).prerelease !== '') {
+      skippedPrerelease = true;
+      continue;
+    }
     if (latest === null || compareVersions(outcome.version, latest) > 0) {
       latest = outcome.version;
       source = outcome.label;
@@ -207,7 +216,13 @@ export async function lookupLatest(
   }
   if (latest !== null) return { latest, source, error: null };
   const reasons = outcomes.map((outcome) => outcome.label + ': ' + (outcome.error ?? '未知错误')).join('；');
-  return { latest: null, source: null, error: reasons === '' ? '没有可用的版本源' : reasons };
+  return {
+    latest: null,
+    source: null,
+    error: skippedPrerelease
+      ? '线上只有预发布版本（' + reasons + '），已按稳定版处理，不提示更新'
+      : (reasons === '' ? '没有可用的版本源' : reasons),
+  };
 }
 
 /** 进程内缓存（key = slug + channel） */

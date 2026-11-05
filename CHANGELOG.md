@@ -24,6 +24,10 @@
 - `scripts/ship.sh` 装完会校验 profile 的 `dsh.profile.bundles` 包含本包，缺了就补，
   避免同一种「静默消失」再发生一次。
 - 重启口径统一：仓库文档与脚本只写 `sudo systemctl restart dsh-web`，不再引用 `~/bin/dsh-restart`。
+- 更新判定的兼容性加固（#27）：release 通道只信 Release 的 tag（不再混主干，避免提示一个
+  没有 asset 的版本）；预发布 tag（`-beta.1` 这类）默认不算可更新；安装前解包核对包名、版本，
+  并按目标包的 `dsh.compatibility.dshReleases` 校验当前宿主版本，不认的一律拒绝；`link:`
+  开发软链安装直接拒绝更新，避免把源码链接换成打包产物。
 - 新增配置项 `selfUpdate.enabled`（默认 `false`）与 `selfUpdate.channel`（`release` / `main`），
   设置页可改，写入 profile patch 后与其它配置一样经 HMR 生效。
 - 入站可读性收尾（#18）：认不出来的消息类型不再变成空串，正文给

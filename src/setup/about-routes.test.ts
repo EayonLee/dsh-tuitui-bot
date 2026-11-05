@@ -21,6 +21,7 @@ import type { WebRoute } from './bind-routes.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type { Logger } from '../types.ts';
 import type { HotReload } from './hot-reload.ts';
+import { makeTarball } from './tar-fixture.ts';
 
 const logger = {
   debug: () => {}, info: () => {}, warn: () => {}, error: () => {},
@@ -117,25 +118,43 @@ function harness(options: Partial<AboutRoutesOptions> & { hotReload: HotReload }
 
 const INSTALLED = { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: '/tmp/nowhere/' };
 
-/** 假网络：Release 说 0.1.31，主干也是 0.1.31 */
+/**
+ * 假网络：Release 说 version，下载地址给一个真的 tar.gz
+ * （现在安装前会拆包校验 name/version/兼容范围，塞假字节会被直接拒掉）。
+ */
 function fetchLatest(version = '0.1.31'): FetchLike {
   const release = {
     tag_name: 'v' + version,
     assets: [{ name: 'dsh-tuitui-bot-' + version + '.tgz', browser_download_url: 'https://example.com/pkg.tgz' }],
   };
+  const tarball = makeTarball({
+    'package/package.json': JSON.stringify({
+      name: '@eayonlee/dsh-tuitui-bot',
+      version,
+      dsh: { compatibility: { dshReleases: { '0.2.1-rc.5': 'compatible' } } },
+    }),
+  });
+  const bytes = tarball.buffer.slice(tarball.byteOffset, tarball.byteOffset + tarball.length) as ArrayBuffer;
   return async (url) => {
     if (url.includes('api.github.com')) {
       return {
         ok: true, status: 200, json: async () => release,
         text: async () => JSON.stringify(release),
-        arrayBuffer: async () => new TextEncoder().encode('{}').buffer as ArrayBuffer,
+        arrayBuffer: async () => bytes,
+      };
+    }
+    if (url.includes('pkg.tgz')) {
+      return {
+        ok: true, status: 200, json: async () => ({}),
+        text: async () => '',
+        arrayBuffer: async () => bytes,
       };
     }
     const manifest = { version };
     return {
       ok: true, status: 200, json: async () => manifest,
       text: async () => JSON.stringify(manifest),
-      arrayBuffer: async () => new TextEncoder().encode('{}').buffer as ArrayBuffer,
+      arrayBuffer: async () => bytes,
     };
   };
 }

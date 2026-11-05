@@ -31,6 +31,11 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - `scripts/ship.sh` now verifies the profile's `dsh.profile.bundles` lists this package and adds
   it when missing, so that silent disappearance cannot repeat.
 - Restart workflow unified on `sudo systemctl restart dsh-web`; no more `~/bin/dsh-restart`.
+- Hardened update decisions (#27): the release channel trusts only the Release tag (main is no
+  longer mixed in, which used to advertise a version whose asset did not exist); prerelease tags
+  (`-beta.1`) are not treated as updates; before installing, the tarball is unpacked and its name,
+  version and `dsh.compatibility.dshReleases` entry are checked against the running host, refusing
+  anything unverified; `link:` development installs refuse to self-update.
 - New config keys `selfUpdate.enabled` (default `false`) and `selfUpdate.channel`
   (`release` / `main`), editable from the settings page and applied through HMR like any other key.
 - Inbound readability (issue #18): a message type the plugin cannot render no longer turns into

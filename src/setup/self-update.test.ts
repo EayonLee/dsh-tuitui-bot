@@ -11,16 +11,21 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyUpdate,
+  assertMutableInstall,
+  checkCompatibility,
   downloadPlan,
   ensureBundleListed,
   pickReleaseAsset,
   planUpdate,
+  readHostVersion,
   readInstalledPackage,
+  readManifestFromTarball,
   readVersionAt,
   sha256,
   type FetchLike,
   type UpdatePlan,
 } from './self-update.ts';
+import { makeTarball } from './tar-fixture.ts';
 
 const temps: string[] = [];
 
@@ -256,6 +261,194 @@ describe('applyUpdate', () => {
       expect(outcome.ok).toBe(false);
       expect(outcome.error).toContain('装完版本不符');
       expect(await readVersionAt(installedDir)).toBe('0.1.30');
+    } finally {
+      delete process.env.FAKE_INSTALL_DIR;
+      delete process.env.FAKE_VERSION;
+    }
+  });
+});
+
+describe('readManifestFromTarball / readHostVersion', () => {
+  it('从 tgz 里读出 package.json（含 dsh.compatibility）', () => {
+    const tarball = makeTarball({
+      'package/package.json': JSON.stringify({
+        name: '@eayonlee/dsh-tuitui-bot',
+        version: '0.1.31',
+        dsh: { compatibility: { dshReleases: { '0.2.1-rc.5': 'compatible' } } },
+      }),
+    });
+    const manifest = readManifestFromTarball(tarball);
+    expect(manifest.name).toBe('@eayonlee/dsh-tuitui-bot');
+    expect(manifest.version).toBe('0.1.31');
+    expect(manifest.dsh?.compatibility?.dshReleases?.['0.2.1-rc.5']).toBe('compatible');
+  });
+
+  it('包里没有 package.json 时如实报错', () => {
+    const tarball = makeTarball({ 'package/README.md': 'hi' });
+    expect(() => readManifestFromTarball(tarball)).toThrow(/找不到 package.json/);
+  });
+
+  it('readHostVersion 在拿不到入口时返回 null 而不是瞎猜', () => {
+    const original = process.argv[1];
+    process.argv[1] = '/nonexistent/path/dsh';
+    try {
+      expect(readHostVersion()).toBeNull();
+    } finally {
+      process.argv[1] = original ?? '';
+    }
+  });
+});
+
+describe('checkCompatibility', () => {
+  const manifest = {
+    name: '@eayonlee/dsh-tuitui-bot',
+    version: '0.1.31',
+    dsh: { compatibility: { dshReleases: { '0.2.1-rc.5': 'compatible' } } },
+  };
+
+  it('宿主在兼容列表内 → 放行', () => {
+    const verdict = checkCompatibility(manifest, '0.2.1-rc.5');
+    expect(verdict).toMatchObject({ checked: true, ok: true });
+  });
+
+  it('宿主不在列表 → 拒绝并说明支持范围', () => {
+    const verdict = checkCompatibility(manifest, '0.3.0');
+    expect(verdict.checked).toBe(true);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.message).toContain('0.3.0');
+    expect(verdict.message).toContain('0.2.1-rc.5');
+  });
+
+  it('显式标为非 compatible → 拒绝', () => {
+    const verdict = checkCompatibility({
+      dsh: { compatibility: { dshReleases: { '0.3.0': 'incompatible' } } },
+    }, '0.3.0');
+    expect(verdict.ok).toBe(false);
+    expect(verdict.message).toContain('incompatible');
+  });
+
+  it('目标没声明兼容范围 → 放行但标注跳过', () => {
+    const verdict = checkCompatibility({ name: 'x', version: '1.0.0' }, '0.2.1-rc.5');
+    expect(verdict).toMatchObject({ checked: false, ok: true });
+  });
+
+  it('取不到宿主版本 → 放行但把支持范围写进文案', () => {
+    const verdict = checkCompatibility(manifest, null);
+    expect(verdict.checked).toBe(false);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.message).toContain('0.2.1-rc.5');
+  });
+});
+
+describe('assertMutableInstall', () => {
+  it('开发软链（link:）安装拒绝自动更新', async () => {
+    const profileDir = await tempDir('profile-link-');
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      dependencies: { '@eayonlee/dsh-tuitui-bot': 'link:/repo/src' },
+      dsh: { profile: { bundles: [] } },
+    }));
+    await expect(assertMutableInstall(profileDir, '@eayonlee/dsh-tuitui-bot'))
+      .rejects.toThrow(/开发软链/);
+  });
+
+  it('tarball 安装允许更新', async () => {
+    const profileDir = await tempDir('profile-file-');
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      dependencies: { '@eayonlee/dsh-tuitui-bot': 'file:/tmp/x.tgz' },
+      dsh: { profile: { bundles: [] } },
+    }));
+    await expect(assertMutableInstall(profileDir, '@eayonlee/dsh-tuitui-bot')).resolves.toBeUndefined();
+  });
+});
+
+describe('applyUpdate 安装前校验（真 tgz）', () => {
+  async function setup(manifest: Record<string, unknown>): Promise<{
+    profileDir: string; installedDir: string; pnpmCommand: string; fetchImpl: FetchLike;
+  }> {
+    const { profileDir, installedDir } = await makeProfileAndPackage({ bundles: [] });
+    const pnpmCommand = await fakePnpm();
+    process.env.FAKE_INSTALL_DIR = installedDir;
+    process.env.FAKE_VERSION = '0.1.31';
+    const tarball = makeTarball({ 'package/package.json': JSON.stringify(manifest) });
+    const fetchImpl: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      arrayBuffer: async () => tarball.buffer.slice(tarball.byteOffset, tarball.byteOffset + tarball.length) as ArrayBuffer,
+    });
+    return { profileDir, installedDir, pnpmCommand, fetchImpl };
+  }
+
+  it('宿主不兼容 → 拒绝，原版本不动', async () => {
+    const { profileDir, installedDir, pnpmCommand, fetchImpl } = await setup({
+      name: '@eayonlee/dsh-tuitui-bot', version: '0.1.31',
+      dsh: { compatibility: { dshReleases: { '0.2.0': 'compatible' } } },
+    });
+    try {
+      const outcome = await applyUpdate({
+        plan: { version: '0.1.31', spec: 'x', downloadUrl: 'https://example.com/pkg.tgz', label: 'test' },
+        installed: { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: installedDir },
+        deps: { fetchImpl, profileDir, packageName: '@eayonlee/dsh-tuitui-bot', pnpmCommand, hostVersion: '0.2.1-rc.5' },
+      });
+      expect(outcome.ok).toBe(false);
+      expect(outcome.error).toContain('没验证过宿主');
+      expect(await readVersionAt(installedDir)).toBe('0.1.30');
+    } finally {
+      delete process.env.FAKE_INSTALL_DIR;
+      delete process.env.FAKE_VERSION;
+    }
+  });
+
+  it('包名不符 → 拒绝（防止装进别的包）', async () => {
+    const { profileDir, installedDir, pnpmCommand, fetchImpl } = await setup({
+      name: '@evil/other', version: '0.1.31',
+    });
+    try {
+      const outcome = await applyUpdate({
+        plan: { version: '0.1.31', spec: 'x', downloadUrl: 'https://example.com/pkg.tgz', label: 'test' },
+        installed: { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: installedDir },
+        deps: { fetchImpl, profileDir, packageName: '@eayonlee/dsh-tuitui-bot', pnpmCommand, hostVersion: '0.2.1-rc.5' },
+      });
+      expect(outcome.ok).toBe(false);
+      expect(outcome.error).toContain('包名不符');
+    } finally {
+      delete process.env.FAKE_INSTALL_DIR;
+      delete process.env.FAKE_VERSION;
+    }
+  });
+
+  it('包内版本与计划不符 → 拒绝', async () => {
+    const { profileDir, installedDir, pnpmCommand, fetchImpl } = await setup({
+      name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30',
+    });
+    try {
+      const outcome = await applyUpdate({
+        plan: { version: '0.1.31', spec: 'x', downloadUrl: 'https://example.com/pkg.tgz', label: 'test' },
+        installed: { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: installedDir },
+        deps: { fetchImpl, profileDir, packageName: '@eayonlee/dsh-tuitui-bot', pnpmCommand, hostVersion: '0.2.1-rc.5' },
+      });
+      expect(outcome.ok).toBe(false);
+      expect(outcome.error).toContain('包里版本不符');
+    } finally {
+      delete process.env.FAKE_INSTALL_DIR;
+      delete process.env.FAKE_VERSION;
+    }
+  });
+
+  it('兼容且版本一致 → 正常安装，detail 里写明兼容结论', async () => {
+    const { profileDir, installedDir, pnpmCommand, fetchImpl } = await setup({
+      name: '@eayonlee/dsh-tuitui-bot', version: '0.1.31',
+      dsh: { compatibility: { dshReleases: { '0.2.1-rc.5': 'compatible' } } },
+    });
+    try {
+      const outcome = await applyUpdate({
+        plan: { version: '0.1.31', spec: 'x', downloadUrl: 'https://example.com/pkg.tgz', label: 'test' },
+        installed: { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: installedDir },
+        deps: { fetchImpl, profileDir, packageName: '@eayonlee/dsh-tuitui-bot', pnpmCommand, hostVersion: '0.2.1-rc.5' },
+      });
+      expect(outcome.ok).toBe(true);
+      expect(outcome.detail).toContain('兼容列表内');
+      expect(await readVersionAt(installedDir)).toBe('0.1.31');
     } finally {
       delete process.env.FAKE_INSTALL_DIR;
       delete process.env.FAKE_VERSION;
