@@ -45,6 +45,24 @@ describe('tuitui_history', () => {
     await expect(tool.execute({ action: 'private' })).rejects.toThrow(/account 必填/);
   });
 
+
+  it('读不出正文的消息给统一占位，而不是空串或裸类型名（issue #18）', async () => {
+    const { tool } = setup([
+      { user_name: '张三', timestamp: '2026-11-04 10:05', data: { msg_type: 'page', page: { title: '周报' } } },
+      { user_name: '李四', timestamp: '2026-11-04 10:06', data: { msg_type: 'weird' } },
+      { user_name: '王五', timestamp: '2026-11-04 10:07', data: {} },
+    ]);
+
+    const out = await tool.execute({ action: 'group', group_id: 'g-1' });
+    const texts = (out.messages as Array<{ text: string }>).map((m) => m.text);
+
+    expect(texts).toEqual([
+      '[未支持的消息类型: page]',
+      '[未支持的消息类型: weird]',
+      '[未支持的消息类型: 未知]',
+    ]);
+  });
+
   it('action 不认识报错', async () => {
     const { tool } = setup();
     await expect(tool.execute({ action: 'everything' })).rejects.toThrow(/action/);

@@ -109,11 +109,25 @@ dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
 | `tuitui_group` | Group admin: `info` / `members` / `robot_in` / `user_is_in` read-only; `create` / `member_add` / `member_remove` need `confirm=true` |
 | `tuitui_history` | Read chat records (group or private) with `limit` (1–100), `cursor`, `order_asc`. Read-only |
 | `tuitui_file` | Files: `upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`; space writes need `confirm=true` |
-| `tuitui_send` | Rich messages: `link` / `page` / `mixed`; `recall` / `modify` / `strong_notice` / `phone_alarm` need `confirm=true` |
+| `tuitui_send` | Rich messages: `link` / `page` / `mixed`; `recall` / `modify` / `strong_notice` / `phone_alarm` need `confirm=true`. `strong_notice` / `phone_alarm` also need a **separately granted API permission**; without it the server answers `errcode 6` |
 | `tuitui_teams` | Team channels: `channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` read-only; `send_post` / `edit_post` / `send_file` need `confirm=true` |
 | `tuitui_bot` | The bot itself: `info` / `get_shortcuts` read-only; `set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` need `confirm=true` |
 | `tuitui_describe_image` | Image understanding (requires `vision.enabled`): uses `vision.baseUrl` when set, otherwise dsh llm |
 | `tuitui_draw` | Image generation (requires `imageGeneration.enabled`): draws, sends to the current chat, returns the local path |
+
+### What it can and cannot read
+
+| Message type | Bot |
+| --- | --- |
+| Text / Markdown / mixed | ✅ body readable; images arrive through attachments |
+| Image / file / voice / video | ✅ downloaded to the media dir for the agent |
+| Merged forward | ✅ rendered by the SDK as `[合并转发：source]`, with every speaker and line |
+| Contact card | ✅ rendered as `[名片]`, with name and account |
+| **Page message** | ⚠️ **not readable**: it can be sent, but never lands in chat history and has no inbound renderer |
+| Unknown `msg_type` | ⚠️ body becomes `[未支持的消息类型: xxx]` plus a warn; never an empty string |
+
+> The placeholder does not mean "nothing was said" — it means "this type cannot be read".
+> Seeing it in context or logs means Tuitui shipped a type the plugin has not caught up with.
 
 ### Smart interjection
 

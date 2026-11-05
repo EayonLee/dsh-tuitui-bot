@@ -9,6 +9,11 @@
 
 ### 变更
 
+- 入站可读性收尾（#18）：认不出来的消息类型不再变成空串，正文给
+  `[未支持的消息类型: xxx]` 占位，同时 `logger.warn` 记下 `msg_type` / 会话 / `msgid`；
+  `tuitui_history` 读不到正文时用同一套占位。合并转发、名片补夹具锁住 SDK 渲染分支。
+- 文档与权限对齐（#18）：`tuitui_send` 的 `strong_notice` / `phone_alarm` 标注需单独申请接口权限；
+  README 新增「能读什么、读不到什么」，标注页面消息可发但不可读。
 - 补充推推执行步骤中可用的 Token 用量说明（#11）。
 - 安装口径收敛：README 只保留「下载 Release 正式包」与「跟随主干 `github:`」两条路径，
   删掉 npm / 一键脚本 / 本地源码的写法；README 与 README_EN 同步

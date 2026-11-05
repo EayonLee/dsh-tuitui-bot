@@ -12,6 +12,13 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
 ### Changes
 
+- Inbound readability (issue #18): a message type the plugin cannot render no longer turns into
+  an empty string — the body becomes `[未支持的消息类型: xxx]` and a `logger.warn` records the
+  `msg_type`, chat and `msgid`; `tuitui_history` uses the same placeholder. Merged-forward and
+  contact-card rendering are now pinned by tests against the SDK.
+- Docs vs permissions (issue #18): `tuitui_send` documents that `strong_notice` / `phone_alarm`
+  need a separately granted API permission; README gains a "what the bot can and cannot read"
+  table, including that page messages can be sent but never read back.
 - Document available token usage in Tuitui execution steps (#11).
 - Install story narrowed to two paths: download the release tarball, or track main via `github:`.
   npm / one-shot script / local checkout instructions removed from README and README_EN

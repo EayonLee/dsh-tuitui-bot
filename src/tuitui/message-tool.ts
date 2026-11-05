@@ -17,12 +17,16 @@ export const SEND_TOOL_NAME = 'tuitui_send';
 const DESCRIPTION = [
   'Send richer Tuitui messages than plain text. Actions:',
   '- link: url + title (+content/image)',
-  '- page: a card page (title/content, optional summary/image)',
+  '- page: a card page (title/content, optional summary/image); it is NOT stored in chat history,',
+  '  so nobody (including you) can read it back later',
   '- mixed: text with inline images (items: [{type:"text",text}|{type:"image",source_path}])',
   '- recall: withdraw a message (needs message_id, confirm=true)',
   '- modify: edit a sent message text (needs message_id, confirm=true)',
-  '- strong_notice: push a notice that must be seen (needs account + confirm=true)',
-  '- phone_alarm: phone/voice alarm (needs accounts or mobiles + confirm=true)',
+  '- strong_notice: push a notice that must be seen (needs account + confirm=true).',
+  '  Requires a separately granted API permission on the bot appId; without it the server answers',
+  '  errcode 6, so do not retry or fall back—tell the user the permission has to be applied for',
+  '- phone_alarm: phone/voice alarm (needs accounts or mobiles + confirm=true). Same separate',
+  '  permission requirement as strong_notice',
   'Target as "c2c:account" or "group:group_id"; omit to use the current conversation.',
 ].join(' ');
 

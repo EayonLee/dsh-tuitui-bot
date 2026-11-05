@@ -8,6 +8,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
 import type { Logger } from '../types.ts';
 import { jsonToolOutput } from './tool-output.ts';
+import { readMsgType, unsupportedMessageText } from './message-text.ts';
 
 export const HISTORY_TOOL_NAME = 'tuitui_history';
 
@@ -32,16 +33,20 @@ interface HistoryArgs {
   order_asc?: boolean;
 }
 
-/** 消息体 → 一行文本（拿不到正文就退回类型名，别让整条记录消失） */
+/**
+ * 消息体 → 一行文本。
+ *
+ * 拿不到正文时用与入站同一套占位文案（`[未支持的消息类型: xxx]`），
+ * 既不会让整条记录消失，也让调用方一眼看出是"这类消息读不了"而不是"没人说话"。
+ */
 function describeMessage(client: TuituiBotClient, data: unknown): string {
   try {
     const text = client.event.renderMessageBody(data);
     if (typeof text === 'string' && text.trim() !== '') return text.trim();
   } catch {
-    // 渲染失败不算错误：往下走，给个占位
+    // 渲染失败不算错误：往下走，给个可读占位
   }
-  const kind = (data as { msg_type?: string } | undefined)?.msg_type;
-  return kind === undefined ? '[非文本消息]' : `[${kind}]`;
+  return unsupportedMessageText(readMsgType(data));
 }
 
 export function registerHistoryTool(ctx: Context, client: TuituiBotClient, logger: Logger): void {

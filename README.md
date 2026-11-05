@@ -142,12 +142,25 @@ dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
 | `tuitui_group` | 群管理：`info` / `members` / `robot_in` / `user_is_in` 只读；`create` / `member_add` / `member_remove` 要 `confirm=true` |
 | `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
 | `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
-| `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true` |
+| `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true`。`strong_notice` / `phone_alarm` **需单独申请接口权限**，没开通时服务端回 `errcode 6` |
 | `tuitui_teams` | 团队频道：`channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` 只读；`send_post` / `edit_post` / `send_file` 要 `confirm=true` |
 | `tuitui_bot` | 机器人自身：`info` / `get_shortcuts` 只读；`set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` 要 `confirm=true` |
 
 > 写操作统一规则：不带 `confirm=true` 直接报错退回。模型自己不会"顺手"改群、改身份、发强通知——
 > 它得先拿到一句明确的「执行」。
+
+### 能读什么、读不到什么
+
+| 消息类型 | 机器人 |
+| --- | --- |
+| 文本 / Markdown / 图文混排 | ✅ 正文可读，图片走附件通道 |
+| 图片 / 文件 / 语音 / 视频 | ✅ 落地到媒体目录交给 agent |
+| 合并转发 | ✅ 按 SDK 渲染成 `[合并转发：来源]`，带每个发言人与内容 |
+| 名片 | ✅ 渲染成 `[名片]`，带姓名与账号 |
+| **页面消息** | ⚠️ **不可读**：能发，但不进聊天记录，历史接口查不到，入站也没有对应渲染 |
+| 认不出来的 `msg_type` | ⚠️ 正文给 `[未支持的消息类型: xxx]` 占位并记一条 warn，不静默空串 |
+
+> 占位不等于「没读到」，是「这类消息读不了」——它在上下文或日志里出现，说明推推又出了插件还没跟上的类型。
 
 
 ### 智能插话
