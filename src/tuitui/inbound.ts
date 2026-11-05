@@ -20,12 +20,22 @@ import type {
   TuituiTeamsPostData,
 } from '@qihoo/tuitui-bot-sdk';
 import type { InboundAttachment, InboundMessage, InboundPostRef, InboundReference } from '../types.ts';
+import { readMsgType, unsupportedMessageText } from './message-text.ts';
 
 /** 渲染消息正文的注入点（来自 client.event.renderMessageBody，避免在纯函数里持有客户端） */
 export type MessageRenderer = (data: unknown) => string;
 
+/** 一条认不出来的消息：正文渲染空了，留个可观测的痕迹（issue #18） */
+export interface UnsupportedMessage {
+  msgType?: string;
+  messageId: string;
+  scene: 'c2c' | 'group';
+}
+
 export interface NormalizeOptions {
   render: MessageRenderer;
+  /** 渲染不出正文时回调（gateway 接 logger.warn），不实现也不影响归一化 */
+  onUnsupported?: (info: UnsupportedMessage) => void;
 }
 
 /**
@@ -70,7 +80,7 @@ function normalizeMessage(body: TuituiEventMessage, options: NormalizeOptions): 
     senderId: body.uid ?? '',
     senderAccount: body.user_account ?? '',
     senderName: body.user_name ?? '',
-    content: renderContent(data, options),
+    content: renderContent(data, options, { messageId, scene: kind }),
     messageId,
     timestamp: body.timestamp ?? '',
     ...(groupId ? { groupId } : {}),
@@ -159,15 +169,32 @@ function normalizeInteractive(body: TuituiEventBody): InboundMessage {
   };
 }
 
-/** 正文：优先 text（SDK 已把共享帖归一化为 text），否则用 SDK 渲染器拼装各消息类型 */
-function renderContent(data: TuituiMessageData, options: NormalizeOptions): string {
+/**
+ * 正文：优先 text（SDK 已把共享帖归一化为 text），否则用 SDK 渲染器拼装各消息类型。
+ *
+ * 渲染不出来（SDK 没有这个 msg_type 的分支，或渲染器自己抛错）时不能返回空串：
+ * 给一条可读占位，并回调 `onUnsupported` 让上层记日志——否则线上只会看到
+ * 「机器人收到一条空消息」，无从知道是哪种类型掉的。
+ */
+function renderContent(
+  data: TuituiMessageData,
+  options: NormalizeOptions,
+  meta: { messageId: string; scene: 'c2c' | 'group' },
+): string {
   const text = typeof data.text === 'string' ? data.text : '';
   if (text.trim()) return text;
+
+  let rendered = '';
   try {
-    return options.render(data).trim();
+    rendered = options.render(data).trim();
   } catch {
-    return '';
+    rendered = '';
   }
+  if (rendered !== '') return rendered;
+
+  const msgType = readMsgType(data);
+  options.onUnsupported?.({ ...(msgType === undefined ? {} : { msgType }), ...meta });
+  return unsupportedMessageText(msgType);
 }
 
 /** 群 @ 列表（推推 at[]: { is_at_all, cid, uid, name }，域账号在 cid 字段） */

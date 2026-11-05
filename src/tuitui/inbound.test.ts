@@ -6,7 +6,7 @@
  *    影子字段带 fileId、原始 images 同 url 时会重复产出两条附件。
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
+import { TuituiBotClient, type TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
 import { getInteractiveAction } from '../features/button-utils.ts';
 import { classifyMime, isMessageEvent, normalizeEvent } from './inbound.ts';
 
@@ -118,13 +118,16 @@ describe('normalizeEvent：single_chat', () => {
     expect(render).toHaveBeenCalled();
   });
 
-  it('渲染器抛错时正文降级为空串，不影响其余字段', () => {
-    const render = vi.fn(() => { throw new Error('render failed'); });
+  it('渲染器抛错时正文降级为可读占位，不影响其余字段', () => {
+    const render = vi.fn(() => {
+      throw new Error('render failed');
+    });
     const body = makeBody({ data: { msg_type: 'unknown_type' } });
 
     const message = normalizeEvent(body, { render })!;
 
-    expect(message.content).toBe('');
+    // issue #18：空串会让"读不了"和"没人说话"无法区分，统一给占位
+    expect(message.content).toBe('[未支持的消息类型: unknown_type]');
     expect(message.senderName).toBe('张三');
   });
 
@@ -585,3 +588,149 @@ describe('normalizeEvent：interactive_action（线上真实回调形状）', ()
     expect(click!.value).toEqual({ t: 'probe' });
   });
 });
+
+describe('未知消息类型与 SDK 渲染分支（issue #18）', () => {
+  // 真的调 SDK：merged / card 的正文是 SDK renderBaseMessage 拼的，
+  // 用假渲染器测等于自己测自己。SDK 哪天删了分支，这里会先红。
+  // 只借它的 renderMessageBody：纯函数，不建连、不发请求
+  const sdk = new TuituiBotClient({ appId: 'test', appSecret: 'test' });
+  const sdkOptions = (onUnsupported?: (info: unknown) => void) => ({
+    render: (data: unknown) => sdk.event.renderMessageBody(data),
+    ...(onUnsupported === undefined ? {} : { onUnsupported }),
+  });
+
+  it('msg_type=page 且没有 text：正文给可读占位，并回调一次', () => {
+    const onUnsupported = vi.fn();
+    const message = normalizeEvent(
+      makeBody({
+        data: { msg_type: 'page', msgid: 'm-page', page: { title: '周报', content: '正文' } },
+      }),
+      sdkOptions(onUnsupported),
+    )!;
+
+    expect(message.content).toBe('[未支持的消息类型: page]');
+    expect(onUnsupported).toHaveBeenCalledTimes(1);
+    expect(onUnsupported).toHaveBeenCalledWith({ msgType: 'page', messageId: 'm-page', scene: 'c2c' });
+  });
+
+  it('群聊里认不出来时，回调带 scene=group', () => {
+    const onUnsupported = vi.fn();
+    normalizeEvent(
+      makeBody({
+        event: 'group_chat',
+        data: { msg_type: 'some_new_type', msgid: 'm-new', group_id: 'g-1' },
+      }),
+      sdkOptions(onUnsupported),
+    );
+
+    expect(onUnsupported).toHaveBeenCalledWith({
+      msgType: 'some_new_type',
+      messageId: 'm-new',
+      scene: 'group',
+    });
+  });
+
+  it('msg_type 缺失时占位写「未知」，不留空串', () => {
+    const message = normalizeEvent(makeBody({ data: { msgid: 'm-none' } }), sdkOptions())!;
+    expect(message.content).toBe('[未支持的消息类型: 未知]');
+  });
+
+  it('渲染器抛错也走占位，不把异常抛给中间件', () => {
+    const onUnsupported = vi.fn();
+    const message = normalizeEvent(
+      makeBody({ data: { msg_type: 'weird', msgid: 'm-x' } }),
+      {
+        render: () => {
+          throw new Error('boom');
+        },
+        onUnsupported,
+      },
+    )!;
+
+    expect(message.content).toBe('[未支持的消息类型: weird]');
+    expect(onUnsupported).toHaveBeenCalledTimes(1);
+  });
+
+  it('没给 onUnsupported 时也不炸（纯函数照样可用）', () => {
+    const message = normalizeEvent(makeBody({ data: { msg_type: 'page', msgid: 'm-p2' } }), sdkOptions())!;
+    expect(message.content).toBe('[未支持的消息类型: page]');
+  });
+
+  it('正常文本不会被误判，也不触发回调', () => {
+    const onUnsupported = vi.fn();
+    const message = normalizeEvent(
+      makeBody({ data: { msg_type: 'text', text: '普通消息', msgid: 'm-t' } }),
+      sdkOptions(onUnsupported),
+    )!;
+
+    expect(message.content).toBe('普通消息');
+    expect(onUnsupported).not.toHaveBeenCalled();
+  });
+
+  it('合并转发：锁住 SDK 的 [合并转发：…] 分支，正文含发言人与内容', () => {
+    const message = normalizeEvent(
+      makeBody({
+        event: 'group_chat',
+        data: {
+          msg_type: 'merged',
+          msgid: 'm-merged',
+          group_id: 'g-1',
+          merged: {
+            source: '群聊记录',
+            msgs: [
+              { msg_type: 'text', text: '第一句', user_name: '张三', user_account: 'zhangsan', timestamp: '1700000000' },
+              { msg_type: 'text', text: '第二句', user_name: '李四', user_account: 'lisi' },
+            ],
+          },
+        },
+      }),
+      sdkOptions(),
+    )!;
+
+    expect(message.content).toContain('[合并转发：群聊记录]');
+    expect(message.content).toContain('发言人: 张三 (zhangsan)');
+    expect(message.content).toContain('第一句');
+    expect(message.content).toContain('发言人: 李四');
+    expect(message.content).toContain('第二句');
+  });
+
+  it('合并转发：source 缺失时用「聊天记录」兜底', () => {
+    const message = normalizeEvent(
+      makeBody({
+        data: {
+          msg_type: 'merged',
+          msgid: 'm-merged2',
+          merged: { msgs: [{ msg_type: 'text', text: '只有一句', user_account: 'zhaoliu' }] },
+        },
+      }),
+      sdkOptions(),
+    )!;
+
+    expect(message.content).toContain('[合并转发：聊天记录]');
+    expect(message.content).toContain('只有一句');
+  });
+
+  it('名片：锁住 SDK 的 [名片] 分支，正文含姓名与账号', () => {
+    const message = normalizeEvent(
+      makeBody({
+        data: { msg_type: 'card', msgid: 'm-card', card: { name: '王五', account: 'wangwu' } },
+      }),
+      sdkOptions(),
+    )!;
+
+    expect(message.content).toContain('[名片]');
+    expect(message.content).toContain('姓名: 王五');
+    expect(message.content).toContain('推推账号: wangwu');
+  });
+
+  it('名片字段缺失时也渲染出可读内容，不退化成占位', () => {
+    const message = normalizeEvent(
+      makeBody({ data: { msg_type: 'card', msgid: 'm-card2', card: {} } }),
+      sdkOptions(),
+    )!;
+
+    expect(message.content).toContain('[名片]');
+    expect(message.content).not.toContain('未支持的消息类型');
+  });
+});
+

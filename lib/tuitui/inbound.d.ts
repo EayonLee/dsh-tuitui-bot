@@ -15,8 +15,16 @@ import type { TuituiEventBody } from '@qihoo/tuitui-bot-sdk';
 import type { InboundAttachment, InboundMessage } from '../types.ts';
 /** 渲染消息正文的注入点（来自 client.event.renderMessageBody，避免在纯函数里持有客户端） */
 export type MessageRenderer = (data: unknown) => string;
+/** 一条认不出来的消息：正文渲染空了，留个可观测的痕迹（issue #18） */
+export interface UnsupportedMessage {
+    msgType?: string;
+    messageId: string;
+    scene: 'c2c' | 'group';
+}
 export interface NormalizeOptions {
     render: MessageRenderer;
+    /** 渲染不出正文时回调（gateway 接 logger.warn），不实现也不影响归一化 */
+    onUnsupported?: (info: UnsupportedMessage) => void;
 }
 /** 归一化入口：不认识的推推事件返回 null */
 export declare function normalizeEvent(body: TuituiEventBody, options: NormalizeOptions): InboundMessage | null;

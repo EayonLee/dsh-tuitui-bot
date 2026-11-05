@@ -261,6 +261,12 @@ export async function bootstrapGateway(
   const handleEvent = async (body: TuituiEventBody): Promise<void> => {
     const message = normalizeEvent(body, {
       render: (data) => client.event.renderMessageBody(data),
+      // 认不出来的消息类型：正文给占位，日志留痕迹（issue #18）
+      onUnsupported: ({ msgType, messageId, scene }) => {
+        logger.warn(
+          `im-tuitui: 未支持的消息类型 msg_type=${msgType ?? '未知'} scene=${scene} msgid=${messageId}（正文已用占位替代）`,
+        );
+      },
     });
     if (!message) {
       // 群事件（建群/被拉/被踢）不是消息，但机器人得知道自己身在何处：
