@@ -86,6 +86,10 @@ dsh --profile <name>                                      # 重启让新版本�
 
 跟着主干走的，重装 `github:EayonLee/dsh-tuitui-bot` 即可。
 
+设置页「关于」也能做这件事：打开 `selfUpdate.enabled` 后点「更新到 vX.Y.Z」就跑完上面两步
+（下载、校验、备份、安装）。宿主加载了 `@deepseek-ai/dsh-hmr` 时**不需要重启**——插件会就地
+热重载，页面上的版本号自己变；没有 HMR 会明说需要重启。失败自动回滚到旧目录。
+
 `dsh --profile <name> --dump-config | grep -A3 im-tuitui` 可以确认插件行已进入组合树。
 
 卸载：
@@ -201,6 +205,11 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 - **上下文与会话**：群聊上下文条数、闲置回收分钟数，带单位后缀与用途说明。
 - **工作区**：下拉直接选目录（默认工作区 / `~/workspace` 下的项目 / 当前值），不用手打绝对路径。
 - **推推原生能力**：交互卡片、中间步骤上报、调试日志三个开关。
+- **关于**：GitHub 图标直达仓库；显示**真正装进 profile 的版本号**（不是构建期写死的号）；
+  「检查更新」查线上最新版本（GitHub Release / 主干 / jsDelivr 多源取最大，6 小时缓存，
+  查不到会如实说「检查失败」而不是冒充「已是最新」）。打开 `selfUpdate.enabled` 后
+  可以直接更新：下载 Release 包 → sha256 校验 → 备份 → 安装 → **宿主有 `dsh-hmr` 时热重载，
+  进程不重启**；没有 HMR 的部署会明确提示「重启后生效」，装坏了自动回滚。
 
 > 名单、提示词这类长文本提交前都在服务端重新校验（长度、控制字符、类型），
 > 客户端校验只负责体验，安全边界在宿主。
@@ -239,6 +248,8 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | 按作用域追加的 system prompt |
 | `textChunkLimit` | number | `4000` | 单条消息最大字符数 |
 | `debug` | boolean | `false` | 调试日志（含原始事件体） |
+| `selfUpdate.enabled` | boolean | `false` | 允许设置页一键更新（下载 Release 包 + 热重载） |
+| `selfUpdate.channel` | `release` \| `main` | `release` | 对比谁算「最新」：正式发布 / 仓库主干 |
 
 ### 会话与并发
 

@@ -10,6 +10,19 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+### Added
+
+- Settings page gains an **About** block (#27): GitHub icon straight to the repository, the version
+  actually installed in the profile (read from disk), and a one-click check against GitHub Release /
+  main / jsDelivr taking the highest answer (6 h cache; a failed check reports the failure instead
+  of claiming to be up to date).
+- Optional in-place update (#27, config key `selfUpdate.enabled`, off by default): it only accepts
+  `dsh-tuitui-bot-<version>.tgz` from this repository's releases, verifies sha256, backs up the
+  previous directory, runs `pnpm add`, and re-adds the profile's `dsh.profile.bundles` entry. When
+  the host provides `@deepseek-ai/dsh-hmr` it calls `reconcileProfile` to hot-reload the plugin so
+  **no process restart is needed**; without HMR it says a restart is required; any failure rolls the
+  previous version back.
+
 ### Changes
 
 - Fixed: `dsh` metadata in `package.json` (`bundle.patch` / `client.platform` / `compatibility`)
@@ -18,6 +31,8 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - `scripts/ship.sh` now verifies the profile's `dsh.profile.bundles` lists this package and adds
   it when missing, so that silent disappearance cannot repeat.
 - Restart workflow unified on `sudo systemctl restart dsh-web`; no more `~/bin/dsh-restart`.
+- New config keys `selfUpdate.enabled` (default `false`) and `selfUpdate.channel`
+  (`release` / `main`), editable from the settings page and applied through HMR like any other key.
 - Inbound readability (issue #18): a message type the plugin cannot render no longer turns into
   an empty string — the body becomes `[未支持的消息类型: xxx]` and a `logger.warn` records the
   `msg_type`, chat and `msgid`; `tuitui_history` uses the same placeholder. Merged-forward and

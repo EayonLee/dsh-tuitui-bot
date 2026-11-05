@@ -104,6 +104,13 @@ export interface AgentStepsConfig {
     /** 工具结果截断字符数 */
     maxResultChars: number;
 }
+/** 自更新配置（设置页「关于」区块） */
+export interface SelfUpdateConfig {
+    /** 允许设置页一键更新（默认关：等于把"装 tgz"的开关放进网页） */
+    enabled: boolean;
+    /** 对比谁算「最新」：release=GitHub 正式发布 / main=仓库主干 */
+    channel: 'release' | 'main';
+}
 export interface ImTuituiConfig {
     /** 推推机器人 AppID */
     appId: string;
@@ -145,6 +152,8 @@ export interface ImTuituiConfig {
         /** 团队帖子：默认排队 */
         post: ConcurrencyStrategy;
     };
+    /** 自更新（检查更新 / 一键更新） */
+    selfUpdate: SelfUpdateConfig;
     /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
     reactions: {
         /** 总开关 */

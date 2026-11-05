@@ -21,6 +21,9 @@ import type { BindStateWire, BotInfoWire } from '../shared/bind-protocol.ts';
 import type { Logger } from '../types.ts';
 import { BindingService } from './binding-service.ts';
 import { registerBindRoutes, type WebServerLike } from './bind-routes.ts';
+import { registerAboutRoutes } from './about-routes.ts';
+import { createHotReload } from './hot-reload.ts';
+import { getProfileDir } from '../shared/index.ts';
 import { createTerminalPresenter, isDesktopHost } from './presenters.ts';
 import type { SetupCredentials } from './persist.ts';
 import { createTuituiClient, describeApiError } from '../tuitui/client.ts';
@@ -110,6 +113,29 @@ export async function ensureCredentials(
   }));
 
   return service.start();
+}
+
+/** 本插件在 profile 组合树里的入口 id（热重载按它重建） */
+export const ENTRY_ID = 'im-tuitui';
+
+/**
+ * 注册版本/更新面板路由（设置页「关于」区块）。
+ *
+ * 与凭据是否配置无关：没绑定时也想看到「装的是哪一版」，所以 apply 里
+ * 两分支都会调它。热重载能力在这里探测一次（宿主可能没装 dsh-hmr）。
+ */
+export function registerAboutPanel(
+  ctx: Context,
+  logger: Logger,
+  config: ImTuituiConfig,
+): void {
+  const hotReload = createHotReload(ctx, [ENTRY_ID], logger);
+  withWebServer(ctx, (webServer) => registerAboutRoutes(webServer, {
+    config: () => config,
+    logger,
+    hotReload,
+    profileDir: () => getProfileDir() ?? null,
+  }));
 }
 
 /**

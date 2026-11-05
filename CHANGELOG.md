@@ -7,6 +7,15 @@
 这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
 版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
 
+### 新增
+
+- 设置页新增「关于」区块（#27）：GitHub 图标直达仓库、显示真正装进 profile 的版本号、
+  一键检查线上最新版本（Release / 主干 / jsDelivr 多源取最大，6h 缓存，查不到如实报错）。
+- 可选的新版一键更新（#27，配置项 `selfUpdate.enabled`，默认关）：只从本仓库 Release 取
+  `dsh-tuitui-bot-<版本>.tgz`，sha256 校验后备份旧目录再 `pnpm add`，装完补
+  `dsh.profile.bundles`；宿主有 `@deepseek-ai/dsh-hmr` 时调 `reconcileProfile` 热重载，
+  **进程不重启**；没有 HMR 明确提示需重启；任一步失败自动回滚旧版本。
+
 ### 变更
 
 - 修复：`package.json` 里的 `dsh` 元数据（`bundle.patch` / `client.platform` / `compatibility`）
@@ -15,6 +24,8 @@
 - `scripts/ship.sh` 装完会校验 profile 的 `dsh.profile.bundles` 包含本包，缺了就补，
   避免同一种「静默消失」再发生一次。
 - 重启口径统一：仓库文档与脚本只写 `sudo systemctl restart dsh-web`，不再引用 `~/bin/dsh-restart`。
+- 新增配置项 `selfUpdate.enabled`（默认 `false`）与 `selfUpdate.channel`（`release` / `main`），
+  设置页可改，写入 profile patch 后与其它配置一样经 HMR 生效。
 - 入站可读性收尾（#18）：认不出来的消息类型不再变成空串，正文给
   `[未支持的消息类型: xxx]` 占位，同时 `logger.warn` 记下 `msg_type` / 会话 / `msgid`；
   `tuitui_history` 读不到正文时用同一套占位。合并转发、名片补夹具锁住 SDK 渲染分支。
