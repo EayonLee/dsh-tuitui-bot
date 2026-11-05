@@ -53,11 +53,11 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 装上就是稳定的。
 
 1. 打开 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest)，
-   下载 `eayonlee-dsh-tuitui-bot-<版本>.tgz`（例如 `0.1.29`）
+   下载 `dsh-tuitui-bot-<版本>.tgz`（例如 `0.1.29`）
 2. 装进 profile：
 
 ```bash
-dsh plugin --profile tuitui add ./eayonlee-dsh-tuitui-bot-0.1.29.tgz
+dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.29.tgz
 ```
 
 想跟着主干走（能拿到还没发版的改动，也可能撞上正在改的东西）：

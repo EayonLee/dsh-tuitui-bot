@@ -43,8 +43,8 @@ STAMP=$(date +%H%M%S)
 OUT="/tmp/tuitui-ship-$STAMP"
 mkdir -p "$OUT"
 echo "▶ 打包 $OUT"
-npm pack --pack-destination "$OUT" 2>&1 | tail -1
-TARBALL="$OUT/eayonlee-dsh-tuitui-bot-${VERSION}.tgz"
+# 统一走 pack.sh：它的产物名是 dsh-tuitui-bot-<version>.tgz（npm pack 会带 scope 前缀）
+TARBALL=$(./scripts/pack.sh "$OUT" | tail -1)
 
 echo "▶ 装进 profile:$PROFILE"
 dsh plugin --profile "$PROFILE" add "$TARBALL" 2>&1 | tail -2
