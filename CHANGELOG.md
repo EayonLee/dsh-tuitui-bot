@@ -18,6 +18,21 @@
 - Release 附带正式包 `dsh-tuitui-bot-<版本>.tgz`，作为推荐安装来源；文件名不带 scope 前缀
   （新增 `scripts/pack.sh` 统一出包，`npm pack` 默认会写成 `eayonlee-` 开头）
 
+## 0.1.30
+
+合并 #11（来自 @wangxiang12379）：修执行进度与 Token 上报。
+
+### 修复
+
+- **runId 复用**：同一条消息的模型调用 / 工具调用 / 完成事件共用一次 `buildContext` 结果（按会话+消息 id 缓存，`agent_end` 时清理），不再每条上报都重建上下文，进度链条不再断
+- **首次上报自动补 `message_received`**：消息进入时若没显式调用，第一次上报会补发，保证宿主看到的顺序完整
+- **Token 用量**：`assistant/message` 的 `usage` 一路带到 `llm_output`；只有工具调用、没有文本的轮次也会上报用量（原来直接 return 掉了）
+- **轮末投递失败不再吞掉任务结束**：`turn/end` 的文本 flush / 错误提示 / 文件交付全部包进 `try/catch/finally`，失败也会在 `finally` 里发 `agent_end`；`reportTarget` 提前快照，避免误用到下一条消息的目标
+
+### 测试
+
+`npx vitest run` 全绿（合并前 860 / 合并后随主线增长），`npm run build` 产物与源码一致。
+
 ## 0.1.29
 
 修「工具对模型不可见」（[#14](https://github.com/EayonLee/dsh-tuitui-bot/issues/14)）：7 个工具因缺少 dsh 强制的 `output` 声明，从上线起就没注册成功过。
