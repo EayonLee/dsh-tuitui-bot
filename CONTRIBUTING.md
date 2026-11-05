@@ -89,6 +89,8 @@ chore: 脚本加可执行位
 5. 改动配置项时，同步更新：`src/config.ts` 的 Schema、`cordis.patch.yml`（若需暴露）、
    `README.md` 与 `README_EN.md` 的配置表、`src/setup/bind-routes.ts` 的可编辑键白名单。
 6. 提交后保持分支可 rebase，合并方式由维护者决定（默认 squash）。
+7. **不要动版本号**：`package.json` 的 `version` 与已发布版本的 CHANGELOG 条目由维护者
+   在发版时统一处理（见 §8）。你的改动写进 `## 未发布（Unreleased）` 即可。
 
 ## 7. 提 issue 之前
 
@@ -98,17 +100,90 @@ chore: 脚本加可执行位
 - 功能建议用 [功能建议](https://github.com/EayonLee/dsh-tuitui-bot/issues/new?template=feature_request.yml)，
   说明推推侧可复用的原生能力（SDK 方法名）比只描述期望更有效。
 
-## 8. 发布（维护者）
+## 8. 版本与发布
 
-1. 更新 `CHANGELOG.md` / `CHANGELOG_EN.md`，语义化版本号写进 `package.json`。
-2. `npm run build`，确认 `lib/` 产物提交进仓库（支持 `github:` 直接安装，CI 会校验产物是否过期）。
-3. `npm pack --dry-run` 检查包内容。
-4. 合并到 `main` 后打 tag 并推送：`git tag v0.x.y && git push origin v0.x.y`。
-   tag 触发 `.github/workflows/release.yml`：跑类型检查 + 测试 + 构建，
-   自动创建 GitHub Release（Release Notes 由提交记录生成），
-   配了 `NPM_TOKEN` 的话同时 `npm publish`。
-5. 用户装法固定一条：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`；
-   锁版本就加 `#v0.x.y`。
+### 谁定版本
+
+**只有维护者发版时才动版本号。** 提 PR 不要改 `package.json` 的 `version`，
+也不要改已发布版本的 CHANGELOG 条目——那两件事属于发版动作，混在功能 PR 里会让历史失真。
+
+日常改动只往 `CHANGELOG.md` / `CHANGELOG_EN.md` 顶部的 **`## 未发布（Unreleased）`**
+里加一条，写清「用户视角看到了什么变化」。
+
+### 版本号怎么定
+
+语义化版本（`MAJOR.MINOR.PATCH`），当前处于 `0.x`：
+
+| 改动性质 | 版本位 | 例子 |
+| --- | --- | --- |
+| 只修 bug、不改行为契约 | PATCH | `0.1.29 → 0.1.30` |
+| 兼容地新增能力（新配置项带默认值、新工具、新命令） | MINOR | `0.1.30 → 0.2.0` |
+| 破坏性变更（配置键改名/删除、默认行为反转、协议不兼容） | MINOR + Notes 单列 | `0.2.0`，并在 Release Notes 的「破坏性变更」写迁移方式 |
+
+一次发版可以包含多个 PR；不要为了单个修复合一个小版本，也不要攒到几十个改动才发。
+
+### 发版步骤（维护者）
+
+1. 确认 `main` 干净、CI 绿、`node scripts/verify-tools.mjs` 通过。
+2. 终结 Unreleased：`CHANGELOG.md` / `CHANGELOG_EN.md` 的
+   `## 未发布（Unreleased）` 改成 `## 0.1.30 (2026-11-06)`。
+3. 改 `package.json` 的 `version`，`npm run build`，把 `lib/` 产物一起提交。
+4. 合并进 `main`。
+5. 打 tag 并推送（**只在 `main` 上打，已发布的 tag 永不移动**）：
+
+   ```bash
+   git tag v0.1.30 && git push origin v0.1.30
+   ```
+
+6. 建 Release 并上传正式包（这是用户唯一推荐的安装来源）：
+
+   ```bash
+   npm pack --pack-destination /tmp/rel
+   gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
+   gh release upload v0.1.30 /tmp/rel/eayonlee-dsh-tuitui-bot-0.1.30.tgz
+   ```
+
+7. 回填 Release 正文（`gh release edit v0.1.30 --notes-file notes.md`），按下节标准写。
+
+### Release Notes 标准
+
+标题固定 `vX.Y.Z`，正文按骨架写：
+
+```markdown
+一句话说清这个版本的主线。
+
+## 新增
+- 做了什么（#issue/PR）
+
+## 修复
+- 修了什么现象；根因一句话（#issue/PR）
+
+## 破坏性变更
+- 改了什么、用户要怎么迁移（没有就整节删掉）
+
+## 升级注意
+- 需不需要重启进程 / 刷新页面 / 重填配置（没有就整节删掉）
+```
+
+硬要求：
+
+- 每条必须能落到 PR 或 issue 号
+- 写「用户看到的现象」，不写「调整了内部实现」
+- 不许出现「若干优化」「体验提升」这类没有信息量的句子
+- 安装方式或包结构有变化，必须写进「升级注意」
+
+### 不再发布 npm
+
+`package.json` 里 `private: true`，本项目**不向 npm 发布**。任何 `npm publish`、
+`NPM_TOKEN` 相关的流水线配置都是错的，发现即回退。
+
+### 用户怎么装
+
+只有两条路径，文档里不许写第三种：
+
+1. **正式包（推荐）**：从 Release 下载 `eayonlee-dsh-tuitui-bot-<版本>.tgz`，
+   然后 `dsh plugin --profile <name> add ./<tarball>`
+2. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
 
 ## 9. 行为准则
 

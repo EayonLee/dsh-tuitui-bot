@@ -46,11 +46,13 @@ The order is the behaviour contract.
 ## Quick start
 
 ```bash
-# 1. install the bundle into a profile
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+# 1. install a published release (recommended)
+#    grab eayonlee-dsh-tuitui-bot-<version>.tgz from
+#    https://github.com/EayonLee/dsh-tuitui-bot/releases/latest
+dsh plugin --profile tuitui add ./eayonlee-dsh-tuitui-bot-0.1.29.tgz
 
-# pin a release if you want a fixed version
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot#v0.1.29
+# or track main (unreleased changes, may be mid-refactor)
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
 
 # 2. configure credentials
 export TUITUI_BOT_APPID="your-app-id"

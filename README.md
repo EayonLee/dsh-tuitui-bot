@@ -49,15 +49,24 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 
 ### 2. 安装插件
 
+**推荐装 Release 里的正式包**——只有维护者打过 tag 的版本才算发布，跑过完整测试，
+装上就是稳定的。
+
+1. 打开 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest)，
+   下载 `eayonlee-dsh-tuitui-bot-<版本>.tgz`（例如 `0.1.29`）
+2. 装进 profile：
+
+```bash
+dsh plugin --profile tuitui add ./eayonlee-dsh-tuitui-bot-0.1.29.tgz
+```
+
+想跟着主干走（能拿到还没发版的改动，也可能撞上正在改的东西）：
+
 ```bash
 dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
 ```
 
-仓库已提交构建产物 `lib/`，直接装即可，不需要本地构建。想锁版本就把 tag 带上：
-
-```bash
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot#v0.1.29
-```
+仓库已提交构建产物 `lib/`，两种装法都不需要本地构建。
 
 ### 3. 配置凭据并启动
 
