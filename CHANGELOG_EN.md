@@ -16,6 +16,9 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   npm / one-shot script / local checkout instructions removed from README and README_EN
 - Added [AGENTS.md](./AGENTS.md): layering, commands, release process, release-note standard, hard rules
 - The project no longer publishes to npm (`private: true`); `install.sh` removed
+- README restructured into nine sections (What it is / Quick start / What it can do / Configuration /
+  Architecture / Development / Contributing / Credits / License); the old commands, tools, smart-interjection,
+  reliability and context sections folded into them
 - Releases now ship `dsh-tuitui-bot-<version>.tgz` as the recommended install source; the file name
   carries no scope prefix (`scripts/pack.sh` builds it — bare `npm pack` would write `eayonlee-...`)
 
