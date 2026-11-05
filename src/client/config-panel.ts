@@ -287,6 +287,20 @@ const PANEL_CSS: readonly string[] = [
   '  scroll-margin-top: 8px;',
   '}',
   '.imqb2-card-head { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }',
+  /* 只对某种模式生效的区块：留在原地但置灰，避免切模式时页面跳动 */
+  '.imqb2-card--muted { opacity: 0.55; }',
+  '.imqb2-card--muted .imqb2-rows { pointer-events: none; user-select: none; }',
+  '.imqb2-card--muted .imqb2-card-title { color: var(--dsw-alias-label-tertiary); }',
+  '.imqb2-card-note {',
+  '  font-size: 11px; line-height: 16px; padding: 1px 6px; border-radius: 6px;',
+  '  color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-l2);',
+  '  border: 0.5px solid var(--dsw-alias-border-l2); white-space: nowrap;',
+  '}',
+  /* 区内小标题：把同一维度的几行收在一起（如「忙的时候」） */
+  '.imqb2-subhead {',
+  '  font-size: 11px; font-weight: 600; line-height: 16px; letter-spacing: .02em;',
+  '  color: var(--dsw-alias-label-tertiary); padding: 14px 0 2px;',
+  '}',
   '.imqb2-card-title { margin: 0; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--dsw-alias-label-primary); }',
   '.imqb2-card-tip {',
   '  display: inline-flex; align-items: center; justify-content: center;',
@@ -493,12 +507,28 @@ function ProbeButton({ state, busy, onTest }: {
   }, label);
 }
 
-function Section({ id, title, desc, children }: {
+function Section({ id, title, desc, children, muted, note }: {
   id: string; title: string; desc?: string; children?: ReactNode;
+  /**
+   * 置灰但保留在原地。
+   *
+   * 有些区块只对某种模式生效（比如「智能判断」只在触发方式=智能时有用）。
+   * 以前是直接不渲染，切模式时下面整片上下跳，改完还得翻页找；现在常驻，
+   * 只是降透明度 + 不可交互，位置固定，一眼能看见它为什么不能用。
+   */
+  muted?: boolean;
+  /** muted 时跟在标题后面的短说明（如「仅智能模式生效」） */
+  note?: string;
 }): ReactNode {
-  return createElement('section', { className: 'imqb2-card', id: 'imqb2-mod-' + id },
+  const className = muted === true ? 'imqb2-card imqb2-card--muted' : 'imqb2-card';
+  return createElement('section', {
+    className,
+    id: 'imqb2-mod-' + id,
+    ...(muted === true ? { 'aria-disabled': 'true' } : {}),
+  },
     createElement('div', { className: 'imqb2-card-head' },
       createElement('h3', { className: 'imqb2-card-title' }, title),
+      note === undefined ? null : createElement('span', { className: 'imqb2-card-note' }, note),
       desc === undefined ? null : createElement('span', {
         className: 'imqb2-card-tip', title: desc, 'aria-label': desc,
       }, '?'),
@@ -846,13 +876,15 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
     ...(cwd !== '' && !workspaceOptions.includes(cwd) ? [{ value: cwd, label: cwd + '（当前）' }] : []),
   ];
 
+  // 导航顺序必须与正文顺序一致（以前正文是 回执→智能、导航是 智能→图像→回执，点了会乱跳）
   const modules = [
     { id: 'scope', label: '服务范围' },
     { id: 'reply', label: '回话方式' },
-    ...(policy === 'smart' ? [{ id: 'smart', label: '智能判断' }] : []),
-    { id: 'image', label: '图像' },
+    { id: 'smart', label: '智能判断' },
     { id: 'reaction', label: '表情回执' },
     { id: 'context', label: '上下文' },
+    { id: 'prompt', label: '提示词' },
+    { id: 'image', label: '图像' },
     { id: 'workspace', label: '工作区' },
     { id: 'native', label: '原生能力' },
     { id: 'output', label: '输出调试' },
@@ -965,6 +997,8 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
             : '群里每条消息都回——建议只用在专用小群。',
         onChange: (v) => { patch('mentionPolicy', v as MentionPolicy); },
       }),
+      // 「要不要说」和「已经在说了又来话怎么办」是两个维度，中间加个小标题分开
+      createElement('div', { className: 'imqb2-subhead' }, '忙的时候'),
       createElement(SelectRow, {
         label: '单聊忙时', value: form['concurrency.c2c'] ?? 'abort', options: CONCURRENCY_OPTIONS,
         help: '私聊正在回上一句时又来一句：打断＝放弃旧的直接接新话，最像真人聊天。',
@@ -981,6 +1015,59 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('concurrency.post', v as ConcurrencyStrategy); },
       }),
     ),
+
+    // 智能判断是「触发方式 = 智能」的细化配置，紧跟在回话方式后面；
+    // 不用条件渲染：切换触发方式时页面不跳，找不到的人也不会以为它消失了。
+    createElement(Section, {
+      id: 'smart',
+      title: '智能判断',
+      desc: '群聊/帖子没有指定叫机器人时，由模型读最近对话决定「这条要不要接」；单聊不经过判定。',
+      muted: policy !== 'smart',
+      note: policy === 'smart' ? undefined : '仅智能模式生效',
+    },
+      createElement('div', { className: 'imqb2-explain' },
+        createElement('div', { className: 'imqb2-explain-title' }, '它到底在判断什么'),
+        createElement('ul', { className: 'imqb2-explain-list' },
+          createElement('li', null, '要不要接这句话 —— 别人在聊自己的事时保持安静，被问到或话题相关才插话。'),
+          createElement('li', null, '接的话怎么接 —— 是正常回答、还是只挂个表情表示看到了。'),
+          createElement('li', null, '什么时候闭嘴 —— 对话已经结束、或者自己刚说过，就不重复刷屏。'),
+        ),
+        createElement('div', { className: 'imqb2-explain-note' },
+          '@ 了机器人、或者引用它的消息回复，一律直接回，不经过这个判定，也不受下面的间隔限制。',
+        ),
+      ),
+      createElement(TextAreaRow, {
+        label: '判定提示词',
+        value: form['smartJudge.prompt'] ?? DEFAULT_SMART_PROMPT,
+        rows: 14,
+        sub: '支持多行；留空恢复出厂默认',
+        help: '模型会拿到【最近对话】与【新消息】，按这里的规则判断要不要回；改坏了可以直接恢复默认。',
+        action: createElement('button', {
+          type: 'button', className: 'imqb2-inline-btn',
+          onClick: () => { patch('smartJudge.prompt', ''); },
+        }, '恢复默认'),
+        onChange: (v) => { patch('smartJudge.prompt', v); },
+      }),
+      createElement(NumberRow, {
+        label: '判定间隔', value: Math.round((form['smartJudge.cooldownMs'] ?? 5000) / 1000),
+        min: 0, max: 3600, step: 5, suffix: '秒',
+        help: '同一会话两次判定的最小间隔，防止每条消息都调模型。',
+        onChange: (v) => { patch('smartJudge.cooldownMs', v * 1000); },
+      }),
+      createElement(NumberRow, {
+        label: '判定超时', value: Math.round((form['smartJudge.timeoutMs'] ?? 20000) / 1000),
+        min: 3, max: 120, step: 1, suffix: '秒',
+        help: '思考型模型几秒才出结果；给太短会把「还在想」误判成不回话。',
+        onChange: (v) => { patch('smartJudge.timeoutMs', v * 1000); },
+      }),
+      createElement(NumberRow, {
+        label: '判断时看几条', value: form['smartJudge.maxHistory'] ?? 50,
+        min: 0, max: 50, step: 1, suffix: '条',
+        help: '交给模型的历史消息条数。太少判断不准，太多费 token。',
+        onChange: (v) => { patch('smartJudge.maxHistory', v); },
+      }),
+    ),
+
 
     createElement(Section, {
       id: 'reaction',
@@ -1013,56 +1100,6 @@ export function ConfigPanel(props: { bindPhase?: string } = {}): ReactNode {
         onChange: (v) => { patch('reactions.fail', v); },
       }),
     ),
-
-    policy === 'smart'
-      ? createElement(Section, {
-          id: 'smart',
-          title: '智能判断',
-          desc: '群聊/帖子没有指定叫机器人时，由模型读最近对话决定「这条要不要接」；单聊不经过判定。',
-        },
-          createElement('div', { className: 'imqb2-explain' },
-            createElement('div', { className: 'imqb2-explain-title' }, '它到底在判断什么'),
-            createElement('ul', { className: 'imqb2-explain-list' },
-              createElement('li', null, '要不要接这句话 —— 别人在聊自己的事时保持安静，被问到或话题相关才插话。'),
-              createElement('li', null, '接的话怎么接 —— 是正常回答、还是只挂个表情表示看到了。'),
-              createElement('li', null, '什么时候闭嘴 —— 对话已经结束、或者自己刚说过，就不重复刷屏。'),
-            ),
-            createElement('div', { className: 'imqb2-explain-note' },
-              '@ 了机器人、或者引用它的消息回复，一律直接回，不经过这个判定，也不受下面的间隔限制。',
-            ),
-          ),
-          createElement(TextAreaRow, {
-            label: '判定提示词',
-            value: form['smartJudge.prompt'] ?? DEFAULT_SMART_PROMPT,
-            rows: 14,
-            sub: '支持多行；留空恢复出厂默认',
-            help: '模型会拿到【最近对话】与【新消息】，按这里的规则判断要不要回；改坏了可以直接恢复默认。',
-            action: createElement('button', {
-              type: 'button', className: 'imqb2-inline-btn',
-              onClick: () => { patch('smartJudge.prompt', ''); },
-            }, '恢复默认'),
-            onChange: (v) => { patch('smartJudge.prompt', v); },
-          }),
-          createElement(NumberRow, {
-            label: '判定间隔', value: Math.round((form['smartJudge.cooldownMs'] ?? 5000) / 1000),
-            min: 0, max: 3600, step: 5, suffix: '秒',
-            help: '同一会话两次判定的最小间隔，防止每条消息都调模型。',
-            onChange: (v) => { patch('smartJudge.cooldownMs', v * 1000); },
-          }),
-          createElement(NumberRow, {
-            label: '判定超时', value: Math.round((form['smartJudge.timeoutMs'] ?? 20000) / 1000),
-            min: 3, max: 120, step: 1, suffix: '秒',
-            help: '思考型模型几秒才出结果；给太短会把「还在想」误判成不回话。',
-            onChange: (v) => { patch('smartJudge.timeoutMs', v * 1000); },
-          }),
-          createElement(NumberRow, {
-            label: '判断时看几条', value: form['smartJudge.maxHistory'] ?? 50,
-            min: 0, max: 50, step: 1, suffix: '条',
-            help: '交给模型的历史消息条数。太少判断不准，太多费 token。',
-            onChange: (v) => { patch('smartJudge.maxHistory', v); },
-          }),
-        )
-      : null,
 
     createElement(Section, {
       id: 'context',
