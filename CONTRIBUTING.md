@@ -101,9 +101,14 @@ chore: 脚本加可执行位
 ## 8. 发布（维护者）
 
 1. 更新 `CHANGELOG.md` / `CHANGELOG_EN.md`，语义化版本号写进 `package.json`。
-2. `npm run build`，确认 `lib/` 产物提交进仓库（支持 `github:` 直接安装）。
-3. `npm pack --dry-run` 检查包内容，`npm publish`。
-4. 打 tag：`git tag v0.x.y && git push --tags`。
+2. `npm run build`，确认 `lib/` 产物提交进仓库（支持 `github:` 直接安装，CI 会校验产物是否过期）。
+3. `npm pack --dry-run` 检查包内容。
+4. 合并到 `main` 后打 tag 并推送：`git tag v0.x.y && git push origin v0.x.y`。
+   tag 触发 `.github/workflows/release.yml`：跑类型检查 + 测试 + 构建，
+   自动创建 GitHub Release（Release Notes 由提交记录生成），
+   配了 `NPM_TOKEN` 的话同时 `npm publish`。
+5. 用户装法固定一条：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`；
+   锁版本就加 `#v0.x.y`。
 
 ## 9. 行为准则
 

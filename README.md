@@ -50,18 +50,13 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 ### 2. 安装插件
 
 ```bash
-# 一键安装脚本（自动建 profile、装包、提示配置；npm 装不上会自动回落 GitHub）
-sh install.sh
-
-# 从 npm 安装（推荐）
-dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
-
-# 从 GitHub 安装（等价；npm 不可达时用，仓库已提交构建产物 lib/，无需本地构建）
 dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+```
 
-# 或从本地源码 / tarball 安装
-dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
-npm pack && dsh plugin --profile tuitui add ./eayonlee-dsh-tuitui-bot-0.1.0.tgz
+仓库已提交构建产物 `lib/`，直接装即可，不需要本地构建。想锁版本就把 tag 带上：
+
+```bash
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot#v0.1.29
 ```
 
 ### 3. 配置凭据并启动
@@ -283,7 +278,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 改完配置或想升级时，重装同一路径即可（profile 会原地替换），然后重启对应 profile：
 
 ```bash
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot   # 或本地 tarball / 源码目录
+dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot
 dsh --profile <name>                                      # 重启让新版本加载
 ```
 

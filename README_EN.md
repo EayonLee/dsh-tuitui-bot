@@ -47,11 +47,10 @@ The order is the behaviour contract.
 
 ```bash
 # 1. install the bundle into a profile
-sh install.sh                                              # one-shot script (npm, falls back to GitHub)
-dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot     # npm (recommended)
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot   # straight from GitHub (lib/ is committed)
-# (or from a local checkout / tarball)
-dsh plugin --profile tuitui add /path/to/dsh-tuitui-bot
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+
+# pin a release if you want a fixed version
+dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot#v0.1.29
 
 # 2. configure credentials
 export TUITUI_BOT_APPID="your-app-id"
@@ -61,6 +60,8 @@ export DEEPSEEK_API_KEY="your-deepseek-key"
 # 3. run
 dsh --profile tuitui
 ```
+
+Build output (`lib/`) is committed, so installing straight from GitHub needs no local build.
 
 Alternatively leave the env vars unset and fill **Settings → Tuitui Bot** in the GUI; the plugin verifies the
 credentials with `property.info()` and writes them into the profile's `cordis.patch.yml`.
@@ -214,7 +215,7 @@ clearing the box restores the factory default ([source](./src/shared/smart-promp
 Re-install the same spec to upgrade (the profile is replaced in place), then restart that profile:
 
 ```bash
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot   # or a local tarball / checkout
+dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot
 dsh --profile <name>                                      # restart to load the new build
 ```
 
