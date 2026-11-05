@@ -11,7 +11,12 @@ import { ConfigSchema, type ImTuituiConfig } from './config.ts';
 import { bootstrapGateway } from './gateway/index.ts';
 import type { DshAgentRegistry } from './session/index.ts';
 import { getProfileDir, resolveEnv } from './shared/index.ts';
-import { ensureCredentials, persistCredentialsToProfile, registerBoundCredentialRoutes } from './setup/index.ts';
+import {
+  ensureCredentials,
+  persistCredentialsToProfile,
+  registerAboutPanel,
+  registerBoundCredentialRoutes,
+} from './setup/index.ts';
 import { withFileLog } from './shared/index.ts';
 import type { Logger } from './types.ts';
 
@@ -32,6 +37,9 @@ export async function apply(ctx: Context, config: ImTuituiConfig): Promise<void>
   // 宿主 logger 转发 + 自己落一份到 ~/.dsh/tuitui.log（排查「为什么没回」靠它）
   const baseLogger: Logger = ((ctx as unknown as Record<string, unknown>).logger as Logger) ?? console;
   const logger: Logger = withFileLog(baseLogger);
+
+  // 版本 / 更新面板：与凭据无关，先在两个分支之前挂上（没绑定时也要能看到版本）
+  registerAboutPanel(ctx, logger, { ...config });
 
   const appId = resolveEnv(config.appId, APP_ID_ENV);
   const appSecret = resolveEnv(config.appSecret, APP_SECRET_ENV);

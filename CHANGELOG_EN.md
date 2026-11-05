@@ -10,6 +10,21 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+### Added
+
+- Settings page gains an **About** block (#27): GitHub icon straight to the repository, the version
+  actually installed in the profile (read from disk), and a one-click check against GitHub Release /
+  main / jsDelivr taking the highest answer (6 h cache; a failed check reports the failure instead
+  of claiming to be up to date).
+- The update entry lives at the right end of the "bound" status row (same line as *Change
+  credentials* / *Unbind*), not in its own settings block; enabled by default
+  (`selfUpdate.enabled: false` keeps the check but disables installing). It only accepts
+  `dsh-tuitui-bot-<version>.tgz` from this repository's releases, verifies sha256, backs up the
+  previous directory, runs `pnpm add`, and re-adds the profile's `dsh.profile.bundles` entry. When
+  the host provides `@deepseek-ai/dsh-hmr` it calls `reconcileProfile` to hot-reload the plugin so
+  **no process restart is needed**; without HMR it says a restart is required; any failure rolls the
+  previous version back.
+
 ### Changes
 
 - Fixed: `dsh` metadata in `package.json` (`bundle.patch` / `client.platform` / `compatibility`)
@@ -18,6 +33,17 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - `scripts/ship.sh` now verifies the profile's `dsh.profile.bundles` lists this package and adds
   it when missing, so that silent disappearance cannot repeat.
 - Restart workflow unified on `sudo systemctl restart dsh-web`; no more `~/bin/dsh-restart`.
+- Version strip polish (#27): the version is shown in full (never ellipsised); "Check for updates"
+  stays clickable except while a check/install runs, and clicking it when already current replies
+  "already up to date (vX.Y.Z)"; restart-required / check-failed (orange), up-to-date (green) and
+  local-ahead (blue) states are colour-coded instead of grey text.
+- Hardened update decisions (#27): the release channel trusts only the Release tag (main is no
+  longer mixed in, which used to advertise a version whose asset did not exist); prerelease tags
+  (`-beta.1`) are not treated as updates; before installing, the tarball is unpacked and its name,
+  version and `dsh.compatibility.dshReleases` entry are checked against the running host, refusing
+  anything unverified; `link:` development installs refuse to self-update.
+- New config keys `selfUpdate.enabled` (default `false`) and `selfUpdate.channel`
+  (`release` / `main`), editable from the settings page and applied through HMR like any other key.
 - Inbound readability (issue #18): a message type the plugin cannot render no longer turns into
   an empty string — the body becomes `[未支持的消息类型: xxx]` and a `logger.warn` records the
   `msg_type`, chat and `msgid`; `tuitui_history` uses the same placeholder. Merged-forward and

@@ -158,6 +158,15 @@ dsh Settings → **Tuitui Bot** edits everything common in place; saving writes 
 - **Context & sessions**: group history size and idle eviction, with unit suffixes and plain-language help.
 - **Workspace**: a dropdown of real directories (default workspace, projects under `~/workspace`, current value).
 - **Tuitui-native switches**: interactive cards, step reporting, debug logs.
+- **Version strip** (right end of the "bound" status row, next to *Change credentials* / *Unbind*):
+  a GitHub icon that opens the repository, the **version actually installed in the profile**
+  (read from disk, not baked in at build time), and a "Check for updates" button that asks the
+  GitHub Release (6 h cache; a failed check says so instead of pretending to be up to date).
+  When a newer version exists the button becomes "Update to vX.Y.Z": download, verify sha256,
+  unpack and check name/version/host compatibility, back up, install, then let the host's
+  `dsh-hmr` **hot-reload the plugin without restarting the process**. Deployments without HMR are
+  told plainly that a restart is required, and any failure rolls the previous files back.
+  Set `selfUpdate.enabled: false` to keep the check but disable installing.
 
 > Long free-text values (lists, prompt) are re-validated server-side before writing: length, control
 > characters and types. Client-side checks are UX only — the security boundary is the host.
@@ -191,6 +200,8 @@ All four strategies act at the **turn** level, not just in the middleware chain:
 | `groupPrompt` / `directPrompt` / `postPrompt` | string | - | Per-scope extra system prompt |
 | `textChunkLimit` | number | `4000` | Max characters per message |
 | `debug` | boolean | `false` | Verbose logs (includes raw event bodies) |
+| `selfUpdate.enabled` | boolean | `false` | Allow the settings page to install updates (release tarball + hot reload) |
+| `selfUpdate.channel` | `release` \| `main` | `release` | What counts as "latest": published release or repository main |
 
 ### Sessions & concurrency
 

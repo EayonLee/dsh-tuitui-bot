@@ -192,6 +192,7 @@ const EDITABLE_CONFIG_KEYS = [
   'reactions.enabled', 'reactions.inGroup', 'reactions.ack', 'reactions.done', 'reactions.fail',
   'concurrency.c2c', 'concurrency.group', 'concurrency.post',
   'sendFile.restrictPaths',
+  'selfUpdate.enabled', 'selfUpdate.channel',
   'vision.enabled', 'vision.baseUrl', 'vision.apiKey', 'vision.model',
   'imageGeneration.enabled', 'imageGeneration.baseUrl', 'imageGeneration.apiKey',
   'imageGeneration.model', 'imageGeneration.size',
@@ -245,6 +246,11 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'interactive.enabled': (v) => booleanSchema(v, 'interactive.enabled'),
   'agentSteps.enabled': (v) => booleanSchema(v, 'agentSteps.enabled'),
   'sendFile.restrictPaths': (v) => booleanSchema(v, 'sendFile.restrictPaths'),
+  'selfUpdate.enabled': (v) => booleanSchema(v, 'selfUpdate.enabled'),
+  'selfUpdate.channel': (v) => {
+    if (v === 'release' || v === 'main') return v;
+    throw new Error('selfUpdate.channel 只能是 release 或 main');
+  },
   'vision.enabled': (v) => booleanSchema(v, 'vision.enabled'),
   'vision.baseUrl': (v) => urlSchema(v, 'vision.baseUrl'),
   'vision.apiKey': (v) => secretSchema(v, 'vision.apiKey'),

@@ -116,6 +116,14 @@ export interface AgentStepsConfig {
   maxResultChars: number;
 }
 
+/** 自更新配置（设置页「关于」区块） */
+export interface SelfUpdateConfig {
+  /** 允许设置页一键更新（默认关：等于把"装 tgz"的开关放进网页） */
+  enabled: boolean;
+  /** 对比谁算「最新」：release=GitHub 正式发布 / main=仓库主干 */
+  channel: 'release' | 'main';
+}
+
 export interface ImTuituiConfig {
   /** 推推机器人 AppID */
   appId: string;
@@ -157,6 +165,8 @@ export interface ImTuituiConfig {
     /** 团队帖子：默认排队 */
     post: ConcurrencyStrategy;
   };
+  /** 自更新（检查更新 / 一键更新） */
+  selfUpdate: SelfUpdateConfig;
   /** 表情回执：收到 / 处理完 / 出错 时挂在那条消息上的反应 */
   reactions: {
     /** 总开关 */
@@ -253,6 +263,10 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     group: Schema.union(['queue', 'drop', 'abort', 'merge']).default('merge').description('群聊忙时：默认攒着，这一轮完了合成一条一起回'),
     post: Schema.union(['queue', 'drop', 'abort', 'merge']).default('queue').description('团队帖子忙时：默认排队'),
   }).description('同一会话多条消息的处理方式'),
+  selfUpdate: Schema.object({
+    enabled: Schema.boolean().default(true).description('一键更新开关：装 Release 包并热重载。默认开；设 false 可让设置页只能看版本、不能装'),
+    channel: Schema.union(['release', 'main']).default('release').description('对比更新的来源：release=GitHub 正式发布（默认）/ main=仓库主干'),
+  }).description('自更新'),
   reactions: Schema.object({
     enabled: Schema.boolean().default(true).description('收到消息先挂表情回执：在算 / 好了 / 出错'),
     inGroup: Schema.boolean().default(true).description('群聊里也挂表情回执（默认给，省得以为机器人卡死）'),

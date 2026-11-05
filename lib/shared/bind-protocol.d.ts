@@ -105,6 +105,8 @@ export interface ConfigPatchWire {
     'reactions.done'?: string;
     'reactions.fail'?: string;
     'sendFile.restrictPaths'?: boolean;
+    'selfUpdate.enabled'?: boolean;
+    'selfUpdate.channel'?: 'release' | 'main';
     'smartJudge.prompt'?: string;
     'smartJudge.maxHistory'?: number;
     'smartJudge.cooldownMs'?: number;
