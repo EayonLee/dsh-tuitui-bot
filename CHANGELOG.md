@@ -9,6 +9,7 @@
 
 ### 变更
 
+- 补充推推执行步骤中可用的 Token 用量说明（#11）。
 - 安装口径收敛：README 只保留「下载 Release 正式包」与「跟随主干 `github:`」两条路径，
   删掉 npm / 一键脚本 / 本地源码的写法；README 与 README_EN 同步
 - 新增 [AGENTS.md](./AGENTS.md)：分层、命令、版本与发版流程、Release Notes 标准、硬性约束
