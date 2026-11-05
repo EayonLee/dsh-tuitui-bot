@@ -13,6 +13,7 @@ import type { DshAgent, SessionManager } from '../session/index.ts';
 import type { Logger, TuituiSender } from '../types.ts';
 import { MEDIA_DIR } from '../shared/dirs.ts';
 import { generateImage } from './openai-compat.ts';
+import { jsonToolOutput } from '../tuitui/tool-output.ts';
 
 export const DRAW_TOOL_NAME = 'tuitui_draw';
 
@@ -61,6 +62,7 @@ export function registerDrawTool(
       required: ['prompt'],
       additionalProperties: false,
     },
+    output: jsonToolOutput(),
     async execute(args: unknown, exec?: { agent?: unknown }): Promise<Record<string, unknown>> {
       const a = (args ?? {}) as DrawArgs;
       const prompt = typeof a.prompt === 'string' ? a.prompt.trim() : '';

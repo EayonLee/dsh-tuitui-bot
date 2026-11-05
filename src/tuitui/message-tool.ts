@@ -10,6 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { ToTarget, TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
 import type { Logger } from '../types.ts';
+import { jsonToolOutput } from './tool-output.ts';
 
 export const SEND_TOOL_NAME = 'tuitui_send';
 
@@ -120,6 +121,7 @@ export function registerSendTool(
       required: ['action'],
       additionalProperties: false,
     },
+    output: jsonToolOutput(),
     async execute(args: unknown, exec?: { agent?: unknown }): Promise<Record<string, unknown>> {
       const a = (args ?? {}) as SendArgs;
       const action = str(a, 'action');

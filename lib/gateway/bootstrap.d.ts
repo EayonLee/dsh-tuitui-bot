@@ -26,5 +26,7 @@ export interface InteractionPayload {
 }
 /** 从归一化消息推导出站目标 */
 export declare function buildReplyTarget(message: InboundMessage): ReplyTarget;
+/** 启动末尾打一行汇总，避免"少注册了几个"没人发现 */
+export declare function logRegistrationSummary(logger: Logger): void;
 export declare function bootstrapGateway(ctx: Context, agents: DshAgentRegistry, config: ImTuituiConfig, logger: Logger): Promise<void>;
 //# sourceMappingURL=bootstrap.d.ts.map
