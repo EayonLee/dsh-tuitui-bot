@@ -8,6 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
 import type { Logger } from '../types.ts';
+import { jsonToolOutput } from './tool-output.ts';
 
 export const BOT_TOOL_NAME = 'tuitui_bot';
 
@@ -74,6 +75,7 @@ export function registerBotTool(ctx: Context, client: TuituiBotClient, logger: L
       required: ['action'],
       additionalProperties: false,
     },
+    output: jsonToolOutput(),
     async execute(args: unknown): Promise<Record<string, unknown>> {
       const a = (args ?? {}) as BotArgs;
       const action = typeof a.action === 'string' ? a.action : '';

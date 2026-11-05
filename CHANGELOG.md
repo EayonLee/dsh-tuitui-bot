@@ -2,6 +2,23 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
+## 0.1.29
+
+修「工具对模型不可见」（[#14](https://github.com/EayonLee/dsh-tuitui-bot/issues/14)）：7 个工具因缺少 dsh 强制的 `output` 声明，从上线起就没注册成功过。
+
+### 修复
+
+- `tuitui_group` / `tuitui_history` / `tuitui_file` / `tuitui_send` / `tuitui_bot` / `tuitui_teams` / `tuitui_draw` 补上 `output: { schema, render }`（新增 `src/tuitui/tool-output.ts` 统一生成，宽松 object schema + 通用摘要渲染）
+- 注册失败从 `warn` 升级为 `error`，启动末尾打一行 `可选能力注册 x/y`，让"少注册几个"在日志里一眼可见
+
+### 为什么会发生
+
+dsh 的 `tools.register()` 校验 `output.render` 必须是函数，缺了直接抛 `must declare output { schema, render, presentationMeta? }`；`runOptional` 把异常兜成了 warn，启动照常，于是「群管理七件事」在 README 上写得明明白白、模型那边却一个都没有。
+
+### 测试
+
+新增 `src/tuitui/tool-registration.test.ts`（5 条）：复刻 dsh 的校验规则跑一遍九个工具的注册函数，断言全部成功、schema 是 object、render 产文本块；全量 869 用例通过。
+
 ## 0.1.28
 
 配置页区块顺序整理（[#12](https://github.com/EayonLee/dsh-tuitui-bot/issues/12)）：纯客户端改动，配置键与 wire 协议不变，刷新页面即生效。

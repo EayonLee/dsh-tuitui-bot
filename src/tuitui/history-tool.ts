@@ -7,6 +7,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
 import type { Logger } from '../types.ts';
+import { jsonToolOutput } from './tool-output.ts';
 
 export const HISTORY_TOOL_NAME = 'tuitui_history';
 
@@ -66,6 +67,7 @@ export function registerHistoryTool(ctx: Context, client: TuituiBotClient, logge
       required: ['action'],
       additionalProperties: false,
     },
+    output: jsonToolOutput(),
     async execute(args: unknown): Promise<Record<string, unknown>> {
       const a = (args ?? {}) as HistoryArgs;
       const action = typeof a.action === 'string' ? a.action : '';

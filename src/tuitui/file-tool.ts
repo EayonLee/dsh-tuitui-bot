@@ -11,6 +11,7 @@ import type { TuituiBotClient } from '@qihoo/tuitui-bot-sdk';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Logger } from '../types.ts';
+import { jsonToolOutput } from './tool-output.ts';
 
 export const FILE_TOOL_NAME = 'tuitui_file';
 
@@ -92,6 +93,7 @@ export function registerFileTool(ctx: Context, client: TuituiBotClient, logger: 
       required: ['action'],
       additionalProperties: false,
     },
+    output: jsonToolOutput(),
     async execute(args: unknown): Promise<Record<string, unknown>> {
       const a = (args ?? {}) as FileArgs;
       const action = str(a, 'action');

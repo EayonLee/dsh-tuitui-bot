@@ -135,12 +135,33 @@ async function dispatchInteraction(
  * 历史上这里有过一次整插件激活失败（可选服务读取抛错带崩 apply），
  * 结果是通道静默死掉、卡片全是死的，所以这些点必须各自兜住。
  */
+/**
+ * 注册一个可选能力的"兜住"包装。
+ *
+ * 注意：这里面吞掉的错误曾经让 7 个工具静默消失了一整天（dsh 要求 output 声明，
+ * 我们没写，只留一行 warn）。所以失败一律按 error 记，并且把成功/失败数汇总出来，
+ * 让"工具少了一半"这种事故在启动日志里一眼可见。
+ */
+const registrationStats = { ok: 0, failed: 0 };
+
 function runOptional(logger: Logger, label: string, fn: () => void): void {
   try {
     fn();
+    registrationStats.ok += 1;
   } catch (error) {
-    logger.warn(`${label} registration failed: ${error instanceof Error ? error.message : String(error)}`);
+    registrationStats.failed += 1;
+    logger.error(`${label} registration failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** 启动末尾打一行汇总，避免"少注册了几个"没人发现 */
+export function logRegistrationSummary(logger: Logger): void {
+  const { ok, failed } = registrationStats;
+  if (failed > 0) {
+    logger.error(`im-tuitui: 可选能力注册 ${String(ok)} 成功 / ${String(failed)} 失败`);
+    return;
+  }
+  logger.info(`im-tuitui: 可选能力注册 ${String(ok)}/${String(ok)}`);
 }
 
 /**
@@ -164,6 +185,10 @@ export async function bootstrapGateway(
   config: ImTuituiConfig,
   logger: Logger,
 ): Promise<void> {
+  // 每轮启动重置计数：插件被加载两次时不会把上一次的数字带进来
+  registrationStats.ok = 0;
+  registrationStats.failed = 0;
+
   const manager = new SessionManager(ctx, agents, config, logger);
 
   // ── 推推客户端 ──
@@ -383,6 +408,9 @@ export async function bootstrapGateway(
 
   // ── 团队频道（tuitui_teams：频道/帖子/成员只读，发帖改帖传文件要 confirm） ──
   runOptional(logger, 'teams tool', () => registerTeamsTool(ctx, client, logger));
+
+  // 工具/能力都注册完了，打个汇总（少注册几个不该悄无声息）
+  logRegistrationSummary(logger);
 
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void }).effect(() => {
