@@ -12,6 +12,12 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
 ### Changes
 
+- Fixed: `dsh` metadata in `package.json` (`bundle.patch` / `client.platform` / `compatibility`)
+  and `peerDependencies` were dropped by mistake while tidying docs (#19). Without the bundle
+  patch dsh loads no entry at all, so the plugin vanished after a reinstall. All restored.
+- `scripts/ship.sh` now verifies the profile's `dsh.profile.bundles` lists this package and adds
+  it when missing, so that silent disappearance cannot repeat.
+- Restart workflow unified on `sudo systemctl restart dsh-web`; no more `~/bin/dsh-restart`.
 - Inbound readability (issue #18): a message type the plugin cannot render no longer turns into
   an empty string — the body becomes `[未支持的消息类型: xxx]` and a `logger.warn` records the
   `msg_type`, chat and `msgid`; `tuitui_history` uses the same placeholder. Merged-forward and

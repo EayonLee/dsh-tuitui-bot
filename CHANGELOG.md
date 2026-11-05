@@ -9,6 +9,12 @@
 
 ### 变更
 
+- 修复：`package.json` 里的 `dsh` 元数据（`bundle.patch` / `client.platform` / `compatibility`）
+  和 `peerDependencies` 在 #19 整理文档时被误删，导致重装后 dsh 读不到 bundle patch，
+  **整个插件不加载**（重启后表现为「插件没了」）。已全部恢复。
+- `scripts/ship.sh` 装完会校验 profile 的 `dsh.profile.bundles` 包含本包，缺了就补，
+  避免同一种「静默消失」再发生一次。
+- 重启口径统一：仓库文档与脚本只写 `sudo systemctl restart dsh-web`，不再引用 `~/bin/dsh-restart`。
 - 入站可读性收尾（#18）：认不出来的消息类型不再变成空串，正文给
   `[未支持的消息类型: xxx]` 占位，同时 `logger.warn` 记下 `msg_type` / 会话 / `msgid`；
   `tuitui_history` 读不到正文时用同一套占位。合并转发、名片补夹具锁住 SDK 渲染分支。

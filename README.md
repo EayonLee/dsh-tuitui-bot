@@ -76,7 +76,8 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 
 ### 升级与卸载
 
-想升级就下新版本的正式包再装一次（profile 会原地替换），然后重启：
+想升级就下新版本的正式包再装一次（profile 会原地替换），然后重启（部署成服务的用
+`sudo systemctl restart dsh-web`，手动前台起的就重跑 `dsh --profile <name>`）：
 
 ```bash
 dsh plugin --profile <name> add ./dsh-tuitui-bot-<新版本>.tgz
