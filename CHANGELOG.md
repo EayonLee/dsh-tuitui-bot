@@ -2,6 +2,19 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
+## 未发布（Unreleased）
+
+这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
+版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
+
+### 变更
+
+- 安装口径收敛：README 只保留「下载 Release 正式包」与「跟随主干 `github:`」两条路径，
+  删掉 npm / 一键脚本 / 本地源码的写法；README 与 README_EN 同步
+- 新增 [AGENTS.md](./AGENTS.md)：分层、命令、版本与发版流程、Release Notes 标准、硬性约束
+- 仓库不再发布 npm（`package.json` 加 `private: true`），移除 `install.sh`
+- Release 附带正式包 `eayonlee-dsh-tuitui-bot-<版本>.tgz`，作为推荐安装来源
+
 ## 0.1.29
 
 修「工具对模型不可见」（[#14](https://github.com/EayonLee/dsh-tuitui-bot/issues/14)）：7 个工具因缺少 dsh 强制的 `output` 声明，从上线起就没注册成功过。
