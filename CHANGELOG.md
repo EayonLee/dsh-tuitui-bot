@@ -25,6 +25,9 @@
 - `scripts/ship.sh` 装完会校验 profile 的 `dsh.profile.bundles` 包含本包，缺了就补，
   避免同一种「静默消失」再发生一次。
 - 重启口径统一：仓库文档与脚本只写 `sudo systemctl restart dsh-web`，不再引用 `~/bin/dsh-restart`。
+- 版本条体验修正（#27）：版本号完整展示不再省略；「检查更新」除检查/更新进行中外都可按，
+  已是最新时点按会回执「已是最新（vX.Y.Z）」；待重启 / 检查失败（橙）、已是最新（绿）、
+  本地更新（蓝）都有状态色，不再是一行灰字。
 - 更新判定的兼容性加固（#27）：release 通道只信 Release 的 tag（不再混主干，避免提示一个
   没有 asset 的版本）；预发布 tag（`-beta.1` 这类）默认不算可更新；安装前解包核对包名、版本，
   并按目标包的 `dsh.compatibility.dshReleases` 校验当前宿主版本，不认的一律拒绝；`link:`

@@ -33,6 +33,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - `scripts/ship.sh` now verifies the profile's `dsh.profile.bundles` lists this package and adds
   it when missing, so that silent disappearance cannot repeat.
 - Restart workflow unified on `sudo systemctl restart dsh-web`; no more `~/bin/dsh-restart`.
+- Version strip polish (#27): the version is shown in full (never ellipsised); "Check for updates"
+  stays clickable except while a check/install runs, and clicking it when already current replies
+  "already up to date (vX.Y.Z)"; restart-required / check-failed (orange), up-to-date (green) and
+  local-ahead (blue) states are colour-coded instead of grey text.
 - Hardened update decisions (#27): the release channel trusts only the Release tag (main is no
   longer mixed in, which used to advertise a version whose asset did not exist); prerelease tags
   (`-beta.1`) are not treated as updates; before installing, the tarball is unpacked and its name,
