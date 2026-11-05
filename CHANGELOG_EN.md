@@ -10,6 +10,11 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+## 0.1.31 (2026-11-05)
+
+In one line: the settings page shows the installed version, checks for updates, and can hot-update
+itself without restarting the process.
+
 ### Added
 
 - Settings page gains an **About** block (#27): GitHub icon straight to the repository, the version
