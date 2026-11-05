@@ -112,8 +112,9 @@ gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
 
 - **凭据**：AppID / AppSecret / API Key 一律不进仓库、不进日志、不回显。配置从 profile 的
   `cordis.patch.yml` 读，脚本里用 `process.env` 或配置文件读。
-- **重启**：不要自己重启 dsh 进程（`~/bin/dsh-restart` 由人执行）。构建产物装好即可，
-  告知用户重启。
+- **重启**：统一走 `sudo systemctl restart dsh-web`。不要写自己的重启脚本，也不要在仓库里
+  放重启工具——一台机器一套起停方式，脚本多了必然打架。构建产物装好即可，**重启由人执行**：
+  agent 自己跑 `systemctl restart dsh-web` 会把自己所在的会话进程一起杀掉（2026-11-05 连挂两次）。
 - **破坏性操作**：删文件、改仓库设置、动分支保护、发布，都必须有人明确说「执行」。
 - **工具注册**：dsh 要求 `output: { schema, render }` 缺一不可，漏了会**静默**注册失败
   （见 issue #14）。新增工具后跑 `node scripts/verify-tools.mjs`。

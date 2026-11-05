@@ -39,6 +39,8 @@ if grep -q "TEST_MODEL_PATH" lib/client.js && ! grep -q 'const TEST_MODEL_PATH =
 fi
 
 # 每次换一个目录：pnpm 按「包名 + file: 路径」记 lockfile，路径不变就跳过重装
+PROFILE_NAME="$PROFILE"
+export PROFILE_NAME
 STAMP=$(date +%H%M%S)
 OUT="/tmp/tuitui-ship-$STAMP"
 mkdir -p "$OUT"
@@ -49,6 +51,10 @@ TARBALL=$(./scripts/pack.sh "$OUT" | tail -1)
 echo "▶ 装进 profile:$PROFILE"
 dsh plugin --profile "$PROFILE" add "$TARBALL" 2>&1 | tail -2
 
+# 装完必须确认 profile 的 bundles 里有本包：dsh 靠 dsh.profile.bundles 加载 bundle patch，
+# 缺了它插件行就永远「not found」，表现是重启后整个插件消失（2026-11-05 就是这么丢的）。
+node -e 'const fs=require("fs");const p=process.env.HOME+"/.dsh/profiles/"+process.env.PROFILE_NAME+"/package.json";const m=JSON.parse(fs.readFileSync(p,"utf8"));const b=m.dsh?.profile?.bundles;if(!Array.isArray(b)){console.log("⚠ bundles 结构异常，跳过");process.exit(0)}if(!b.includes("@eayonlee/dsh-tuitui-bot")){b.push("@eayonlee/dsh-tuitui-bot");fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");console.log("✔ 已补进 bundles")}else{console.log("✔ bundles 已包含本包")}'
+
 INSTALLED=$(node -p "require(process.env.HOME + '/.dsh/profiles/$PROFILE/node_modules/@eayonlee/dsh-tuitui-bot/package.json').version")
 echo "✔ 已安装 $INSTALLED（客户端 bundle 刷新页面即生效，服务端代码要重启进程）"
-echo "  重启：~/bin/dsh-restart"
+echo "  重启：sudo systemctl restart dsh-web"

@@ -1,8 +1,10 @@
 {
   "name": "@eayonlee/dsh-tuitui-bot",
   "version": "0.1.30",
+  "icon": "./assets/icons/tuitui.jpg",
   "private": true,
   "description": "在推推（Tuitui）单聊、群聊与团队频道里直接对话 DeepSeek Harness。 Chat with DeepSeek Harness in Tuitui IM.",
+  "author": "EayonLee",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -47,12 +49,29 @@
     "tuitui-bot",
     "360"
   ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EayonLee/dsh-tuitui-bot.git"
   },
-  "license": "MIT",
-  "author": "EayonLee",
+  "homepage": "https://github.com/EayonLee/dsh-tuitui-bot#readme",
+  "bugs": {
+    "url": "https://github.com/EayonLee/dsh-tuitui-bot/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.5": "compatible"
+      },
+      "note": "基于 dsh 0.2.1-rc.5 宿主验证：插件会话编排、流式编辑、交互卡片问答/审批、端内绑定页。宿主大版本升级后请重新验收席位行为。"
+    }
+  },
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json --noEmit && tsdown --config tsdown.client.config.ts",
     "build:client": "tsdown --config tsdown.client.config.ts",
@@ -67,6 +86,34 @@
   "dependencies": {
     "@qihoo/tuitui-bot-sdk": "1.0.24",
     "yaml": "2.8.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.5 <5",
+    "@deepseek-ai/dsh-agent": ">=0.2.1-rc.5 <0.3.0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.3.0",
+    "@deepseek-ai/dsh-session": ">=0.2.1-rc.5 <0.3.0",
+    "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.5 <0.3.0",
+    "@deepseek-ai/schemastery": ">=3.18.5 <4"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": false
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": false
+    },
+    "@deepseek-ai/dsh-agent": {
+      "optional": false
+    },
+    "@deepseek-ai/dsh-session": {
+      "optional": false
+    },
+    "@deepseek-ai/dsh-llm": {
+      "optional": false
+    },
+    "@deepseek-ai/dsh-user-approval": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
