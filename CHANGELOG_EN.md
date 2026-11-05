@@ -10,6 +10,21 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+## 0.1.32 (2026-11-05)
+
+In one line: when the GitHub API is rate-limited, "Check for updates" no longer turns into "check
+failed".
+
+### Fixed
+
+- The update check falls back to `releases.atom`: the unauthenticated GitHub API allows 60 requests
+  per hour **per IP**, which a shared office NAT exhausts easily (we hit 403 `API rate limit
+  exceeded` for real). The atom feed lives on the web domain, is not rate-limited that way, and
+  lists exactly the releases, so it is used when the API fails (reported as "GitHub Release (Atom)").
+- Applying an update now builds the direct release URL from the version when the API is rate-limited
+  or unreachable, so an available update is never a dead button; the tarball name and version are
+  still verified after download.
+
 ## 0.1.31 (2026-11-05)
 
 In one line: the settings page shows the installed version, checks for updates, and can hot-update

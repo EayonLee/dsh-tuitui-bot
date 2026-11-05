@@ -455,3 +455,32 @@ describe('applyUpdate 安装前校验（真 tgz）', () => {
     }
   });
 });
+
+describe('planUpdate · API 限流兜底', () => {
+  const slug = 'EayonLee/dsh-tuitui-bot';
+
+  it('API 403 时按版本号拼直链，不再让用户看得到点不动', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: false, status: 403, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    const plan = await planUpdate({ slug, channel: 'release', fetchImpl, latestVersion: '0.1.32' });
+    expect(plan.downloadUrl).toBe('https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v0.1.32/dsh-tuitui-bot-0.1.32.tgz');
+    expect(plan.label).toBe('GitHub Release（直链）');
+    expect(plan.digest).toBeUndefined();
+  });
+
+  it('API 正常但缺 asset 时仍然报错（不拿直链糊弄）', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: true, status: 200, json: async () => ({ tag_name: 'v0.1.32', assets: [] }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    await expect(planUpdate({ slug, channel: 'release', fetchImpl, latestVersion: '0.1.32' }))
+      .rejects.toThrow(/没有 dsh-tuitui-bot-0\.1\.32\.tgz/);
+  });
+
+  it('API 网络异常（throw）也走直链', async () => {
+    const fetchImpl: FetchLike = async () => { throw new Error('ECONNRESET'); };
+    const plan = await planUpdate({ slug, channel: 'release', fetchImpl, latestVersion: '0.1.33' });
+    expect(plan.downloadUrl).toContain('/v0.1.33/dsh-tuitui-bot-0.1.33.tgz');
+  });
+});

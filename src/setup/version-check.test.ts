@@ -16,6 +16,7 @@ import {
   lookupLatest,
   parseVersion,
   resetLatestCache,
+  versionFromAtom,
   type FetchLike,
 } from './version-check.ts';
 
@@ -70,10 +71,13 @@ describe('parseVersion / compareVersions', () => {
 describe('buildSources', () => {
   const slug = 'EayonLee/dsh-tuitui-bot';
 
-  it('release 通道只用 Release（不混主干，避免提示一个装不了的版本）', () => {
+  it('release 通道只用 Release 语义的源（不混主干，避免提示一个装不了的版本）', () => {
     const sources = buildSources(slug, 'release');
-    expect(sources).toHaveLength(1);
-    expect(sources[0]?.url).toContain('/releases/latest');
+    expect(sources.map((item) => item.url)).toEqual([
+      'https://api.github.com/repos/EayonLee/dsh-tuitui-bot/releases/latest',
+      'https://github.com/EayonLee/dsh-tuitui-bot/releases.atom',
+    ]);
+    expect(sources.map((item) => item.label)).toEqual(['GitHub Release', 'GitHub Release（Atom）']);
   });
 
   it('main 通道看主干 package.json，jsDelivr 兜底', () => {
@@ -182,5 +186,62 @@ describe('checkLatest 缓存', () => {
     const second = await checkLatest({ slug: 'g/h', channel: 'release', fetchImpl: working, now: 2 });
     expect(second.latest).toBe('0.2.0');
     expect(second.cached).toBe(false);
+  });
+});
+
+const ATOM = [
+  '<?xml version="1.0" encoding="UTF-8"?>',
+  '<feed xmlns="http://www.w3.org/2005/Atom">',
+  '  <title>Release notes from dsh-tuitui-bot</title>',
+  '  <entry>',
+  '    <id>tag:github.com,2008:Repository/1/v0.1.32</id>',
+  '    <link rel="alternate" type="text/html" href="https://github.com/EayonLee/dsh-tuitui-bot/releases/tag/v0.1.32"/>',
+  '    <title>v0.1.32</title>',
+  '  </entry>',
+  '  <entry>',
+  '    <title>v0.1.29</title>',
+  '  </entry>',
+  '</feed>',
+].join('\n');
+
+describe('releases.atom 兜底源', () => {
+  it('取第一条 entry 的版本号（不是全部拼起来）', () => {
+    expect(versionFromAtom(ATOM)).toBe('0.1.32');
+  });
+
+  it('没有 entry 时返回 null', () => {
+    expect(versionFromAtom('<feed></feed>')).toBeNull();
+    expect(versionFromAtom('')).toBeNull();
+  });
+
+  it('API 被限流（403）时用 atom 顶上，并标出来源', async () => {
+    const fetchImpl: FetchLike = async (url) => {
+      if (url.includes('api.github.com')) {
+        return { ok: false, status: 403, json: async () => ({}), text: async () => '{"message":"rate limit"}' };
+      }
+      return { ok: true, status: 200, json: async () => ({}), text: async () => ATOM };
+    };
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    expect(result.latest).toBe('0.1.32');
+    expect(result.source).toBe('GitHub Release（Atom）');
+  });
+
+  it('API 与 atom 都挂时如实报错，两个原因都带出来', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: false, status: 403, json: async () => ({}), text: async () => 'nope',
+    });
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    expect(result.latest).toBeNull();
+    expect(result.error).toContain('HTTP 403');
+    expect(result.error).toContain('Atom');
+  });
+
+  it('atom 里有更新的版本时取最大（API 落后也不漏）', async () => {
+    const fetchImpl: FetchLike = async (url) => {
+      const body = url.includes('api.github.com') ? { tag_name: 'v0.1.30' } : ATOM;
+      return { ok: true, status: 200, json: async () => body, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) };
+    };
+    const result = await lookupLatest('EayonLee/dsh-tuitui-bot', 'release', fetchImpl);
+    expect(result.latest).toBe('0.1.32');
   });
 });

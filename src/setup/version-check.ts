@@ -71,8 +71,26 @@ export interface VersionSource {
   url: string;
   /** 展示给人看的来源名 */
   label: string;
+  /** 响应形态：json（默认）/ atom（XML 订阅） */
+  kind?: 'json' | 'atom';
   /** 从响应里取出未加工的版本字符串；取不到返回 null */
   parse: (payload: unknown) => string | null;
+}
+
+/**
+ * 从 releases.atom 第一条 entry 里取版本号。
+ *
+ * 为什么要这个源：GitHub 未认证 API 是 60 次/小时 **按 IP** 计的，办公楼里
+ * 一台 NAT 出口很容易被打满（实测 403 rate limit exceeded）。atom 订阅走的是
+ * 网页域，不吃这个限流，而且它列的正是"发布会"这一栏，语义和 Release 一致。
+ */
+export function versionFromAtom(xml: string): string | null {
+  const entry = /<entry\b[\s\S]*?<title>([^<]+)<\/title>/.exec(xml);
+  if (entry === null) return null;
+  const raw = (entry[1] ?? '').trim();
+  if (raw === '') return null;
+  const version = /v?(\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.]+)?)/.exec(raw);
+  return version === null ? null : (version[1] ?? null);
 }
 
 /** 从 package.json 形状的对象里取 version */
@@ -116,11 +134,18 @@ export function buildSources(slug: string, channel: UpdateChannel): VersionSourc
     label: 'jsDelivr',
     parse: versionFromManifest,
   };
+  const releaseAtom: VersionSource = {
+    url: 'https://github.com/' + slug + '/releases.atom',
+    label: 'GitHub Release（Atom）',
+    kind: 'atom',
+    parse: (payload) => (typeof payload === 'string' ? versionFromAtom(payload) : null),
+  };
   // release 通道只用 Release：它代表"用户真正能下载到的包"。
   // 早期版本把主干 raw 混进来取最大，结果是主干改了版本号还没发 Release 时，
   // 页面提示「可更新 v0.1.32」，点了却因为 Release 里没有这个 asset 而失败。
   // 宁可查不到，也不报一个装不了的版本。
-  return channel === 'release' ? [release] : [mainRaw, mainCdn, release];
+  // API 与 atom 都是 Release 语义，取最大即可；API 被限流时 atom 顶上
+  return channel === 'release' ? [release, releaseAtom] : [mainRaw, mainCdn, release];
 }
 
 /** 单个源的查询结果 */
@@ -161,6 +186,11 @@ async function readSource(source: VersionSource, fetchImpl: FetchLike, timeoutMs
     });
     if (!response.ok) {
       return { label: source.label, version: null, error: 'HTTP ' + String(response.status) };
+    }
+    if (source.kind === 'atom') {
+      const text = await response.text();
+      const version = source.parse(text);
+      return { label: source.label, version, error: version === null ? '响应里没有版本号' : null };
     }
     // Release 是 JSON；raw/jsDelivr 也是 JSON；都用 json()，解析失败再看文本
     let payload: unknown;

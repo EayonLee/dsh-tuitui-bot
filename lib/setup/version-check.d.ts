@@ -37,9 +37,19 @@ export interface VersionSource {
     url: string;
     /** 展示给人看的来源名 */
     label: string;
+    /** 响应形态：json（默认）/ atom（XML 订阅） */
+    kind?: 'json' | 'atom';
     /** 从响应里取出未加工的版本字符串；取不到返回 null */
     parse: (payload: unknown) => string | null;
 }
+/**
+ * 从 releases.atom 第一条 entry 里取版本号。
+ *
+ * 为什么要这个源：GitHub 未认证 API 是 60 次/小时 **按 IP** 计的，办公楼里
+ * 一台 NAT 出口很容易被打满（实测 403 rate limit exceeded）。atom 订阅走的是
+ * 网页域，不吃这个限流，而且它列的正是"发布会"这一栏，语义和 Release 一致。
+ */
+export declare function versionFromAtom(xml: string): string | null;
 /**
  * 列出要查的源。
  *

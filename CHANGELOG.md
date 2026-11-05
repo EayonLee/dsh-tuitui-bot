@@ -7,6 +7,18 @@
 这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
 版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
 
+## 0.1.32 (2026-11-05)
+
+一句话：GitHub API 被限流时，「检查更新」不再变成「检查失败」。
+
+### 修复
+
+- 检查更新接上 `releases.atom` 兜底：GitHub 未认证 API 是 60 次/小时**按 IP** 计的，
+  办公网 NAT 出口很容易打满（实测 403 `API rate limit exceeded`）；atom 走网页域不吃这个限流，
+  语义同样是「发布会」，API 挂了就用它，来源标注为「GitHub Release（Atom）」。
+- 一键更新在 API 限流/断网时按版本号拼 Release 直链（`/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`），
+  不再出现「看得到新版、点更新却报 403」；包名与版本仍由装前解包校验把关。
+
 ## 0.1.31 (2026-11-05)
 
 一句话：设置页能看版本、能查更新，自己就能热更新，不用重启。

@@ -276,15 +276,30 @@ export async function planUpdate(options: {
   if (channel === 'main') {
     return { version: latestVersion, spec: 'github:' + slug, label: 'GitHub 主干' };
   }
+  // 版本号既然已经由 version-check 得出（可能来自 atom，绕过了 API 限流），
+  // 下载地址就是确定的：Release 资产的命名规则是死的。
+  // API 被限流或超时时走这条路，别让用户「看得到新版却点不动」。
+  const directPlan = (): UpdatePlan => {
+    const url = 'https://github.com/' + slug + '/releases/download/v' + latestVersion
+      + '/dsh-tuitui-bot-' + latestVersion + '.tgz';
+    return { version: latestVersion, spec: url, downloadUrl: url, label: 'GitHub Release（直链）' };
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => { controller.abort(); }, options.timeoutMs ?? 8000);
   try {
-    const response = await fetchImpl('https://api.github.com/repos/' + slug + '/releases/latest', {
-      signal: controller.signal,
-      headers: { accept: 'application/json', 'user-agent': 'dsh-tuitui-bot-self-update' },
-    });
-    if (!response.ok) throw new Error('查 Release 失败：HTTP ' + String(response.status));
-    const release = await response.json();
+    let response: Awaited<ReturnType<FetchLike>>;
+    try {
+      response = await fetchImpl('https://api.github.com/repos/' + slug + '/releases/latest', {
+        signal: controller.signal,
+        headers: { accept: 'application/json', 'user-agent': 'dsh-tuitui-bot-self-update' },
+      });
+    } catch {
+      // 断网 / 超时 / DNS 挂：版本号已经知道，直链照样能装
+      return directPlan();
+    }
+    if (!response.ok) return directPlan();
+    const release = await response.json().catch(() => null);
+    if (release === null || typeof release !== 'object') return directPlan();
     const version = releaseVersion(release) ?? latestVersion;
     const asset = pickReleaseAsset(release, version);
     if (asset === null) throw new Error('Release 里没有 ' + 'dsh-tuitui-bot-' + version + '.tgz');
