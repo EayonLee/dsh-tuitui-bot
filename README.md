@@ -25,22 +25,6 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 上层是自带的洋葱中间件链：**访问控制 → 历史缓冲 → 触发门控 → 清洗 → 限流 → 命令 →
 并发串行 → 打字状态 → 引用解析 → 附件处理 → 上下文组包**，顺序即行为契约。
 
-### 功能一览
-
-| 能力 | 说明 |
-| --- | --- |
-| 💬 三种会话形态 | 单聊、群聊、团队频道帖子（含回帖串），各自独立的会话上下文 |
-| ⚡ 流式输出 | 首条消息拿到 `msgid` 后用 `modifyText` 原地刷新，不刷屏；降级时自动切成追加片段 |
-| 🃏 原生交互卡片 | 审批 / 提问用推推交互卡片，点击后 `modifyInteractive` 原地更新为最终状态 |
-| 🖼️ 富媒体理解 | 图片/文件/语音/视频落地到本地媒体目录，交给 agent 读取（视觉工具可选） |
-| 📎 文件回传 | `tuitui_send_file` 工具 + `present` 交付物自动投递到当前会话 |
-| 🧭 上下文感知 | 群历史缓冲、引用消息解析、发送者部门路径、@ 标记清洗 |
-| 🧩 斜杠命令 | `/new` `/compact` `/model` `/preset` `/status` `/stop` 等，同步为推推快捷指令 |
-| 🧠 原生步骤上报 | 通过 `client.agent` 上报模型/工具调用，推推客户端原生展示执行过程 |
-| 🔐 四档访问控制 | open / allowlist / blocklist / disabled，单聊 / 群聊 / 帖子分别配置，黑白名单以标签录入 |
-| 🗣️ 智能插话 | smart 模式下由模型读群聊上下文自行判断要不要开口，**判定提示词可在设置页整段改写** |
-| 🛠️ 端内设置页 | 凭据绑定 + 全部常用配置可视化编辑，保存即写 profile 并自动重载；名单是标签，工作区是下拉 |
-
 ## 快速开始
 
 ### 1. 准备机器人凭据
@@ -90,7 +74,104 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
   - `always`：群里每条消息都回（只建议专用小群）。
 - 团队频道：在频道里发帖并 `@机器人`（或回复机器人的帖子）
 
-## 配置
+### 升级与卸载
+
+想升级就下新版本的正式包再装一次（profile 会原地替换），然后重启：
+
+```bash
+dsh plugin --profile <name> add ./dsh-tuitui-bot-<新版本>.tgz
+dsh --profile <name>                                      # 重启让新版本加载
+```
+
+跟着主干走的，重装 `github:EayonLee/dsh-tuitui-bot` 即可。
+
+`dsh --profile <name> --dump-config | grep -A3 im-tuitui` 可以确认插件行已进入组合树。
+
+卸载：
+
+```bash
+dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
+# 凭据写在 profile 的 cordis.patch.yml 里，需要的话一并手动删除
+```
+
+## 能做什么
+
+### 功能一览
+
+| 能力 | 说明 |
+| --- | --- |
+| 💬 三种会话形态 | 单聊、群聊、团队频道帖子（含回帖串），各自独立的会话上下文 |
+| ⚡ 流式输出 | 首条消息拿到 `msgid` 后用 `modifyText` 原地刷新，不刷屏；降级时自动切成追加片段 |
+| 🃏 原生交互卡片 | 审批 / 提问用推推交互卡片，点击后 `modifyInteractive` 原地更新为最终状态 |
+| 🖼️ 富媒体理解 | 图片/文件/语音/视频落地到本地媒体目录，交给 agent 读取（视觉工具可选） |
+| 📎 文件回传 | `tuitui_send_file` 工具 + `present` 交付物自动投递到当前会话 |
+| 🧭 上下文感知 | 群历史缓冲、引用消息解析、发送者部门路径、@ 标记清洗 |
+| 🧩 斜杠命令 | `/new` `/compact` `/model` `/preset` `/status` `/stop` 等，同步为推推快捷指令 |
+| 🧠 原生步骤上报 | 通过 `client.agent` 上报模型/工具调用，推推客户端原生展示执行过程 |
+| 🔐 四档访问控制 | open / allowlist / blocklist / disabled，单聊 / 群聊 / 帖子分别配置，黑白名单以标签录入 |
+| 🗣️ 智能插话 | smart 模式下由模型读群聊上下文自行判断要不要开口，**判定提示词可在设置页整段改写** |
+| 🛠️ 端内设置页 | 凭据绑定 + 全部常用配置可视化编辑，保存即写 profile 并自动重载；名单是标签，工作区是下拉 |
+
+### 内置命令
+
+
+| 命令 | 说明 |
+| --- | --- |
+| `/new`（别名 `/reset` `/clear`） | 开始新会话（清空上下文） |
+| `/compact` | 压缩会话历史（摘要替换旧记录） |
+| `/model` | 查看或切换模型 |
+| `/preset` | 查看或切换 agent preset（新会话生效） |
+| `/status` | 当前会话状态（会话 id、模型、preset、消息数） |
+| `/stop` | 中止当前生成 |
+| `/bot-ping` | 延迟检测（传输 + 处理耗时） |
+| `/bot-version` | 版本信息 |
+| `/bot-help` | 全部命令 |
+| `/auth` | 访问控制自检（当前 peer 是否被允许） |
+
+> 常用命令会同步到推推的**快捷指令**面板，用户无需记忆。
+
+
+### 工具
+
+
+| 工具 | 说明 |
+| --- | --- |
+| `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话；默认不限制路径，想发什么发什么 |
+| `tuitui_describe_image` | 图像理解（需 `vision.enabled`）：配了 `vision.baseUrl` 就走自己的端点，否则退回 dsh llm |
+| `tuitui_draw` | 图像生成（需 `imageGeneration.enabled`）：出图并直接发到当前会话，返回本地文件路径 |
+| `tuitui_group` | 群管理：`info` / `members` / `robot_in` / `user_is_in` 只读；`create` / `member_add` / `member_remove` 要 `confirm=true` |
+| `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
+| `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
+| `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true` |
+| `tuitui_teams` | 团队频道：`channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` 只读；`send_post` / `edit_post` / `send_file` 要 `confirm=true` |
+| `tuitui_bot` | 机器人自身：`info` / `get_shortcuts` 只读；`set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` 要 `confirm=true` |
+
+> 写操作统一规则：不带 `confirm=true` 直接报错退回。模型自己不会"顺手"改群、改身份、发强通知——
+> 它得先拿到一句明确的「执行」。
+
+
+### 智能插话
+
+
+`mentionPolicy: 'smart'` 时，群里**每条**消息（未 @ 也算）会走一次判定：
+
+1. **冷却**：同一会话 `smartJudge.cooldownMs` 内只判一次，超出的消息直接按「不插嘴」处理，不烧 token。
+2. **取上下文**：从历史缓冲拿最近 `smartJudge.maxHistory` 条（带说话人，机器人自己标 `[你]`）。
+3. **问模型**：用该会话当前生效的模型，把 `smartJudge.prompt` + 历史 + 新消息发过去，
+   同时把 `join_decision` 工具的 JSON Schema 一起下发（`act` 枚举 text / emoji / silent），
+   模型按 schema 调工具，参数就是判定结果——**格式由代码定死，不靠模型自觉写 JSON**。
+   工具不可用或参数不合约时退回文本 JSON 解析（老 `{"join":true|false}` 也认）。
+   提示词只管性格，改提示词改不出解析错误。
+4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
+   宁可漏答一句，也不在群里刷屏。
+5. **没有确定性兜底**：既不看名字，也不看「刚聊过的人接着说话」。判定不可用 = 不插嘴。
+
+提示词里**没有判断清单**——写成清单，它就变成按表格打勾的机器人。出厂文案给的是处境和动机
+（感兴趣、不同意、觉得好笑、无聊、手上有信息、被叫到、该有人拍板），让它自己拿主意。
+提示词是**一等配置**：不同群需要不同的「人设」，在设置页整段改，改完保存即生效；
+清空输入框恢复出厂默认（见 [`src/shared/smart-prompt.ts`](./src/shared/smart-prompt.ts)）。
+
+## 配置解读
 
 配置项定义在 [`src/config.ts`](./src/config.ts)，可在 profile 的 `cordis.patch.yml` 中覆盖
 （**patch 是整体替换 config，需写全你要保留的键**）。
@@ -199,108 +280,8 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `agentSteps.maxResultChars` | `800` | 工具结果截断长度 |
 | `apiBaseUrl` / `websocketBaseUrl` | - | 私有化部署端点覆盖（亦可用 `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`） |
 
-## 内置命令
 
-| 命令 | 说明 |
-| --- | --- |
-| `/new`（别名 `/reset` `/clear`） | 开始新会话（清空上下文） |
-| `/compact` | 压缩会话历史（摘要替换旧记录） |
-| `/model` | 查看或切换模型 |
-| `/preset` | 查看或切换 agent preset（新会话生效） |
-| `/status` | 当前会话状态（会话 id、模型、preset、消息数） |
-| `/stop` | 中止当前生成 |
-| `/bot-ping` | 延迟检测（传输 + 处理耗时） |
-| `/bot-version` | 版本信息 |
-| `/bot-help` | 全部命令 |
-| `/auth` | 访问控制自检（当前 peer 是否被允许） |
-
-> 常用命令会同步到推推的**快捷指令**面板，用户无需记忆。
-
-## 工具
-
-| 工具 | 说明 |
-| --- | --- |
-| `tuitui_send_file` | 把本地文件/URL/内存内容发到当前会话；默认不限制路径，想发什么发什么 |
-| `tuitui_describe_image` | 图像理解（需 `vision.enabled`）：配了 `vision.baseUrl` 就走自己的端点，否则退回 dsh llm |
-| `tuitui_draw` | 图像生成（需 `imageGeneration.enabled`）：出图并直接发到当前会话，返回本地文件路径 |
-| `tuitui_group` | 群管理：`info` / `members` / `robot_in` / `user_is_in` 只读；`create` / `member_add` / `member_remove` 要 `confirm=true` |
-| `tuitui_history` | 拉聊天记录：群或私聊，支持 `limit`（1–100）、`cursor`、`order_asc`。只读 |
-| `tuitui_file` | 文件：`upload` / `query` / `batch_query` / `list_nodes` / `list_files` / `list_team_files`；空间增删（`add_node` / `delete_node` / `add_file`）要 `confirm=true` |
-| `tuitui_send` | 消息花样：`link` / `page` / `mixed`；`recall` / `modify` / `strong_notice` / `phone_alarm` 要 `confirm=true` |
-| `tuitui_teams` | 团队频道：`channel_info` / `channel_posts` / `post_chain` / `post_tags` / `members` / `member_names` / `announcement` 只读；`send_post` / `edit_post` / `send_file` 要 `confirm=true` |
-| `tuitui_bot` | 机器人自身：`info` / `get_shortcuts` 只读；`set_name` / `set_avatar` / `set_shortcuts` / `set_workspace_menus` 要 `confirm=true` |
-
-> 写操作统一规则：不带 `confirm=true` 直接报错退回。模型自己不会"顺手"改群、改身份、发强通知——
-> 它得先拿到一句明确的「执行」。
-
-## 智能插话是怎么工作的
-
-`mentionPolicy: 'smart'` 时，群里**每条**消息（未 @ 也算）会走一次判定：
-
-1. **冷却**：同一会话 `smartJudge.cooldownMs` 内只判一次，超出的消息直接按「不插嘴」处理，不烧 token。
-2. **取上下文**：从历史缓冲拿最近 `smartJudge.maxHistory` 条（带说话人，机器人自己标 `[你]`）。
-3. **问模型**：用该会话当前生效的模型，把 `smartJudge.prompt` + 历史 + 新消息发过去，
-   同时把 `join_decision` 工具的 JSON Schema 一起下发（`act` 枚举 text / emoji / silent），
-   模型按 schema 调工具，参数就是判定结果——**格式由代码定死，不靠模型自觉写 JSON**。
-   工具不可用或参数不合约时退回文本 JSON 解析（老 `{"join":true|false}` 也认）。
-   提示词只管性格，改提示词改不出解析错误。
-4. **失败即闭嘴**：超时（`timeoutMs`）、输出解析不了、模型报错、服务缺失——一律 `join:false`。
-   宁可漏答一句，也不在群里刷屏。
-5. **没有确定性兜底**：既不看名字，也不看「刚聊过的人接着说话」。判定不可用 = 不插嘴。
-
-提示词里**没有判断清单**——写成清单，它就变成按表格打勾的机器人。出厂文案给的是处境和动机
-（感兴趣、不同意、觉得好笑、无聊、手上有信息、被叫到、该有人拍板），让它自己拿主意。
-提示词是**一等配置**：不同群需要不同的「人设」，在设置页整段改，改完保存即生效；
-清空输入框恢复出厂默认（见 [`src/shared/smart-prompt.ts`](./src/shared/smart-prompt.ts)）。
-
-## 发送可靠性
-
-推推的 `/message/custom/send` 偶尔会回 `errcode 10503`（消息发送失败），绝大多数是服务端瞬时故障或瞬时限流。插件对这条链路做了三层保护：
-
-| 层 | 做法 | 作用 |
-| --- | --- | --- |
-| 重试 | 最多 6 次，指数退避 + Full Jitter（0.5s 起、单次上限 15s、总预算 75s） | 瞬时故障自动恢复，不丢已经生成好的回复 |
-| 分类 | `10503` / `429` / `5xx` / 网络错误才重试；参数、鉴权、权限类错误直接放弃 | 不让人白等 75 秒 |
-| 队列 | 同一会话串行发送，不同会话并行；每会话最多积压 20 条 | 重试期间后一条不会插队，顺序不乱 |
-
-服务端返回 `Retry-After` 时按它的时间等（只受总预算约束）。长文本切成多条时，片与片之间留 250ms，避免密集发送触发限流。
-
-策略放在 [`src/tuitui/retry-policy.ts`](src/tuitui/retry-policy.ts)，队列在 [`src/tuitui/send-queue.ts`](src/tuitui/send-queue.ts)，参考了 [p-retry](https://github.com/sindresorhus/p-retry) 与 AWS 的 [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)。
-
-## 会话与上下文
-
-| 行为 | 说明 |
-| --- | --- |
-| 会话隔离 | 会话键是 `tuitui:<scope>:<peerId>`：单聊按对方账号、群聊按 `group_id`、帖子按 `channel_id`，各自独立上下文 |
-| 群上下文 | 未 @ 的群消息也会进历史缓冲（受 `historyLimit` 约束），被叫到时随消息一起交给 agent |
-| 闲置回收 | 超过 `sessionIdleTimeout` 没消息就回收内存里的 agent；下次说话自动恢复原会话，上下文不丢 |
-| 长任务保护 | agent 正在跑（非 idle）的会话不会被回收，避免长任务被中途清掉 |
-| 并发串行 | 同一 peer 的消息排队串行处理（`maxQueue`），不同 peer 互不阻塞 |
-| 引用解析 | 被回复的那条消息会作为引用一起交给 agent，群里「它刚才说」这类指代不会丢 |
-| 出站 @ 解析 | 正文里写 `@某某` 会解析成推推的 `at` 元数据（代码块、邮箱、`@all` 不算），跟显式 `at` 合并去重；只写文字不带 `at`，对方收不到通知 |
-| 入站去重 | 已处理的 msgid 落盘到 `~/.dsh/tuitui-bot/tuitui-seen.json`（FIFO 1000 条），重启后推推重推同一批消息也不会答两遍 |
-| 僵尸连接自愈 | 连上后 30 分钟一条事件都没收到 → 判定僵死，重建订阅；每 5 分钟打一行 `[tuitui/watch]` 状态（连了多久 / 最近事件多久前 / 最后错误 / 重建次数） |
-| 收敛上限 | 等回合收敛最多 15 分钟，超时记一笔放行，避免一个卡死的 turn 把会话槽位永久占住 |
-
-## 安装后刷新 / 卸载
-
-改完配置或想升级时，重装同一路径即可（profile 会原地替换），然后重启对应 profile：
-
-```bash
-dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot
-dsh --profile <name>                                      # 重启让新版本加载
-```
-
-`dsh --profile <name> --dump-config | grep -A3 im-tuitui` 可以确认插件行已进入组合树。
-
-卸载：
-
-```bash
-dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
-# 凭据写在 profile 的 cordis.patch.yml 里，需要的话一并手动删除
-```
-
-## 常见问题
+### 常见问题
 
 **群里不回应？** 先看 `/auth` 自检，再确认触发方式：`require` 只认 @；`smart` 要看模型判定；
 `always` 才全回。帖子还要确认 `requireMentionInPost`。
@@ -339,6 +320,36 @@ src/tuitui/sender.ts   im.sendText / modifyText / sendInteractive / modifyIntera
 
 关键设计：**全插件只有 `src/tuitui/` 直接 import 推推 SDK**，其余模块只依赖
 [`src/types.ts`](./src/types.ts) 里的 `TuituiSender` 抽象，便于替换与测试。
+
+
+### 发送可靠性
+
+推推的 `/message/custom/send` 偶尔会回 `errcode 10503`（消息发送失败），绝大多数是服务端瞬时故障或瞬时限流。插件对这条链路做了三层保护：
+
+| 层 | 做法 | 作用 |
+| --- | --- | --- |
+| 重试 | 最多 6 次，指数退避 + Full Jitter（0.5s 起、单次上限 15s、总预算 75s） | 瞬时故障自动恢复，不丢已经生成好的回复 |
+| 分类 | `10503` / `429` / `5xx` / 网络错误才重试；参数、鉴权、权限类错误直接放弃 | 不让人白等 75 秒 |
+| 队列 | 同一会话串行发送，不同会话并行；每会话最多积压 20 条 | 重试期间后一条不会插队，顺序不乱 |
+
+服务端返回 `Retry-After` 时按它的时间等（只受总预算约束）。长文本切成多条时，片与片之间留 250ms，避免密集发送触发限流。
+
+策略放在 [`src/tuitui/retry-policy.ts`](src/tuitui/retry-policy.ts)，队列在 [`src/tuitui/send-queue.ts`](src/tuitui/send-queue.ts)，参考了 [p-retry](https://github.com/sindresorhus/p-retry) 与 AWS 的 [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)。
+
+### 会话与上下文
+
+| 行为 | 说明 |
+| --- | --- |
+| 会话隔离 | 会话键是 `tuitui:<scope>:<peerId>`：单聊按对方账号、群聊按 `group_id`、帖子按 `channel_id`，各自独立上下文 |
+| 群上下文 | 未 @ 的群消息也会进历史缓冲（受 `historyLimit` 约束），被叫到时随消息一起交给 agent |
+| 闲置回收 | 超过 `sessionIdleTimeout` 没消息就回收内存里的 agent；下次说话自动恢复原会话，上下文不丢 |
+| 长任务保护 | agent 正在跑（非 idle）的会话不会被回收，避免长任务被中途清掉 |
+| 并发串行 | 同一 peer 的消息排队串行处理（`maxQueue`），不同 peer 互不阻塞 |
+| 引用解析 | 被回复的那条消息会作为引用一起交给 agent，群里「它刚才说」这类指代不会丢 |
+| 出站 @ 解析 | 正文里写 `@某某` 会解析成推推的 `at` 元数据（代码块、邮箱、`@all` 不算），跟显式 `at` 合并去重；只写文字不带 `at`，对方收不到通知 |
+| 入站去重 | 已处理的 msgid 落盘到 `~/.dsh/tuitui-bot/tuitui-seen.json`（FIFO 1000 条），重启后推推重推同一批消息也不会答两遍 |
+| 僵尸连接自愈 | 连上后 30 分钟一条事件都没收到 → 判定僵死，重建订阅；每 5 分钟打一行 `[tuitui/watch]` 状态（连了多久 / 最近事件多久前 / 最后错误 / 重建次数） |
+| 收敛上限 | 等回合收敛最多 15 分钟，超时记一笔放行，避免一个卡死的 turn 把会话槽位永久占住 |
 
 ## 开发
 
