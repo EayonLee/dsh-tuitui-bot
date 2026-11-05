@@ -12,6 +12,7 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
 ### Changes
 
+- Document available token usage in Tuitui execution steps (#11).
 - Install story narrowed to two paths: download the release tarball, or track main via `github:`.
   npm / one-shot script / local checkout instructions removed from README and README_EN
 - Added [AGENTS.md](./AGENTS.md): layering, commands, release process, release-note standard, hard rules
