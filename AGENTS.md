@@ -66,9 +66,9 @@ node scripts/verify-tools.mjs   # 校验 9 个工具是否真的注册进 dsh
 git tag v0.1.30 && git push origin v0.1.30
 
 # 5. 建 Release 并上传正式包
-npm pack --pack-destination /tmp/rel
+./scripts/pack.sh /tmp/rel
 gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
-gh release upload v0.1.30 /tmp/rel/eayonlee-dsh-tuitui-bot-0.1.30.tgz
+gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
 ```
 
 ### Release Notes 标准
@@ -103,7 +103,7 @@ gh release upload v0.1.30 /tmp/rel/eayonlee-dsh-tuitui-bot-0.1.30.tgz
 对外只有两条路径，任何文档都不要写第三种：
 
 1. **正式包**：从 [Releases](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 下载
-   `eayonlee-dsh-tuitui-bot-<版本>.tgz`，然后 `dsh plugin --profile <name> add ./<tarball>`
+   `dsh-tuitui-bot-<版本>.tgz`，然后 `dsh plugin --profile <name> add ./<tarball>`
 2. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
 
 不写 npm、不写本地源码目录、不写一键脚本。

@@ -138,9 +138,9 @@ chore: 脚本加可执行位
 6. 建 Release 并上传正式包（这是用户唯一推荐的安装来源）：
 
    ```bash
-   npm pack --pack-destination /tmp/rel
+   ./scripts/pack.sh /tmp/rel
    gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
-   gh release upload v0.1.30 /tmp/rel/eayonlee-dsh-tuitui-bot-0.1.30.tgz
+   gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
    ```
 
 7. 回填 Release 正文（`gh release edit v0.1.30 --notes-file notes.md`），按下节标准写。
@@ -181,7 +181,7 @@ chore: 脚本加可执行位
 
 只有两条路径，文档里不许写第三种：
 
-1. **正式包（推荐）**：从 Release 下载 `eayonlee-dsh-tuitui-bot-<版本>.tgz`，
+1. **正式包（推荐）**：从 Release 下载 `dsh-tuitui-bot-<版本>.tgz`，
    然后 `dsh plugin --profile <name> add ./<tarball>`
 2. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
 

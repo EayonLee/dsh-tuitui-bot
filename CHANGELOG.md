@@ -13,7 +13,8 @@
   删掉 npm / 一键脚本 / 本地源码的写法；README 与 README_EN 同步
 - 新增 [AGENTS.md](./AGENTS.md)：分层、命令、版本与发版流程、Release Notes 标准、硬性约束
 - 仓库不再发布 npm（`package.json` 加 `private: true`），移除 `install.sh`
-- Release 附带正式包 `eayonlee-dsh-tuitui-bot-<版本>.tgz`，作为推荐安装来源
+- Release 附带正式包 `dsh-tuitui-bot-<版本>.tgz`，作为推荐安装来源；文件名不带 scope 前缀
+  （新增 `scripts/pack.sh` 统一出包，`npm pack` 默认会写成 `eayonlee-` 开头）
 
 ## 0.1.29
 
