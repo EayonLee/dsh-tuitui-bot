@@ -101,6 +101,38 @@ export function formatAnswer(answer: UserQuestionAnswer): string {
 }
 
 /**
+ * 构建已失效卡片（超时 / 被新问题取代）：删掉按钮，明确写「已失效」。
+ *
+ * 不重写卡片的话，超时那张卡片上的按钮一直可点，用户点下去只会得到
+ * 「没有待答问题」，甚至把答案错位到下一题（#42）。
+ */
+export function buildQuestionExpiredCard(
+  question: UserQuestion,
+  reason: 'timeout' | 'superseded' | 'aborted',
+  theme?: Partial<CardTheme>,
+): TuituiOutboundInteractiveMessage {
+  const resolvedTheme = resolveCardTheme(theme);
+  const opts = question.options ?? [];
+  const why = reason === 'timeout'
+    ? '⏰ 已超时，本次提问已结束'
+    : reason === 'superseded'
+      ? '🔁 已被新的提问取代'
+      : '🚫 已取消';
+  return {
+    head: {
+      text: question.header ? `❓ ${question.header}` : '❓ 需要你回答',
+      bgcolor: resolvedTheme.headBgColor,
+      tcolor: resolvedTheme.headTextColor,
+    },
+    body: {
+      title: question.question,
+      content: [...optionLines(question), '', why].join('\n'),
+    },
+    footer: [{ text: opts.length > 0 ? '该问题已失效，按钮不再生效' : '该问题已失效' }],
+  };
+}
+
+/**
  * 构建已作答卡片：删掉按钮，把答案写回卡片。
  *
  * 推推没有"点击后自动置灰"的按钮状态，不重写卡片的话同一条卡片里的按钮

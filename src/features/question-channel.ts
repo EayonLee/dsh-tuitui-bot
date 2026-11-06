@@ -25,7 +25,13 @@ import type {
 } from '../types.ts';
 import { getScopePeer, peerFromSessionKey } from '../shared/scope.ts';
 import { parseAnswer } from './answer-parser.ts';
-import { buildKeyboard, buildQuestionCard, buildQuestionResolvedCard, formatQuestion } from './question-renderer.ts';
+import {
+  buildKeyboard,
+  buildQuestionCard,
+  buildQuestionExpiredCard,
+  buildQuestionResolvedCard,
+  formatQuestion,
+} from './question-renderer.ts';
 import { decodeButtonData, getInteractiveAction, type CardTheme } from './button-utils.ts';
 
 // ── 最小契约（对齐 dsh-user-questions，避免硬依赖） ──
@@ -303,6 +309,7 @@ export class QuestionChannel {
       this.pending.delete(key);
       this.clearTimer(prev);
       this.removeAbort(prev);
+      void this.expireCard(prev, 'superseded');
       prev.reject(new QuestionChannelError('superseded by a new question', ASK_ABORTED));
     }
 
@@ -322,18 +329,28 @@ export class QuestionChannel {
         collected: [],
         ...(cardMsgId ? { cardMsgId } : {}),
       };
+      // 先入表再挂 abort：onAbort 用 pending 做归属判断，晚入表会被自己挡掉，
+      // 变成「signal 已 abort 但没人 reject」，一直挂到超时（#42）
+      entry.timer = setTimeout(() => this.onTimeout(key), this.config.askTimeoutMs);
+      this.pending.set(key, entry);
       if (request.signal) {
         const onAbort = (): void => {
           if (this.pending.get(key) !== entry) return;
           this.pending.delete(key);
           this.clearTimer(entry);
+          // 卡片还挂着按钮：标成已失效，别让用户对一个死问题继续点（#42）
+          void this.expireCard(entry, 'aborted');
           reject(new QuestionChannelError('ask_user_question was aborted before the user answered', ASK_ABORTED));
         };
         entry.onAbort = onAbort;
         request.signal.addEventListener('abort', onAbort, { once: true });
+        // 发送卡片是 await 的：这段时间里 signal 可能已经 abort，事件不会再触发第二次，
+        // 只挂 listener 会让这个 Promise 一直挂到超时（#42）
+        if (request.signal.aborted) {
+          onAbort();
+          return;
+        }
       }
-      entry.timer = setTimeout(() => this.onTimeout(key), this.config.askTimeoutMs);
-      this.pending.set(key, entry);
       this.logger.info(`im-tuitui: question sent to tuitui, waiting for answer key=${key}`);
     });
   }
@@ -404,8 +421,29 @@ export class QuestionChannel {
     this.pending.delete(key);
     this.removeAbort(entry);
     entry.timer = undefined;
+    // 超时后那张卡片还带着可点按钮：用户再点只会得到「没有待答问题」，
+    // 甚至把答案错位到下一题。改写为「已超时」（#42）
+    void this.expireCard(entry, 'timeout');
     void this.sender.sendMarkdown(entry.record.replyTarget, '⚠️ 提问已超时，未收到回答。').catch(() => {});
     entry.reject(new QuestionChannelError('ask_user_question timed out before the user answered', ASK_ABORTED));
+  }
+
+  /** 把待答卡片改写成「已失效」（无卡片 / 卡片能力关闭时静默跳过） */
+  private async expireCard(entry: PendingEntry, reason: 'timeout' | 'superseded' | 'aborted'): Promise<void> {
+    const msgId = entry.cardMsgId;
+    const question = entry.request.questions[entry.index];
+    if (msgId === undefined || question === undefined || !this.cardsEnabled()) return;
+    try {
+      await this.sender.modifyInteractive(
+        entry.record.replyTarget,
+        msgId,
+        buildQuestionExpiredCard(question, reason, this.theme()),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `im-tuitui: question card expire failed key=${entry.record.sessionKey}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /** 已作答卡片回写（同步路径用，失败不打扰用户） */

@@ -209,6 +209,30 @@ describe('buildApprovalText', () => {
 });
 
 describe('ApprovalChannel.install', () => {
+  it('发审批卡片期间被 abort：立刻返回 cancelled，不挂到超时（#42）', async () => {
+    const sent: SentCard[] = [];
+    const controller = new AbortController();
+    const sender = createSender(sent);
+    const originalSend = sender.sendInteractive;
+    sender.sendInteractive = vi.fn(async (...args: Parameters<typeof originalSend>) => {
+      controller.abort();
+      return originalSend(...args);
+    });
+
+    const ch = new ApprovalChannel(
+      createManager({ findBySessionId: (id) => (id === 'sess-a' ? makeRecord(sessionKey('c2c', 'peer-a')) : undefined) }),
+      sender,
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const outcome = await handler(
+      makeRequest({ id: 'sess-a', signal: controller.signal }),
+      () => Promise.resolve('unavailable' as ApprovalOutcome),
+    );
+
+    expect(outcome).toBe('cancelled');
+  });
   it('routes tuitui sessions to park and delegates others to next', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(

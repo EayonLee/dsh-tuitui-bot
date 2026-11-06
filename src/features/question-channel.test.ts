@@ -323,6 +323,36 @@ describe('QuestionChannel.askViaTuitui', () => {
     await expect(p).rejects.toThrow('timed out');
     expect(sent.some((s) => (s.text ?? '').includes('超时'))).toBe(true);
   });
+
+  it('超时把卡片改写成「已超时」，按钮不再可点（#42）', async () => {
+    const sent: SentMessage[] = [];
+    const ch = new QuestionChannel(createManager(), createSender(sent), { requireMention: false, askTimeoutMs: 20 }, createLogger());
+    const p = startAsk(ch, 'c2c', 'U1', [q2()]);
+    p.catch(() => {});
+    await sleep(80);
+    await expect(p).rejects.toThrow('timed out');
+
+    const updated = sent.find((s) => s.updated === true);
+    expect(updated).toBeDefined();
+    expect(JSON.stringify(updated?.card)).toContain('已超时');
+  });
+
+  it('发卡片期间被 abort：立刻以 aborted 失败，不挂到超时（#42）', async () => {
+    const sent: SentMessage[] = [];
+    const controller = new AbortController();
+    const sender = createSender(sent);
+    // 卡片发送卡住：模拟「await sendQuestion 期间 signal 被 abort」
+    const originalSend = sender.sendInteractive;
+    sender.sendInteractive = vi.fn(async (...args: Parameters<typeof originalSend>) => {
+      controller.abort();
+      return originalSend(...args);
+    });
+
+    const ch = new QuestionChannel(createManager(), sender, { requireMention: false, askTimeoutMs: 60_000 }, createLogger());
+    const p = startAsk(ch, 'c2c', 'U1', [q2()], controller.signal);
+
+    await expect(p).rejects.toThrow('aborted');
+  });
 });
 
 describe('QuestionChannel.handleInteraction', () => {
