@@ -19,6 +19,12 @@
 - 一键更新在 API 限流/断网时按版本号拼 Release 直链（`/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`），
   不再出现「看得到新版、点更新却报 403」；包名与版本仍由装前解包校验把关。
 
+### 变更
+
+- 本版起同时发布到 npm：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`。
+  `package.json` 去掉 `private`、加 `publishConfig`（锁官方源 + `access: public`），
+  与 GitHub Release 同版本、同 `files` 白名单；README / AGENTS 的安装口径同步改成三条路径。
+
 ## 0.1.31 (2026-11-05)
 
 一句话：设置页能看版本、能查更新，自己就能热更新，不用重启。

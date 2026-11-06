@@ -2,7 +2,6 @@
   "name": "@eayonlee/dsh-tuitui-bot",
   "version": "0.1.32",
   "icon": "./assets/icons/tuitui.jpg",
-  "private": true,
   "description": "在推推（Tuitui）单聊、群聊与团队频道里直接对话 DeepSeek Harness。 Chat with DeepSeek Harness in Tuitui IM.",
   "author": "EayonLee",
   "type": "module",
@@ -50,6 +49,10 @@
     "360"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EayonLee/dsh-tuitui-bot.git"

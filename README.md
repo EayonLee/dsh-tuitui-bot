@@ -33,15 +33,20 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 
 ### 2. 安装插件
 
-**推荐装 Release 里的正式包**——只有维护者打过 tag 的版本才算发布，跑过完整测试，
-装上就是稳定的。
+**推荐从 npm 装**——只有维护者发过版的版本才在 npm 上，跑过完整测试，装上就是稳定的：
+
+```bash
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
+```
+
+内网/断网装不了 npm 的，用 Release 里的正式包（同一个版本、同一份产物）：
 
 1. 打开 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest)，
-   下载 `dsh-tuitui-bot-<版本>.tgz`（例如 `0.1.29`）
+   下载 `dsh-tuitui-bot-<版本>.tgz`
 2. 装进 profile：
 
 ```bash
-dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.29.tgz
+dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.32.tgz
 ```
 
 想跟着主干走（能拿到还没发版的改动，也可能撞上正在改的东西）：
@@ -50,7 +55,7 @@ dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.29.tgz
 dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
 ```
 
-仓库已提交构建产物 `lib/`，两种装法都不需要本地构建。
+仓库已提交构建产物 `lib/`，三种装法都不需要本地构建。
 
 ### 3. 配置凭据并启动
 
@@ -76,11 +81,11 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 
 ### 升级与卸载
 
-想升级就下新版本的正式包再装一次（profile 会原地替换），然后重启（部署成服务的用
+想升级就按同一个 spec 再装一次（profile 会原地替换），然后重启（部署成服务的用
 `sudo systemctl restart dsh-web`，手动前台起的就重跑 `dsh --profile <name>`）：
 
 ```bash
-dsh plugin --profile <name> add ./dsh-tuitui-bot-<新版本>.tgz
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<新版本>   # 或再装一次正式包
 dsh --profile <name>                                      # 重启让新版本加载
 ```
 
