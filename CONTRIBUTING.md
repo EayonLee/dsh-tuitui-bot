@@ -172,18 +172,26 @@ chore: 脚本加可执行位
 - 不许出现「若干优化」「体验提升」这类没有信息量的句子
 - 安装方式或包结构有变化，必须写进「升级注意」
 
-### 不再发布 npm
+### npm 与 Release 双通道
 
-`package.json` 里 `private: true`，本项目**不向 npm 发布**。任何 `npm publish`、
-`NPM_TOKEN` 相关的流水线配置都是错的，发现即回退。
+每次发版都要同时发两个地方，版本号一致、产物一致：
+
+- npm：`@eayonlee/dsh-tuitui-bot`（`publishConfig` 已锁官方源 + `access: public`）
+- GitHub Release：附带 `dsh-tuitui-bot-<版本>.tgz`
+
+只发一边会出现「npm 上能看到新版、Release 里没有 asset」这类撕裂，自更新那条路会失败。
+`npm publish` 属于发版动作：只有维护者在发版时执行，日常 PR 一律不碰。
 
 ### 用户怎么装
 
-只有两条路径，文档里不许写第三种：
+对外只有两条路径，文档里不许写第三种：
 
-1. **正式包（推荐）**：从 Release 下载 `dsh-tuitui-bot-<版本>.tgz`，
-   然后 `dsh plugin --profile <name> add ./<tarball>`
-2. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
+1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot[@<版本>]`
+2. **Release 直链**：
+   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`
+
+升级就是装新版本，卸载是 `dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot`。
+不支持从源码目录装、不支持 `github:EayonLee/dsh-tuitui-bot` 跟主干。
 
 ## 9. 行为准则
 

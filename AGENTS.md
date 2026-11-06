@@ -109,15 +109,17 @@ npm 与 Release 必须同版本、同内容：`scripts/pack.sh` 打出的 tarbal
 
 ## 安装口径（文档必须一致）
 
-对外只有三条路径，任何文档都不要写第四种：
+对外**只有两条路径**，任何文档都不要写第三种：
 
-1. **npm（推荐）**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<版本>`
-2. **正式包**：从 [Releases](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 下载
-   `dsh-tuitui-bot-<版本>.tgz`，然后 `dsh plugin --profile <name> add ./<tarball>`
-3. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
+1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot[@<版本>]`
+2. **Release 直链**：
+   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`
 
-npm 与 Release 是同一个版本、同一份产物（`files` 白名单一致）；断网/内网装不了 npm 时用 Release 包。
-不写本地源码目录、不写一键脚本。
+升级、卸载都用这两条（卸载按包名 `remove @eayonlee/dsh-tuitui-bot`）。
+
+npm 与 Release 同版本、同产物（同一份 `files` 白名单）。**不写**从源码目录安装、**不写**
+`github:EayonLee/dsh-tuitui-bot` 跟主干、不写一键脚本——这三样都已经被明确排除。
+本地开发的 `link:$PWD` 只在 CONTRIBUTING 里给贡献者看，不算用户安装方式。
 
 ## 硬性约束
 

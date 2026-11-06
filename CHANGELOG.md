@@ -7,6 +7,13 @@
 这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
 版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
 
+### 变更
+
+- 安装方式收敛为**只有两种**：npm 包（`@eayonlee/dsh-tuitui-bot`）与 GitHub Release 直链
+  （`.../releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`）。升级、卸载同样只走这两条。
+  移除 `github:EayonLee/dsh-tuitui-bot` 跟主干的安装说明，README / README_EN / AGENTS /
+  CONTRIBUTING 全部对齐。
+
 ## 0.1.32 (2026-11-05)
 
 一句话：GitHub API 被限流时，「检查更新」不再变成「检查失败」。
@@ -23,7 +30,7 @@
 
 - 本版起同时发布到 npm：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`。
   `package.json` 去掉 `private`、加 `publishConfig`（锁官方源 + `access: public`），
-  与 GitHub Release 同版本、同 `files` 白名单；README / AGENTS 的安装口径同步改成三条路径。
+  与 GitHub Release 同版本、同 `files` 白名单；README / AGENTS 的安装口径同步更新。
 
 ## 0.1.31 (2026-11-05)
 
