@@ -17,6 +17,29 @@ export interface ReplyLimiterConfig {
   dedupeWindowMs?: number;
   /** 最多跟踪多少 target（超出按插入顺序驱逐，默认 1000，防长期运行泄漏） */
   maxTrackedTargets?: number;
+  /**
+   * 单次发送的超时（ms，默认 15000；0 = 不限）。
+   *
+   * SDK 的 HTTP 层不接受 signal，一次「连上了但永不返回」的请求会把该 target
+   * 的串行链永久挂住，之后所有发送都排在这条链后面，表现为该会话彻底静默
+   * （#37）。超时只解除阻塞、不自动重试：重试可能让已经送达的消息重复。
+   */
+  taskTimeoutMs?: number;
+  /** 超时告警出口（宿主 logger） */
+  logger?: { warn(message: string): void };
+}
+
+/** 发送超时：调用方可以据此区分「网络失败」与「永久挂死」 */
+export class ReplyTimeoutError extends Error {
+  public readonly targetKey: string;
+  public readonly timeoutMs: number;
+
+  public constructor(targetKey: string, timeoutMs: number) {
+    super(`发送超时（${timeoutMs}ms 未返回）：${targetKey}`);
+    this.name = 'ReplyTimeoutError';
+    this.targetKey = targetKey;
+    this.timeoutMs = timeoutMs;
+  }
 }
 
 /** 一次发送判定结果 */
@@ -40,6 +63,7 @@ interface TargetState {
 const DEFAULT_MIN_INTERVAL_MS = 300;
 const DEFAULT_DEDUPE_WINDOW_MS = 2000;
 const DEFAULT_MAX_TRACKED_TARGETS = 1000;
+const DEFAULT_TASK_TIMEOUT_MS = 15 * 1000;
 
 /** 可清除的等待（与 setTimeout 等价，单独包一层只为可读性） */
 function delay(ms: number): Promise<void> {
@@ -50,12 +74,38 @@ export class ReplyLimiter {
   private readonly minIntervalMs: number;
   private readonly dedupeWindowMs: number;
   private readonly maxTracked: number;
+  private readonly taskTimeoutMs: number;
+  private readonly logger: { warn(message: string): void } | undefined;
   private readonly targets = new Map<string, TargetState>();
 
   public constructor(config?: ReplyLimiterConfig) {
     this.minIntervalMs = Math.max(0, config?.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS);
     this.dedupeWindowMs = Math.max(0, config?.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS);
     this.maxTracked = Math.max(1, config?.maxTrackedTargets ?? DEFAULT_MAX_TRACKED_TARGETS);
+    this.taskTimeoutMs = Math.max(0, config?.taskTimeoutMs ?? DEFAULT_TASK_TIMEOUT_MS);
+    this.logger = config?.logger;
+  }
+
+  /**
+   * 给单次发送加超时。超时后抛 ReplyTimeoutError，串行链照常往后走
+   * （链本身在 run() 里把失败吞成 undefined，不会毒化后续）。
+   */
+  private async withTimeout<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
+    if (this.taskTimeoutMs <= 0) return task();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        this.logger?.warn(`[reply-limiter] ${targetKey} 发送 ${this.taskTimeoutMs}ms 未返回，解除阻塞`);
+        reject(new ReplyTimeoutError(targetKey, this.taskTimeoutMs));
+      }, this.taskTimeoutMs);
+      // 不要因为这条定时器把进程吊住
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([task(), timeout]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
   }
 
   /**
@@ -104,7 +154,7 @@ export class ReplyLimiter {
       const decision = this.check(targetKey, content);
       if (!decision.allowed) return undefined;
       if (decision.waitMs > 0) await delay(decision.waitMs);
-      const value = await task();
+      const value = await this.withTimeout(targetKey, task);
       this.record(targetKey, content);
       return value;
     });

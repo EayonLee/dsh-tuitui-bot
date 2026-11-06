@@ -23,6 +23,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   `/tmp` that is deleted right after install, so every later `pnpm install` / `dsh plugin add` in that
   profile failed with ENOENT. The tarball is now persisted to `.dsh-tuitui-updates/` inside the profile
   (only the current version is kept) and installed from that stable path (#36).
+- Outbound sends now time out after 15 s. A single request that connected but never returned used to
+  hang that target's serial send chain forever, silently queueing every later reply and stalling
+  deliverables and turn-end bookkeeping. The timeout only unblocks and warns; it does not retry, to
+  avoid duplicating messages that did arrive (#37).
 
 ### Changed
 
