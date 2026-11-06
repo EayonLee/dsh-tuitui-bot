@@ -7,6 +7,13 @@
 这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
 版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
 
+### 修复
+
+- 附件发送的路径白名单默认收紧为开启（`sendFile.restrictPaths: true`），并且凭据文件
+  （`cordis.patch.yml`）、私钥（`*.pem` / `*.key` / `~/.ssh`）、`.env` / `.npmrc` 以及
+  `$DSH_HOME/profiles/**` 无论开关如何都拒绝发送。此前默认放开任意路径，群聊里的一次诱导
+  就能把这些文件发进群（#34）。
+
 ### 变更
 
 - 安装方式收敛为**只有两种**：npm 包（`@eayonlee/dsh-tuitui-bot`）与 GitHub Release 直链
