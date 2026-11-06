@@ -105,6 +105,68 @@ describe('concurrencyGuard', () => {
     expect(c.skipped).toBe('concurrency:merged');
   });
 
+  it('merge：锁随幸存者交接，第三条不会与它并发（#39）', async () => {
+    const guard = concurrencyGuard({ strategy: 'merge', maxQueue: 10 });
+    const gate = createGate();
+    const calls: string[] = [];
+
+    const a = makeCtx(makeMessage({ messageId: 'a', content: '第一句' }));
+    const b = makeCtx(makeMessage({ messageId: 'b', content: '第二句' }));
+    const runA = guard(a, async () => {
+      calls.push('a-enter');
+      await gate.wait;
+      calls.push('a-exit');
+    });
+    const runB = guard(b, async () => {
+      calls.push('b-enter');
+      await gate.wait;
+      calls.push('b-exit');
+    });
+
+    gate.open();
+    await Promise.all([runA, runB]);
+    expect(calls).toEqual(['a-enter', 'a-exit', 'b-enter', 'b-exit']);
+
+    // 幸存者 B 跑完之后的第三条：正常排队、串行执行
+    const d = makeCtx(makeMessage({ messageId: 'd', content: '第四条' }));
+    await guard(d, async () => {
+      calls.push('d-enter');
+      calls.push('d-exit');
+    });
+    expect(calls.slice(-2)).toEqual(['d-enter', 'd-exit']);
+  });
+
+  it('merge：幸存者还在跑时插进来的消息必须等它退出（不并发）', async () => {
+    const guard = concurrencyGuard({ strategy: 'merge', maxQueue: 10 });
+    const gate = createGate();
+    const survivorGate = createGate();
+    const events: string[] = [];
+
+    const a = makeCtx(makeMessage({ messageId: 'a', content: '第一句' }));
+    const b = makeCtx(makeMessage({ messageId: 'b', content: '第二句' }));
+    const runA = guard(a, async () => { events.push('a'); await gate.wait; });
+    const runB = guard(b, async () => {
+      events.push('b-enter');
+      await survivorGate.wait;   // 幸存者故意拖住
+      events.push('b-exit');
+    });
+
+    gate.open();
+    // 交接要经过 owner 收尾 + 微任务调度，用宏任务 flush 一次拿到稳定状态
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // 此刻 B 已接手并卡在 survivorGate 上
+    expect(events).toContain('b-enter');
+
+    const late = makeCtx(makeMessage({ messageId: 'late', content: '后来的' }));
+    const runLate = guard(late, async () => { events.push('late'); });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events).not.toContain('late');
+
+    survivorGate.open();
+    await Promise.all([runA, runB, runLate]);
+    expect(events).toEqual(['a', 'b-enter', 'b-exit', 'late']);
+  });
+
   it('merge：缓冲超过 maxQueue 时丢弃并 skip', async () => {
     const guard = concurrencyGuard({ strategy: 'merge', maxQueue: 1 });
     const gate = createGate();
