@@ -33,29 +33,33 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 
 ### 2. 安装插件
 
-**推荐从 npm 装**——只有维护者发过版的版本才在 npm 上，跑过完整测试，装上就是稳定的：
+**只支持两种安装方式**：npm 包，或者 GitHub Release 里的正式包（tgz）。两者是同一个版本、
+同一份产物，装哪个都一样。
+
+**方式一 · npm（推荐）**
 
 ```bash
 dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
 ```
 
-内网/断网装不了 npm 的，用 Release 里的正式包（同一个版本、同一份产物）：
-
-1. 打开 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest)，
-   下载 `dsh-tuitui-bot-<版本>.tgz`
-2. 装进 profile：
+要固定版本就带上版本号：
 
 ```bash
-dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.32.tgz
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot@0.1.32
 ```
 
-想跟着主干走（能拿到还没发版的改动，也可能撞上正在改的东西）：
+**方式二 · GitHub Release 直链**
+
+把 `0.1.32` 换成 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 的版本号：
 
 ```bash
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v0.1.32/dsh-tuitui-bot-0.1.32.tgz
 ```
 
-仓库已提交构建产物 `lib/`，三种装法都不需要本地构建。
+内网、断网、或者 npm 抽风的时候用这条——它直接从 GitHub 取包，不经过 npm registry。
+
+> 除此之外没有别的安装渠道：不支持从源码目录装、不支持 `github:EayonLee/dsh-tuitui-bot` 跟主干。
+> 每个 Release / npm 版本都带完整构建产物 `lib/`，装包本身不需要本地构建。
 
 ### 3. 配置凭据并启动
 
@@ -81,15 +85,17 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 
 ### 升级与卸载
 
-想升级就按同一个 spec 再装一次（profile 会原地替换），然后重启（部署成服务的用
-`sudo systemctl restart dsh-web`，手动前台起的就重跑 `dsh --profile <name>`）：
+升级就是用上面那两种方式之一装新版本（profile 原地替换），然后重启——部署成服务的用
+`sudo systemctl restart dsh-web`，手动前台起的重跑 `dsh --profile <name>`：
 
 ```bash
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<新版本>   # 或再装一次正式包
-dsh --profile <name>                                      # 重启让新版本加载
-```
+# 方式一：npm
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<新版本>
+# 方式二：Release 直链
+dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<新版本>/dsh-tuitui-bot-<新版本>.tgz
 
-跟着主干走的，重装 `github:EayonLee/dsh-tuitui-bot` 即可。
+dsh --profile <name>                # 重启让新版本加载
+```
 
 设置页「已绑定」那行右侧也能做这件事：有新版本时点「更新到 vX.Y.Z」就跑完上面两步
 （下载、校验、备份、安装）。宿主加载了 `@deepseek-ai/dsh-hmr` 时**不需要重启**——插件会就地
@@ -97,7 +103,7 @@ dsh --profile <name>                                      # 重启让新版本�
 
 `dsh --profile <name> --dump-config | grep -A3 im-tuitui` 可以确认插件行已进入组合树。
 
-卸载：
+卸载（两种安装方式卸载命令相同，按包名走）：
 
 ```bash
 dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot

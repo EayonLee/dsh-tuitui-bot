@@ -10,6 +10,13 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+### Changed
+
+- Installation is now **exactly two channels**: the npm package (`@eayonlee/dsh-tuitui-bot`) and the
+  GitHub release URL (`.../releases/download/v<version>/dsh-tuitui-bot-<version>.tgz`). Upgrading and
+  uninstalling follow the same two. The `github:EayonLee/dsh-tuitui-bot` main-tracking instructions
+  are gone; README / README_EN / AGENTS / CONTRIBUTING all match.
+
 ## 0.1.32 (2026-11-05)
 
 In one line: when the GitHub API is rate-limited, "Check for updates" no longer turns into "check

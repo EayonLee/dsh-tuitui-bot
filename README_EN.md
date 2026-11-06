@@ -30,16 +30,16 @@ The order is the behaviour contract.
 ## Quick start
 
 ```bash
-# 1. install from npm (recommended) — only released versions live there
+# 1. install — exactly two supported channels: the npm package, or the GitHub
+#    release tarball. Same version, same contents, pick either.
+#
+#    a) npm (recommended); pin a version by appending @<version>
 dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
 
-# or install the release tarball (same version, same contents; use this offline)
-#    grab dsh-tuitui-bot-<version>.tgz from
-#    https://github.com/EayonLee/dsh-tuitui-bot/releases/latest
-dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.32.tgz
-
-# or track main (unreleased changes, may be mid-refactor)
-dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot
+#    b) GitHub release URL — use this offline / behind a proxy.
+#       Replace 0.1.32 with the latest version from
+#       https://github.com/EayonLee/dsh-tuitui-bot/releases/latest
+dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v0.1.32/dsh-tuitui-bot-0.1.32.tgz
 
 # 2. configure credentials
 export TUITUI_BOT_APPID="your-app-id"
@@ -50,7 +50,9 @@ export DEEPSEEK_API_KEY="your-deepseek-key"
 dsh --profile tuitui
 ```
 
-Build output (`lib/`) is committed, so installing straight from GitHub needs no local build.
+Nothing else is supported: no install from a source checkout, no `github:EayonLee/dsh-tuitui-bot`
+main tracking. Every npm version and every release tarball ships the built `lib/`, so installing
+never needs a local build.
 
 Alternatively leave the env vars unset and fill **Settings → Tuitui Bot** in the GUI; the plugin verifies the
 credentials with `property.info()` and writes them into the profile's `cordis.patch.yml`.
@@ -67,14 +69,21 @@ personality and the conversation:
 
 ### Upgrade & uninstall
 
-Re-install the same spec to upgrade (the profile is replaced in place), then restart that profile:
+Upgrading means installing the new version through one of the same two channels (the profile is
+replaced in place), then restarting that profile:
 
 ```bash
-dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot
+# a) npm
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<new-version>
+# b) GitHub release URL
+dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<new-version>/dsh-tuitui-bot-<new-version>.tgz
+
 dsh --profile <name>                                      # restart to load the new build
 ```
 
 `dsh --profile <name> --dump-config | grep -A3 im-tuitui` confirms the plugin row is in the combined tree.
+
+Uninstalling is the same for both channels — remove by package name:
 
 ```bash
 dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
