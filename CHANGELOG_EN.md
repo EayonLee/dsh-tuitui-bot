@@ -10,6 +10,13 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+### Fixed
+
+- The attachment path allowlist is now on by default (`sendFile.restrictPaths: true`), and credential
+  files (`cordis.patch.yml`), private keys (`*.pem` / `*.key` / `~/.ssh`), `.env` / `.npmrc` and
+  `$DSH_HOME/profiles/**` are refused regardless of the switch. Previously any readable path was
+  allowed, so one prompt injection in a group could send those files into the chat (#34).
+
 ### Changed
 
 - Installation is now **exactly two channels**: the npm package (`@eayonlee/dsh-tuitui-bot`) and the

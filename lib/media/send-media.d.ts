@@ -17,7 +17,21 @@ export type MediaSenderLike = Pick<TuituiSender, 'sendImage' | 'sendFile'>;
  * 「路径不允许」）；root 不存在则该 root 无效。
  */
 export declare function isWithinRoot(filePath: string, root: string): boolean;
-/** 路径白名单校验：restrictPaths 关闭时放行任意路径，否则限定 media + cwd + extraRoots */
+/**
+ * 敏感路径判定 —— 凭据与密钥不允许作为附件发送。
+ *
+ * 宿主的 profile 目录（`$DSH_HOME/profiles/**`）整体视为敏感：凭据就写在
+ * 里面的 cordis.patch.yml，按目录拒绝比按文件名拒绝更难绕过（profile 可能被
+ * 复制成 cordis.patch.yml.bak 之类的名字）。
+ */
+export declare function isSensitivePath(filePath: string): boolean;
+/**
+ * 路径白名单校验。
+ *
+ * 两道闸，顺序不能换：
+ * 1. 敏感路径（凭据/私钥/profile 目录）**永远拒绝**，与 restrictPaths 无关；
+ * 2. restrictPaths 打开时限定 media + cwd + extraRoots，关闭时放行其余任意路径。
+ */
 export declare function isPathAllowed(filePath: string, config: SendFileConfig, cwd: string): boolean;
 /** sendMediaFile 的结果：成功附带元数据；缺失不抛错；失败携带原因供日志与错误信息透出 */
 export type SendMediaResult = {

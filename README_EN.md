@@ -243,8 +243,10 @@ channel/team ids. Deny lists win over everything. An empty allowlist in `allowli
 `vision.apiKey` / `vision.model` (image understanding), `imageGeneration.enabled` /
 `imageGeneration.baseUrl` / `imageGeneration.apiKey` / `imageGeneration.model` /
 `imageGeneration.size` (image generation), `sendFile.restrictPaths` / `sendFile.extraRoots` /
-`sendFile.sendPresentedFiles`. Endpoint API keys are write-only: they never come back from the
-config API and the settings page only shows whether one is stored.
+`sendFile.sendPresentedFiles`. `sendFile.restrictPaths` defaults to **true** (only media + cwd +
+`extraRoots`), and credentials, private keys and the dsh profile directory are refused even when it is
+turned off. Endpoint API keys are write-only: they never come back from the config API and the
+settings page only shows whether one is stored.
 
 ### Tuitui-native switches
 

@@ -115,9 +115,49 @@ describe('isWithinRoot 路径边界', () => {
 describe('isPathAllowed 白名单', () => {
   const baseConfig = { restrictPaths: true, extraRoots: [] as string[], sendPresentedFiles: true, maxFiles: 5 };
 
-  it('restrictPaths=false 时放行任意路径', async () => {
+  it('restrictPaths=false 时放行普通路径（敏感路径除外）', async () => {
     const outside = await makeDir();
     expect(isPathAllowed(join(outside, 'x.txt'), { ...baseConfig, restrictPaths: false }, homeRoot)).toBe(true);
+  });
+
+  it('敏感路径无论 restrictPaths 开关都拒绝（#34）', async () => {
+    const dir = await makeDir();
+    const loose = { ...baseConfig, restrictPaths: false };
+    const strict = { ...baseConfig, restrictPaths: true };
+
+    for (const config of [loose, strict]) {
+      // 凭据文件：profile 里的、当前目录里的、改名备份的都不行
+      expect(isPathAllowed(join(homeRoot, '.dsh', 'profiles', 'web', 'cordis.patch.yml'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, 'cordis.patch.yml'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, 'cordis.patch.yml.bak'), config, dir)).toBe(false);
+      // 私钥与证书
+      expect(isPathAllowed(join(homeRoot, '.ssh', 'id_rsa'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(homeRoot, '.ssh', 'config'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, 'server.pem'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, 'client.key'), config, dir)).toBe(false);
+      // 环境变量与工具凭据
+      expect(isPathAllowed(join(dir, '.env'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, '.env.local'), config, dir)).toBe(false);
+      expect(isPathAllowed(join(dir, '.npmrc'), config, dir)).toBe(false);
+    }
+  });
+
+  it('profile 目录整体视为敏感（即使文件名看着无害）', async () => {
+    const config = { ...baseConfig, restrictPaths: false };
+    const profileFile = join(homeRoot, '.dsh', 'profiles', 'web', 'cordis.yml');
+    expect(isPathAllowed(profileFile, config, homeRoot)).toBe(false);
+  });
+
+  it('大小写与符号链接不影响敏感判定', async () => {
+    const dir = await makeDir();
+    const real = join(dir, 'CORDIS.PATCH.YML');
+    await writeFile(real, 'x');
+    expect(isPathAllowed(real, { ...baseConfig, restrictPaths: false }, dir)).toBe(false);
+
+    const { symlink } = await import('node:fs/promises');
+    const link = join(dir, 'innocent.txt');
+    await symlink(real, link);
+    expect(isPathAllowed(link, { ...baseConfig, restrictPaths: false }, dir)).toBe(false);
   });
 
   it('cwd / media 目录 / extraRoots 内放行', async () => {

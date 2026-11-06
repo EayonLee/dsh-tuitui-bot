@@ -304,7 +304,7 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | `imageGeneration.enabled` | `false` | 启用图像生成（`tuitui_draw` 工具） |
 | `imageGeneration.baseUrl` / `apiKey` / `model` | - | 图像生成端点，与理解各配一套 |
 | `imageGeneration.size` | `1024x1024` | 出图尺寸，留空用服务端默认 |
-| `sendFile.restrictPaths` | `false` | 是否限制可发送的文件路径；默认放开，打开后只允许 media + cwd + extraRoots |
+| `sendFile.restrictPaths` | `true` | 是否限制可发送的文件路径；默认只允许 media + cwd + extraRoots，关掉后放开其余路径。**凭据/私钥/profile 目录无论开关都拒绝** |
 | `sendFile.extraRoots` | `[]` | 额外允许发送的目录 |
 | `sendFile.sendPresentedFiles` | `true` | 轮末投递 `present` 声明的文件 |
 
