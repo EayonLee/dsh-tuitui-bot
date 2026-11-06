@@ -1,10 +1,40 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ReplyLimiter } from './reply-limiter.ts';
+import { ReplyLimiter, ReplyTimeoutError } from './reply-limiter.ts';
 
 /**
  * ReplyLimiter 的语义是出站节流 / 去重守卫，因此用例分四组：
  * 节流、去重、排队与容错（设计说明见 reply-limiter.ts 文件头）。
  */
+describe('ReplyLimiter 超时（#37）', () => {
+  it('发送永不返回时超时抛错，链路继续走（不会永久静默）', async () => {
+    const warnings: string[] = [];
+    const limiter = new ReplyLimiter({
+      minIntervalMs: 0,
+      taskTimeoutMs: 30,
+      logger: { warn: (m) => warnings.push(m) },
+    });
+
+    const hang = limiter.run('c2c:u1', '第一句', () => new Promise<string>(() => {}));
+    await expect(hang).rejects.toBeInstanceOf(ReplyTimeoutError);
+
+    const next = await limiter.run('c2c:u1', '第二句', async () => 'sent');
+    expect(next).toBe('sent');
+    expect(warnings.some((m) => m.includes('解除阻塞'))).toBe(true);
+  });
+
+  it('taskTimeoutMs=0 表示不限（保持旧行为）', async () => {
+    const limiter = new ReplyLimiter({ minIntervalMs: 0, taskTimeoutMs: 0 });
+    expect(await limiter.run('c2c:u2', 'x', async () => 'ok')).toBe('ok');
+  });
+
+  it('超时不记账：同内容在去重窗口内仍可重发', async () => {
+    const limiter = new ReplyLimiter({ minIntervalMs: 0, dedupeWindowMs: 2000, taskTimeoutMs: 20 });
+    await expect(limiter.run('c2c:u3', '同一句', () => new Promise<void>(() => {})))
+      .rejects.toBeInstanceOf(ReplyTimeoutError);
+    expect(await limiter.run('c2c:u3', '同一句', async () => 'sent')).toBe('sent');
+  });
+});
+
 describe('ReplyLimiter', () => {
   beforeEach(() => {
     vi.useFakeTimers();

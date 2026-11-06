@@ -16,6 +16,24 @@ export interface ReplyLimiterConfig {
     dedupeWindowMs?: number;
     /** 最多跟踪多少 target（超出按插入顺序驱逐，默认 1000，防长期运行泄漏） */
     maxTrackedTargets?: number;
+    /**
+     * 单次发送的超时（ms，默认 15000；0 = 不限）。
+     *
+     * SDK 的 HTTP 层不接受 signal，一次「连上了但永不返回」的请求会把该 target
+     * 的串行链永久挂住，之后所有发送都排在这条链后面，表现为该会话彻底静默
+     * （#37）。超时只解除阻塞、不自动重试：重试可能让已经送达的消息重复。
+     */
+    taskTimeoutMs?: number;
+    /** 超时告警出口（宿主 logger） */
+    logger?: {
+        warn(message: string): void;
+    };
+}
+/** 发送超时：调用方可以据此区分「网络失败」与「永久挂死」 */
+export declare class ReplyTimeoutError extends Error {
+    readonly targetKey: string;
+    readonly timeoutMs: number;
+    constructor(targetKey: string, timeoutMs: number);
 }
 /** 一次发送判定结果 */
 export interface ReplyLimitResult {
@@ -30,8 +48,15 @@ export declare class ReplyLimiter {
     private readonly minIntervalMs;
     private readonly dedupeWindowMs;
     private readonly maxTracked;
+    private readonly taskTimeoutMs;
+    private readonly logger;
     private readonly targets;
     constructor(config?: ReplyLimiterConfig);
+    /**
+     * 给单次发送加超时。超时后抛 ReplyTimeoutError，串行链照常往后走
+     * （链本身在 run() 里把失败吞成 undefined，不会毒化后续）。
+     */
+    private withTimeout;
     /**
      * 纯查询：这次发送会被去重吗？需要等多久？
      *
