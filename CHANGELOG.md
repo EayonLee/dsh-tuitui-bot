@@ -30,6 +30,10 @@
   `--host 0.0.0.0` 启动或挂在反代后面时，局域网内任何人都能替换凭据或解绑（#44）。
 - 自动保存失败时的兜底引导不再把 AppSecret 明文 `console.log` 出去（stdout 在 `dsh web` 下
   会进 `~/.dsh/web.log`，systemd 下进 journal）。现在只回显 appId，secret 用占位符（#44）。
+- 图像生成拿到的是 `url`（而不是 `b64_json`）时改为按二进制下载：此前用 `response.text()`
+  取图再按 latin1 还原，PNG 的 `0x89` 等字节会被 UTF-8 解码破坏，出图必坏（#43）。
+- `tuitui_describe_image` 不再接受私有网段/环回地址的 URL（SSRF），本地图片也限制在
+  media / agent cwd / `sendFile.extraRoots` 之内，避免把任意文件送去外部视觉端点（#43）。
 
 ### 破坏性变更
 

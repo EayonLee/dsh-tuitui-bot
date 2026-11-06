@@ -156,13 +156,41 @@ describe('generateImage', () => {
     expect(JSON.parse(body)).not.toHaveProperty('size');
   });
 
-  it('返回 url 时再取一次字节', async () => {
+  it('返回 url 时按二进制重新下载，字节不被 UTF-8 解码破坏（#43）', async () => {
+    // 真实的 1×1 PNG（70 字节），首字节 0x89 正是会被 UTF-8 解码吃掉的字符
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
     const fetchImpl: FetchLike = async (url) => {
       if (url.includes('images/generations')) return jsonResponse({ data: [{ url: 'https://cdn/x.png' }] });
-      return textResponse('PNGDATA');
+      return {
+        ok: true,
+        status: 200,
+        text: async () => png.toString('utf8'), // 故意提供会损坏的解码结果：正常代码不该用它
+        arrayBuffer: async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer,
+        headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'image/png' : null) },
+      };
     };
     const out = await generateImage(imageConfig, 'p', fetchImpl);
-    expect(Buffer.from(out.bytes).toString()).toBe('PNGDATA');
+    expect(Buffer.from(out.bytes).equals(png)).toBe(true);
+    expect(out.bytes[0]).toBe(0x89);
+    expect(out.mediaType).toBe('image/png');
+  });
+
+  it('没有 content-type 时按魔法字节嗅探（jpeg）', async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+    const fetchImpl: FetchLike = async (url) => {
+      if (url.includes('images/generations')) return jsonResponse({ data: [{ url: 'https://cdn/x.jpg' }] });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '',
+        arrayBuffer: async () => jpeg.buffer as ArrayBuffer,
+      };
+    };
+    const out = await generateImage(imageConfig, 'p', fetchImpl);
+    expect(out.mediaType).toBe('image/jpeg');
   });
 
   it('既没有 b64 也没有 url 时报错', async () => {

@@ -78,20 +78,55 @@ function sniffImageMediaType(bytes: Uint8Array): ImageMediaType | null {
   return null;
 }
 
-/** 加载图片字节（本地路径 / http URL），校验大小 + 嗅探 MIME */
+/** 内网 / 环回 / 链路本地目标：图片下载不允许（SSRF） */
+export function isPrivateHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === '::1' || host === '0.0.0.0') return true;
+  if (host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) return true; // 链路本地 / ULA
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (ipv4 === null) return false;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  if (a === 127 || a === 10 || a === 0) return true;
+  if (a === 169 && b === 254) return true;   // 云元数据服务
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
+/** 本地图片只能来自这些根目录（与附件白名单同一套：media / agent cwd / extraRoots） */
+export interface ImagePathPolicy {
+  /** 判定本地路径是否允许读取 */
+  allows(path: string): boolean;
+}
+
+/** 加载图片字节（本地路径 / http URL），校验来源 + 大小 + MIME */
 async function loadImageBytes(
   image: string,
   maxBytes: number,
   signal: AbortSignal,
+  pathPolicy?: ImagePathPolicy,
 ): Promise<{ data: Uint8Array; mediaType: ImageMediaType }> {
   let data: Uint8Array;
   if (/^https?:\/\//i.test(image)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(image);
+    } catch {
+      throw new Error('tuitui_describe_image: invalid image url');
+    }
+    if (isPrivateHostname(parsed.hostname)) {
+      throw new Error(`tuitui_describe_image: refusing to fetch a private host (${parsed.hostname})`);
+    }
     const resp = await fetch(image, { signal, redirect: 'error' });
     if (!resp.ok) throw new Error(`tuitui_describe_image: download failed (HTTP ${resp.status})`);
     const buf = Buffer.from(await resp.arrayBuffer());
     if (buf.length > maxBytes) throw new Error(`tuitui_describe_image: image too large (${buf.length} bytes)`);
     data = new Uint8Array(buf);
   } else {
+    if (pathPolicy !== undefined && !pathPolicy.allows(image)) {
+      throw new Error(`tuitui_describe_image: image path is outside the allowed roots: ${image}`);
+    }
     const info = await stat(image).catch(() => null);
     if (!info?.isFile()) throw new Error(`tuitui_describe_image: image file not found: ${image}`);
     if (info.size > maxBytes) throw new Error(`tuitui_describe_image: image too large (${info.size} bytes)`);
@@ -270,7 +305,12 @@ export function ensureVisionInputModal(vision: VisionConfig, logger: Logger): vo
 }
 
 /** 注册 tuitui_describe_image 工具（服务缺失时优雅降级，不阻断插件启动） */
-export function registerDescribeImageTool(ctx: Context, config: VisionConfig, logger: Logger): void {
+export function registerDescribeImageTool(
+  ctx: Context,
+  config: VisionConfig,
+  logger: Logger,
+  pathPolicy?: ImagePathPolicy,
+): void {
   if (!config.enabled) return;
   // 两种模式：自己配了 OpenAI 兼容端点（直连），或者沿用 dsh 的 llm adapter。
   const direct = isDirectEndpoint(config);
@@ -333,7 +373,7 @@ export function registerDescribeImageTool(ctx: Context, config: VisionConfig, lo
         throw new Error('tuitui_describe_image: `image` must be a non-empty string');
       }
 
-      const loaded = await loadImageBytes(image, config.maxBytes, exec.signal);
+      const loaded = await loadImageBytes(image, config.maxBytes, exec.signal, pathPolicy);
 
       // 配了 baseUrl + apiKey 就直接打用户的 OpenAI 兼容端点；
       // 没配（老配置）才退回 dsh llm + attachments 那条老路。

@@ -39,6 +39,12 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - The fallback instructions printed when auto-save fails no longer echo the AppSecret in plain text
   (stdout goes to `~/.dsh/web.log` under `dsh web`, and to the journal under systemd). Only the appId
   is printed, the secret is a placeholder (#44).
+- Image generation now downloads the `url` form as binary. It used to read the image through
+  `response.text()` and re-encode as latin1, which mangled PNG bytes such as `0x89` during UTF-8
+  decoding, so every generated image came out corrupt (#43).
+- `tuitui_describe_image` refuses private/loopback URLs (SSRF) and only reads local images inside
+  media / the agent cwd / `sendFile.extraRoots`, instead of handing any readable file to an external
+  vision endpoint (#43).
 
 ### Breaking changes
 

@@ -42,7 +42,32 @@ export type FetchLike = (input: string, init?: {
   ok: boolean;
   status: number;
   text(): Promise<string>;
+  /**
+   * 二进制读取。图片下载必须走这个：`text()` 会把字节按 UTF-8 解码，
+   * PNG 的 `0x89` 之类的非法序列会被替换成 U+FFFD，再按 latin1 还原就永远是坏图。
+   * 测试替身可以不实现（老路径会退回 text()，仅用于兼容旧用例）。
+   */
+  arrayBuffer?(): Promise<ArrayBuffer>;
+  /** 响应头：用来按 content-type 判定图片类型（可选，测试替身可不实现） */
+  headers?: { get(name: string): string | null };
 }>;
+
+/** 按魔法字节嗅探图片类型；认不出时返回 undefined */
+export function sniffImageMediaType(bytes: Uint8Array): string | undefined {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return 'image/png';
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
+  if (
+    bytes.length >= 12
+    && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+    && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+  return undefined;
+}
 
 function fail(status: number, message: string, upstream?: string): ImageModelError {
   const error = new Error(message) as ImageModelError;
@@ -215,9 +240,17 @@ export async function generateImage(
   if (typeof first.url === 'string' && first.url !== '') {
     const response = await fetchImpl(first.url, { method: 'GET' });
     if (!response.ok) throw fail(response.status, `图片下载失败（${response.status}）`);
-    const raw = await response.text();
-    // b64 走的是 text()，这里图片是二进制：用 Buffer 还原（FetchLike 只暴露 text 便于测试）
-    return { bytes: Uint8Array.from(Buffer.from(raw, 'binary')), mediaType: 'image/png' };
+    // 二进制必须走 arrayBuffer()：text() 会按 UTF-8 解码，0x89 这类字节会被替换掉（#43）
+    if (typeof response.arrayBuffer !== 'function') {
+      throw fail(0, '图片下载失败：当前 fetch 实现不支持 arrayBuffer，无法安全读取二进制');
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length === 0) throw fail(0, '图片下载失败：返回内容为空');
+    const headerType = response.headers?.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+    const mediaType = headerType?.startsWith('image/') === true
+      ? headerType
+      : (sniffImageMediaType(bytes) ?? 'image/png');
+    return { bytes, mediaType };
   }
   throw fail(0, '上游返回里既没有 b64_json 也没有 url');
 }

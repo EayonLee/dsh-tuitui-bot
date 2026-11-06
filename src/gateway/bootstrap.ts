@@ -26,6 +26,7 @@ import { buildCommandList } from '../commands/index.ts';
 import { startMediaCleanup } from '../media/media-cleaner.ts';
 import { ensureVisionInputModal, registerDescribeImageTool } from '../media/vision-tool.ts';
 import { registerSendFileTool } from '../media/send-file-tool.ts';
+import { isPathAllowed, resolveAgentCwd } from '../media/send-media.ts';
 import { registerGroupTool } from '../tuitui/group-tool.ts';
 import { registerHistoryTool } from '../tuitui/history-tool.ts';
 import { registerFileTool } from '../tuitui/file-tool.ts';
@@ -381,7 +382,9 @@ export async function bootstrapGateway(
 
   // ── 视觉工具注册（tuitui_describe_image，复用 dsh llm + attachments） ──
   runOptional(logger, 'vision modal', () => ensureVisionInputModal(config.vision, logger));
-  runOptional(logger, 'describe-image tool', () => registerDescribeImageTool(ctx, config.vision, logger));
+  runOptional(logger, 'describe-image tool', () => registerDescribeImageTool(ctx, config.vision, logger, {
+    allows: (path) => isPathAllowed(path, config.sendFile, resolveAgentCwd(config.cwd)),
+  }));
   runOptional(logger, 'draw tool', () => {
     if (!config.imageGeneration.enabled) {
       logger.info('im-tuitui: 图像生成未启用，tuitui_draw 未注册');

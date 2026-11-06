@@ -230,6 +230,8 @@ describe('registerDescribeImageTool', () => {
     toolsOnly?: boolean;
     chunks?: unknown[];
     savedRef?: Record<string, unknown>;
+    /** 本地图片来源白名单（缺省不限制，仅为既有用例保持宽松） */
+    pathPolicy?: { allows(path: string): boolean };
   }
 
   function setupTool(options: SetupOptions = {}) {
@@ -279,11 +281,36 @@ describe('registerDescribeImageTool', () => {
       baseUrl: options.baseUrl ?? vision.baseUrl,
       apiKey: options.apiKey ?? vision.apiKey,
     };
-    registerDescribeImageTool(ctx as never, toolConfig, logger);
+    registerDescribeImageTool(ctx as never, toolConfig, logger, options.pathPolicy);
     return { defs, saved, streamOptions, warn, definition: defs[0], config: toolConfig };
   }
 
   const signal = new AbortController().signal;
+
+  it('私有网段 / 环回地址一律拒绝下载（SSRF，#43）', async () => {
+    const { definition } = setupTool();
+    for (const url of [
+      'http://127.0.0.1:8043/x.png',
+      'http://localhost/x.png',
+      'http://192.168.1.10/x.png',
+      'http://169.254.169.254/latest/meta-data/x.png',
+      'http://[::1]/x.png',
+      'http://10.0.0.5/x.png',
+    ]) {
+      await expect(definition!.execute({ image: url }, { signal })).rejects.toThrow(/private host/);
+    }
+  });
+
+  it('本地路径必须落在白名单根目录内（#43）', async () => {
+    const { definition } = setupTool({
+      pathPolicy: { allows: (p) => p.startsWith('/srv/agent/media/') },
+    });
+    await expect(definition!.execute({ image: '/etc/passwd' }, { signal }))
+      .rejects.toThrow(/outside the allowed roots/);
+    // 白名单内但文件不存在 → 是「找不到」，不是「不允许」
+    await expect(definition!.execute({ image: '/srv/agent/media/none.png' }, { signal }))
+      .rejects.toThrow(/not found/);
+  });
 
   it('未启用时不注册，也不 warn', () => {
     const { defs, warn } = setupTool({ enabled: false });
