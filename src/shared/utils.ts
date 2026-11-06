@@ -78,12 +78,25 @@ function findProfileBySymlink(baseDir: string): string | null {
     return null;
   }
   const match = (name: string): string | null => {
-    const linked = resolve(profilesRoot, name, 'node_modules', '@qihoo', 'dsh-tuitui-bot');
+    const modules = resolve(profilesRoot, name, 'node_modules');
+    // 包名换过（@qihoo → @eayonlee）：不写死 scope，扫一遍 @* 目录，
+    // 否则 link: 安装下这条兜底永远匹配不到（#47）
+    let scopes: string[];
     try {
-      return realpathSync(linked) === realBase ? resolve(profilesRoot, name) : null;
+      scopes = readdirSync(modules).filter((entry) => entry.startsWith('@'));
     } catch {
-      return null; // 该 profile 未装本插件或链接损坏
+      return null; // 该 profile 没有任何依赖目录
     }
+    for (const scope of scopes) {
+      try {
+        if (realpathSync(resolve(modules, scope, 'dsh-tuitui-bot')) === realBase) {
+          return resolve(profilesRoot, name);
+        }
+      } catch {
+        // 该 scope 下没装本插件或链接损坏，继续看下一个
+      }
+    }
+    return null;
   };
   const current = currentProfileName();
   if (current !== undefined) {
