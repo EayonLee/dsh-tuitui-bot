@@ -34,6 +34,7 @@ import type {
   PresetComposition,
   PresetEntry,
   PresetSwitchOutcome,
+  ModelSwitchOutcome,
   SessionRecord,
   SessionStatus,
   TokenUsageStats,
@@ -102,6 +103,14 @@ export class SessionManager {
    * 后写入 sessions 的覆盖前者且前者无人 dispose（泄漏）。
    */
   private inflight = new Map<string, Promise<SessionRecord>>();
+  /**
+   * 每个会话键的「换会话代数」：`/new` 时 +1。
+   *
+   * 打开会话（resume/create）是异步的，期间用户可能已经 `/new` 换了会话。没有这个
+   * 计数，那条在飞的流程收尾时会把旧 sessionId 写回 prefs、并把旧记录塞回 sessions，
+   * 把刚落地的 /new 覆盖掉（#41）。
+   */
+  private readonly epochs = new Map<string, number>();
   private readonly evictor: IdleEvictor;
   private readonly modelResolver: ModelResolver;
   private readonly ctx: Context;
@@ -250,19 +259,27 @@ export class SessionManager {
   /**
    * 切换模型（fork + 重建会话，保留历史）
    */
-  async setModelOverride(scope: ChatScope, peerId: string, route: ModelRoute): Promise<void> {
+  async setModelOverride(scope: ChatScope, peerId: string, route: ModelRoute): Promise<ModelSwitchOutcome> {
     const key = this.sessionKey(scope, peerId);
+    const record = this.sessions.get(key);
+
+    // 正在生成的轮次里不能 fork：rebuildSession 会 dispose 掉正在跑的 handle，
+    // 那一轮的回答直接消失（用户在 /model 的瞬间看到回复断掉）（#41）
+    if (record !== undefined && record.agent.status !== 'idle') {
+      this.logger.info(`model switch deferred (turn in flight): key=${key}`);
+      return { ok: false, reason: 'busy' };
+    }
 
     this.modelResolver.setOverride(key, route);
 
-    const record = this.sessions.get(key);
     if (!record) {
       this.logger.info(`model pref saved (no active session): key=${key} → ${route.provider}/${route.model}`);
-      return;
+      return { ok: true, appliesTo: 'next-session' };
     }
 
     await this.rebuildSession(record, { route });
     this.logger.info(`model switched via fork: key=${key} → ${route.provider}/${route.model}`);
+    return { ok: true, appliesTo: 'active-session' };
   }
 
   /**
@@ -485,6 +502,21 @@ export class SessionManager {
     }
   }
 
+  /** 会话键的代数（/new 会 +1） */
+  private epochOf(sessionKey: string): number {
+    return this.epochs.get(sessionKey) ?? 0;
+  }
+
+  /**
+   * 只在「打开流程开始时的代数」仍然有效时落盘 prefs。
+   *
+   * 代数变了说明期间 `/new` 已经换了会话，此时把旧 sessionId 写回 prefs 就是覆盖（#41）。
+   */
+  private persistSessionIdIfCurrent(sessionKey: string, sessionId: string, epoch: number): void {
+    if (this.epochOf(sessionKey) !== epoch) return;
+    this.persistSessionId(sessionKey, sessionId);
+  }
+
   private async composePreset(presetId?: string): Promise<PresetComposition> {
     const presets = this.getPresetsService();
     if (!presets) return {};
@@ -547,7 +579,9 @@ export class SessionManager {
     peerId: string,
     senderId: string,
     replyTarget: ReplyTarget,
+    depth = 0,
   ): Promise<SessionRecord> {
+    const epoch = this.epochOf(key);
     const route = this.modelResolver.getEffectiveRoute(key);
     // prefs 命中 = 已知存量会话；miss 时取 0.5.x 派生 id 仅作存量探测候选，不用于新建
     const candidateIsLegacy = this.modelResolver.getSessionId(key) === undefined;
@@ -561,7 +595,7 @@ export class SessionManager {
     const live = this.agents.get(sessionId);
     if (live) {
       agent = live;
-      this.persistSessionId(key, sessionId);
+      this.persistSessionIdIfCurrent(key, sessionId, epoch);
       this.logger.info(`reusing live agent: key=${key}`);
     } else {
       // preset 只解析一次：resume/create 共用同一组合，避免重复 resolve/mount 目录。
@@ -579,7 +613,7 @@ export class SessionManager {
         agent = resumed.agent;
         handle = resumed;
         // 0.5.x 迁移：候选命中老会话，沿用并落盘
-        this.persistSessionId(key, sessionId);
+        this.persistSessionIdIfCurrent(key, sessionId, epoch);
         this.logger.info(`resumed session: key=${key} preset=${agentPreset ?? 'none'} route=${resumeRoute ? `${resumeRoute.provider}/${resumeRoute.model}` : 'session-own'}`);
       } catch (err) {
         if (!(await this.mayCreateAfterResumeFailure(key, sessionId, err))) throw err;
@@ -595,9 +629,21 @@ export class SessionManager {
         });
         agent = created.agent;
         handle = created;
-        this.persistSessionId(key, sessionId);
+        this.persistSessionIdIfCurrent(key, sessionId, epoch);
         this.logger.info(`created new session: key=${key} sessionId=${sessionId} preset=${agentPreset ?? 'none'}`);
       }
+    }
+
+    // 打开期间 /new 换了会话（prefs 已指向别的 id）：这次结果作废，按最新 prefs 重来（#41）
+    const prefsNow = this.modelResolver.getSessionId(key);
+    if (prefsNow !== undefined && prefsNow !== sessionId) {
+      if (handle !== undefined) await handle.dispose().catch(() => undefined);
+      if (depth >= 2) {
+        this.logger.warn(`session open raced with /new twice, giving up: key=${key}`);
+        throw new Error('session open raced with /new');
+      }
+      this.logger.info(`session open raced with /new, retrying: key=${key}`);
+      return this.openSession(key, scope, peerId, senderId, replyTarget, depth + 1);
     }
 
     const record: SessionRecord = {
@@ -694,6 +740,7 @@ export class SessionManager {
   async remove(scope: ChatScope, peerId: string): Promise<void> {
     const key = this.sessionKey(scope, peerId);
     const record = this.sessions.get(key);
+    this.epochs.set(key, this.epochOf(key) + 1);
     this.modelResolver.setSessionId(key, mintSessionId());
 
     if (!record) return;
@@ -767,6 +814,12 @@ export class SessionManager {
 
   async disposeAll(): Promise<void> {
     this.evictor.dispose();
+    // 先等在飞的 openSession 落地：它们收尾时会把记录塞回 sessions，
+    // 在 clear() 之后到达就成了没人管的野会话（#41）
+    if (this.inflight.size > 0) {
+      this.logger.debug(`disposeAll: waiting for ${this.inflight.size} pending session open(s)`);
+      await Promise.allSettled([...this.inflight.values()]);
+    }
     const records = [...this.sessions.values()];
     this.sessions.clear();
     for (const record of records) {

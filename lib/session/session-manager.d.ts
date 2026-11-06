@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { ChatScope, Logger, ReplyTarget } from '../types.ts';
 import type { ImTuituiConfig } from '../config.ts';
 import type { ModelRoute, ModelEntry } from '../model/types.ts';
-import type { DshAgent, DshAgentRegistry, PresetEntry, PresetSwitchOutcome, SessionRecord, SessionStatus, TokenUsageStats, CompactOutcome, QuestionChannelLike, ApprovalChannelLike } from './types.ts';
+import type { DshAgent, DshAgentRegistry, PresetEntry, PresetSwitchOutcome, ModelSwitchOutcome, SessionRecord, SessionStatus, TokenUsageStats, CompactOutcome, QuestionChannelLike, ApprovalChannelLike } from './types.ts';
 /** 与宿主 latestCompletedPrefixBoundary 同义：最后一个 turn/end 起到下一 turn 开始前的边界 */
 export declare function latestCompletedPrefixBoundary(events: readonly unknown[]): number | undefined;
 export declare class SessionManager {
@@ -15,6 +15,14 @@ export declare class SessionManager {
      * 后写入 sessions 的覆盖前者且前者无人 dispose（泄漏）。
      */
     private inflight;
+    /**
+     * 每个会话键的「换会话代数」：`/new` 时 +1。
+     *
+     * 打开会话（resume/create）是异步的，期间用户可能已经 `/new` 换了会话。没有这个
+     * 计数，那条在飞的流程收尾时会把旧 sessionId 写回 prefs、并把旧记录塞回 sessions，
+     * 把刚落地的 /new 覆盖掉（#41）。
+     */
+    private readonly epochs;
     private readonly evictor;
     private readonly modelResolver;
     private readonly ctx;
@@ -65,7 +73,7 @@ export declare class SessionManager {
     /**
      * 切换模型（fork + 重建会话，保留历史）
      */
-    setModelOverride(scope: ChatScope, peerId: string, route: ModelRoute): Promise<void>;
+    setModelOverride(scope: ChatScope, peerId: string, route: ModelRoute): Promise<ModelSwitchOutcome>;
     /**
      * 切换指定 peer 的 agent preset（per-peer 覆盖）
      *
@@ -103,6 +111,14 @@ export declare class SessionManager {
     private currentSessionId;
     /** 候选命中后落盘，后续永远走 prefs */
     private persistSessionId;
+    /** 会话键的代数（/new 会 +1） */
+    private epochOf;
+    /**
+     * 只在「打开流程开始时的代数」仍然有效时落盘 prefs。
+     *
+     * 代数变了说明期间 `/new` 已经换了会话，此时把旧 sessionId 写回 prefs 就是覆盖（#41）。
+     */
+    private persistSessionIdIfCurrent;
     private composePreset;
     /** 获取或恢复或创建会话（get → resume → create）；同 key 并发合并为一次 */
     getOrCreate(scope: ChatScope, peerId: string, senderId: string, replyTarget: ReplyTarget): Promise<SessionRecord>;

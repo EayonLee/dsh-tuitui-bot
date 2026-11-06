@@ -67,6 +67,17 @@ export interface PresetSwitchOutcome {
     presetId?: string;
     message?: string;
 }
+/**
+ * 切换模型的结局（/model）。
+ *
+ * `busy` = 当前轮次还在生成，fork 会把那一轮掐掉，所以这次不切；
+ * `next-session` = 没有活跃会话，只记偏好，下次开新会话生效。
+ */
+export interface ModelSwitchOutcome {
+    ok: boolean;
+    reason?: 'busy';
+    appliesTo?: 'active-session' | 'next-session';
+}
 export interface DshAgentHandle {
     agent: DshAgent;
     dispose(): Promise<void>;
