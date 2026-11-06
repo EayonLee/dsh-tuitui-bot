@@ -45,6 +45,16 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - `tuitui_describe_image` refuses private/loopback URLs (SSRF) and only reads local images inside
   media / the agent cwd / `sendFile.extraRoots`, instead of handing any readable file to an external
   vision endpoint (#43).
+- The merge strategy no longer releases the lock early. The owner dropped the lock and cleared the
+  state before the survivor ran the rest of the chain, so a single peer could end up with two
+  concurrent chains fighting over history and the session. The lock is now handed to the survivor,
+  which is responsible for releasing it (#39).
+- The middleware error handler now ends the chain after catching an exception. Previously it neither
+  rethrew nor skipped, so the integration layer processed the same message a second time: the user got
+  "处理异常" and then a normal answer (#39).
+- Text answers to pending questions/approvals are intercepted before the mention gate. In groups a bare
+  "1" or "同意" usually does not @ the bot, so the gate skipped it and the answer never reached the
+  channel until the turn timed out (#39).
 
 ### Breaking changes
 

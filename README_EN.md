@@ -284,8 +284,8 @@ Tuitui events (WebSocket)
    │  src/tuitui/inbound.ts      normalize single_chat / group_chat / teams_post_create / interactive_action
    ▼
 Middleware onion (src/gateway/middleware/)
-   errorHandler → messageFilter → accessPolicy → historyBuffer → mentionGate →
-   contentSanitizer → rateLimiter → slashCommand → questionAnswer →
+   errorHandler → messageFilter → accessPolicy → historyBuffer → questionAnswer → mentionGate →
+   contentSanitizer → rateLimiter → slashCommand →
    concurrencyGuard → typingIndicator → quoteRef → attachmentProcessor → envelopeFormatter
    ▼
 src/transport/inbound.ts   5-layer assembly → agent.followup

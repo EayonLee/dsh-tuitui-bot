@@ -33,6 +33,8 @@ function makeConfig(overrides: Record<string, unknown> = {}): ImTuituiConfig {
     interactive: { enabled: false },
     reactions: { enabled: false, inGroup: true, ack: '👀', done: '✅', fail: '😵' },
     concurrency: { c2c: 'abort', group: 'queue', post: 'queue' },
+    // 链上 attachmentProcessor 会读 media.enabled：缺了会抛 TypeError（真实默认值见 config.ts）
+    media: { enabled: false, maxMB: 200, ttlHours: 24, downloadTimeoutMs: 30_000 },
     access: {
       c2cMode: 'open', c2cAllow: [], c2cBlock: [],
       groupMode: 'open', groupAllow: [], groupBlock: [],
@@ -58,8 +60,8 @@ const logger = {
   debug: () => undefined,
 };
 
-function build(config: ImTuituiConfig) {
-  return setupMiddlewares({ config, manager: makeManager(), logger, commands: [] });
+function build(config: ImTuituiConfig, manager: SessionManager = makeManager()) {
+  return setupMiddlewares({ config, manager, logger, commands: [] });
 }
 
 /** 跑完整链，返回被哪一层拦下（undefined = 通过） */
@@ -132,6 +134,26 @@ describe('中间件链编排（集成）', () => {
   it('未 @ 的群聊命令同样被门控拦下（命令层在门控之后）', async () => {
     const ctx = makeCtx(makeMessage({ groupId: GROUP_ID, content: '/new', atMe: false }));
     expect(await runChain(makeConfig(), ctx)).toBe('mention');
+  });
+
+  it('群里有待答问题时，未 @ 的「1」也会被通道消费（#39）', async () => {
+    const consumed: string[] = [];
+    const manager = {
+      ...makeManager(),
+      questionChannel: {
+        answerFromText: (ctx: MiddlewareContext) => {
+          consumed.push(ctx.message.content);
+          return true;
+        },
+      },
+    } as unknown as SessionManager;
+
+    const ctx = makeCtx(makeMessage({ atMe: false, content: '1' }));
+    await build(makeConfig(), manager).dispatch(ctx);
+
+    // 被问题通道消费：不是被 @ 门控 skip 掉
+    expect(consumed).toEqual(['1']);
+    expect(ctx.skipped).toBe('question-answer');
   });
 
   it('单聊直接通过全链，不进入 @ 门控', async () => {

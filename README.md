@@ -348,8 +348,8 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
    │  src/tuitui/inbound.ts      归一化：single_chat / group_chat / teams_post_create / interactive_action
    ▼
 中间件洋葱 (src/gateway/middleware/)
-   errorHandler → messageFilter → accessPolicy → historyBuffer → mentionGate →
-   contentSanitizer → rateLimiter → slashCommand → questionAnswer →
+   errorHandler → messageFilter → accessPolicy → historyBuffer → questionAnswer → mentionGate →
+   contentSanitizer → rateLimiter → slashCommand →
    concurrencyGuard → typingIndicator → quoteRef → attachmentProcessor → envelopeFormatter
    ▼
 src/transport/inbound.ts   5 层组装（用户内容/引用/发送者标签/媒体元数据/历史 envelope）→ agent.followup

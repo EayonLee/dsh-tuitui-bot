@@ -53,6 +53,9 @@ export function errorHandler(logger?: Logger, options: ErrorHandlerOptions = {})
       }
 
       if (rethrow) throw error;
+      // 已经回过「处理异常」就必须结束这条链：否则集成方会把同一条消息再正常
+      // 处理一遍（#39），用户先收到报错、紧接着又收到一条正常回答。
+      ctx.skip('error:' + (error.name || 'Error'));
     }
   };
 }
