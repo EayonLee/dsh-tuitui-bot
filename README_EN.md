@@ -30,10 +30,13 @@ The order is the behaviour contract.
 ## Quick start
 
 ```bash
-# 1. install a published release (recommended)
+# 1. install from npm (recommended) — only released versions live there
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
+
+# or install the release tarball (same version, same contents; use this offline)
 #    grab dsh-tuitui-bot-<version>.tgz from
 #    https://github.com/EayonLee/dsh-tuitui-bot/releases/latest
-dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.29.tgz
+dsh plugin --profile tuitui add ./dsh-tuitui-bot-0.1.32.tgz
 
 # or track main (unreleased changes, may be mid-refactor)
 dsh plugin --profile tuitui add github:EayonLee/dsh-tuitui-bot

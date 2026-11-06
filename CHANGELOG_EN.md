@@ -25,6 +25,13 @@ failed".
   or unreachable, so an available update is never a dead button; the tarball name and version are
   still verified after download.
 
+### Changed
+
+- Published to npm as of this version: `dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`.
+  `package.json` drops `private` and gains `publishConfig` (official registry + `access: public`);
+  the npm package matches the GitHub Release version and `files` whitelist, and README / AGENTS now
+  document three install paths.
+
 ## 0.1.31 (2026-11-05)
 
 In one line: the settings page shows the installed version, checks for updates, and can hot-update

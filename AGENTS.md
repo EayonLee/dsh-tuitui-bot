@@ -44,7 +44,8 @@ node scripts/verify-tools.mjs   # 校验 9 个工具是否真的注册进 dsh
 1. **日常改动不碰 `package.json` 的 `version`。** 版本号是发版动作，不是提交动作。
 2. **日常改动只写 `CHANGELOG.md` / `CHANGELOG_EN.md` 顶部的 `## 未发布（Unreleased）`**，
    维护者发版时才把它改成版本号 + 日期，并同步 `package.json`。
-3. **不发 npm。** `package.json` 里 `private: true`，任何 `npm publish` 都是错的。
+3. **发 npm 是发版动作，不是提交动作。** 只有维护者在发版时、按下面的流程才 `npm publish`；
+   平时任何 PR 都不要动 `package.json` 的 `publishConfig`，也不要往 npm 发任何东西。
 4. 一个 PR 只做一件事；顺手改版本号、改别人 CHANGELOG 条目，都会被退。
 
 ### 维护者发版流程
@@ -69,7 +70,15 @@ git tag v0.1.30 && git push origin v0.1.30
 ./scripts/pack.sh /tmp/rel
 gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
 gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
+
+# 6. 发布到 npm（与 Release 同一个版本号，两条安装通道要同时发）
+npm whoami --registry=https://registry.npmjs.org   # 必须输出 eayonlee
+npm publish                                        # publishConfig 已锁官方源 + access public
+npm view @eayonlee/dsh-tuitui-bot version           # 回读校验
 ```
+
+npm 与 Release 必须同版本、同内容：`scripts/pack.sh` 打出的 tarball 和 `npm publish` 的产物
+走同一份 `files` 白名单，谁先发都不会出现「npm 上是新的、Release 里没有 asset」这种撕裂。
 
 ### Release Notes 标准
 
@@ -100,13 +109,15 @@ gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
 
 ## 安装口径（文档必须一致）
 
-对外只有两条路径，任何文档都不要写第三种：
+对外只有三条路径，任何文档都不要写第四种：
 
-1. **正式包**：从 [Releases](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 下载
+1. **npm（推荐）**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<版本>`
+2. **正式包**：从 [Releases](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 下载
    `dsh-tuitui-bot-<版本>.tgz`，然后 `dsh plugin --profile <name> add ./<tarball>`
-2. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
+3. **跟随主干**：`dsh plugin --profile <name> add github:EayonLee/dsh-tuitui-bot`
 
-不写 npm、不写本地源码目录、不写一键脚本。
+npm 与 Release 是同一个版本、同一份产物（`files` 白名单一致）；断网/内网装不了 npm 时用 Release 包。
+不写本地源码目录、不写一键脚本。
 
 ## 硬性约束
 
