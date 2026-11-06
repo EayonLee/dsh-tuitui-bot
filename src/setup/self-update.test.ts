@@ -5,6 +5,7 @@
  * package.json 版本），网络用一个假 fetch 顶替。测的是编排与失败路径，
  * 尤其是"失败了必须回到原样"这条硬要求。
  */
+import { existsSync } from 'node:fs';
 import { mkdtemp, writeFile, readFile, chmod, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,6 +23,7 @@ import {
   readManifestFromTarball,
   readVersionAt,
   sha256,
+  UPDATE_CACHE_DIRNAME,
   type FetchLike,
   type UpdatePlan,
 } from './self-update.ts';
@@ -65,6 +67,7 @@ async function fakePnpm(): Promise<string> {
     'const dir = process.env.FAKE_INSTALL_DIR;',
     "const version = process.env.FAKE_VERSION || '0.0.0';",
     "fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@eayonlee/dsh-tuitui-bot', version }));",
+    'if (process.env.FAKE_ARGS_FILE) fs.writeFileSync(process.env.FAKE_ARGS_FILE, JSON.stringify(process.argv.slice(2)));',
     'if (process.env.FAKE_OUTPUT) console.error(process.env.FAKE_OUTPUT);',
     'process.exit(Number(process.env.FAKE_EXIT || 0));',
     '',
@@ -452,6 +455,37 @@ describe('applyUpdate 安装前校验（真 tgz）', () => {
     } finally {
       delete process.env.FAKE_INSTALL_DIR;
       delete process.env.FAKE_VERSION;
+    }
+  });
+
+  it('安装用的 spec 指向 profile 内的稳定路径，临时目录删掉后依然有效（#36）', async () => {
+    const { profileDir, installedDir, pnpmCommand, fetchImpl } = await setup({
+      name: '@eayonlee/dsh-tuitui-bot', version: '0.1.31',
+      dsh: { compatibility: { dshReleases: { '0.2.1-rc.5': 'compatible' } } },
+    });
+    const argsFile = join(profileDir, 'pnpm-args.json');
+    process.env.FAKE_ARGS_FILE = argsFile;
+    try {
+      const outcome = await applyUpdate({
+        plan: { version: '0.1.31', spec: 'x', downloadUrl: 'https://example.com/pkg.tgz', label: 'test' },
+        installed: { name: '@eayonlee/dsh-tuitui-bot', version: '0.1.30', dir: installedDir },
+        deps: { fetchImpl, profileDir, packageName: '@eayonlee/dsh-tuitui-bot', pnpmCommand, hostVersion: '0.2.1-rc.5' },
+      });
+      expect(outcome.ok).toBe(true);
+
+      const args = JSON.parse(await readFile(argsFile, 'utf8')) as string[];
+      const spec = args.find((arg) => arg.startsWith('file:'));
+      expect(spec).toBeDefined();
+      // 必须落在 profile 内，绝不能是 os.tmpdir() 里那个装完就删的路径
+      expect(spec?.startsWith('file:' + join(profileDir, UPDATE_CACHE_DIRNAME))).toBe(true);
+      const tgz = (spec as string).slice('file:'.length);
+      expect(tgz).not.toContain('dsh-tuitui-update-');
+      // applyUpdate 已经返回（临时目录早被 finally 删掉），tarball 仍然在
+      expect(existsSync(tgz)).toBe(true);
+    } finally {
+      delete process.env.FAKE_INSTALL_DIR;
+      delete process.env.FAKE_VERSION;
+      delete process.env.FAKE_ARGS_FILE;
     }
   });
 });

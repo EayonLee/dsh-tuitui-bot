@@ -2,6 +2,17 @@
 export declare const MAX_DOWNLOAD_BYTES: number;
 /** pnpm 安装超时：180 秒（走代理时也要够） */
 export declare const PNPM_TIMEOUT_MS: number;
+/**
+ * 更新包的持久缓存目录（相对 profile 根）。
+ *
+ * 自更新下载到 os.tmpdir() 的临时目录，装完就删；如果直接把 `file:<临时路径>`
+ * 写进 profile 的 package.json，依赖就会指向一个已经不存在的位置，之后这个
+ * profile 里任何 `pnpm install` / `dsh plugin add` 都会 ENOENT（#36）。
+ * 所以安装前把 tarball 落到 profile 内的稳定路径，只留当前版本这一份。
+ */
+export declare const UPDATE_CACHE_DIRNAME = ".dsh-tuitui-updates";
+/** 把下载好的 tarball 复制到 profile 内的稳定缓存，返回稳定路径 */
+export declare function persistTarball(profileDir: string, downloadedPath: string): Promise<string>;
 /** 已安装包的信息（磁盘真值） */
 export interface InstalledPackage {
     name: string;

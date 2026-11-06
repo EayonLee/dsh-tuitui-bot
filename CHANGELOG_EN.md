@@ -19,6 +19,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - Under the merge concurrency strategy, messages merged into a survivor were still processed a second
   time on their own, so one message got two replies. Non-survivors now explicitly skip the downstream
   chain; messages released by the urgent path keep their previous behaviour (#35).
+- The settings-page one-click update wrote a `file:` dependency pointing at a temporary tarball under
+  `/tmp` that is deleted right after install, so every later `pnpm install` / `dsh plugin add` in that
+  profile failed with ENOENT. The tarball is now persisted to `.dsh-tuitui-updates/` inside the profile
+  (only the current version is kept) and installed from that stable path (#36).
 
 ### Changed
 
