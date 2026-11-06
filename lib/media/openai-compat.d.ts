@@ -38,7 +38,19 @@ export type FetchLike = (input: string, init?: {
     ok: boolean;
     status: number;
     text(): Promise<string>;
+    /**
+     * 二进制读取。图片下载必须走这个：`text()` 会把字节按 UTF-8 解码，
+     * PNG 的 `0x89` 之类的非法序列会被替换成 U+FFFD，再按 latin1 还原就永远是坏图。
+     * 测试替身可以不实现（老路径会退回 text()，仅用于兼容旧用例）。
+     */
+    arrayBuffer?(): Promise<ArrayBuffer>;
+    /** 响应头：用来按 content-type 判定图片类型（可选，测试替身可不实现） */
+    headers?: {
+        get(name: string): string | null;
+    };
 }>;
+/** 按魔法字节嗅探图片类型；认不出时返回 undefined */
+export declare function sniffImageMediaType(bytes: Uint8Array): string | undefined;
 /** 去掉末尾斜杠；空串直接报错，让调用方给出"还没配"的明确提示 */
 export declare function normalizeBaseUrl(baseUrl: string): string;
 /** 用户自己配了端点（baseUrl + apiKey 都有）就走直连，否则退回 dsh llm */

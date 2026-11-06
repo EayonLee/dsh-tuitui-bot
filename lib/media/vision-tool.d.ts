@@ -3,6 +3,13 @@ import type { VisionConfig } from '../config.ts';
 import type { Logger } from '../types.ts';
 /** 工具名（tuitui 前缀避免与外部 describe-image 包的同名工具冲突） */
 export declare const DESCRIBE_IMAGE_TOOL_NAME = "tuitui_describe_image";
+/** 内网 / 环回 / 链路本地目标：图片下载不允许（SSRF） */
+export declare function isPrivateHostname(hostname: string): boolean;
+/** 本地图片只能来自这些根目录（与附件白名单同一套：media / agent cwd / extraRoots） */
+export interface ImagePathPolicy {
+    /** 判定本地路径是否允许读取 */
+    allows(path: string): boolean;
+}
 /**
  * 启动时检查 settings.yaml 里 vision 模型的 input 模态是否声明了 image。
  *
@@ -18,5 +25,5 @@ export declare const DESCRIBE_IMAGE_TOOL_NAME = "tuitui_describe_image";
  */
 export declare function ensureVisionInputModal(vision: VisionConfig, logger: Logger): void;
 /** 注册 tuitui_describe_image 工具（服务缺失时优雅降级，不阻断插件启动） */
-export declare function registerDescribeImageTool(ctx: Context, config: VisionConfig, logger: Logger): void;
+export declare function registerDescribeImageTool(ctx: Context, config: VisionConfig, logger: Logger, pathPolicy?: ImagePathPolicy): void;
 //# sourceMappingURL=vision-tool.d.ts.map
