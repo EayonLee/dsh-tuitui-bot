@@ -31,6 +31,21 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   when it still fails the user gets a "N replies could not be sent" notice while the log records the
   failed count and a preview. The buffer used to be cleared unconditionally in `finally`, so replies
   vanished with only one error log line (#38).
+- The settings-page write routes (bind / unbind / config / test-model) now require the request to come
+  from the local machine, the same rule the about/update routes already used. Previously only the
+  Origin check applied and requests without an Origin header (curl, scripts) were let through, so with
+  `--host 0.0.0.0` or behind a reverse proxy anyone on the LAN could replace the credentials or unbind
+  the bot (#44).
+- The fallback instructions printed when auto-save fails no longer echo the AppSecret in plain text
+  (stdout goes to `~/.dsh/web.log` under `dsh web`, and to the journal under systemd). Only the appId
+  is printed, the secret is a placeholder (#44).
+
+### Breaking changes
+
+- Settings-page writes (bind / unbind / config / test-model) are now accepted only from the local
+  machine. Opening the dsh web UI from another host via `--host 0.0.0.0` or a reverse proxy will get a
+  403 for those actions; use SSH port forwarding (`ssh -L 3080:127.0.0.1:3080`) and operate from the
+  local browser (#44).
 
 ### Changed
 

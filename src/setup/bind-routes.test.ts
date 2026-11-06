@@ -67,6 +67,8 @@ interface ReqOptions {
   raw?: Buffer;
   origin?: string;
   host?: string;
+  /** 伪造来源地址（默认为本机；null 表示没有 socket） */
+  remoteAddress?: string | null;
 }
 
 function makeReq(method: string, options: ReqOptions = {}): Parameters<WebRoute['handler']>[0] {
@@ -74,12 +76,14 @@ function makeReq(method: string, options: ReqOptions = {}): Parameters<WebRoute[
   if (options.raw !== undefined) chunks.push(options.raw);
   else if (options.body !== undefined) chunks.push(Buffer.from(JSON.stringify(options.body)));
   const req = Readable.from(chunks);
+  const remoteAddress = options.remoteAddress === undefined ? '127.0.0.1' : options.remoteAddress;
   return Object.assign(req, {
     method,
     headers: {
       host: options.host ?? '127.0.0.1:3080',
       ...(options.origin !== undefined ? { origin: options.origin } : {}),
     },
+    ...(remoteAddress === null ? {} : { socket: { remoteAddress } }),
   }) as unknown as Parameters<WebRoute['handler']>[0];
 }
 
@@ -159,6 +163,24 @@ describe('GET /bind 状态查询', () => {
     const res = await h.call(BIND_STATE_PATH, makeReq('GET'));
 
     expect(res.json()).toEqual({ phase: 'failed', reason: '凭据无效' });
+  });
+
+  it('非本机来源一律 403：绑定/解绑/改配置都不能交给局域网（#44）', async () => {
+    const h = harness();
+    const remote = { remoteAddress: '192.168.1.50' };
+
+    for (const path of [BIND_STATE_PATH, BIND_MANUAL_PATH, BIND_UNBIND_PATH, BIND_CONFIG_PATH, TEST_MODEL_PATH]) {
+      const method = path === BIND_STATE_PATH || path === BIND_CONFIG_PATH ? 'GET' : 'POST';
+      const res = await h.call(path, makeReq(method, { ...remote, body: {} }));
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'forbidden' });
+    }
+  });
+
+  it('IPv6 映射的回环地址照常放行', async () => {
+    const h = harness();
+    const res = await h.call(BIND_STATE_PATH, makeReq('GET', { remoteAddress: '::ffff:127.0.0.1' }));
+    expect(res.statusCode).toBe(200);
   });
 
   it('Origin 与 Host 不同源返回 403', async () => {

@@ -248,6 +248,11 @@ channel/team ids. Deny lists win over everything. An empty allowlist in `allowli
 turned off. Endpoint API keys are write-only: they never come back from the config API and the
 settings page only shows whether one is stored.
 
+Settings-page **writes** (bind / unbind / config / test-model) are accepted only from the local
+machine: those routes can replace credentials or unbind the bot, so besides the same-origin check the
+source address must be loopback. Opening the web UI from another host via `--host 0.0.0.0` or a reverse
+proxy returns 403 — use `ssh -L 3080:127.0.0.1:3080` and operate from the local browser.
+
 ### Tuitui-native switches
 
 `interactive.enabled` (cards for approval/questions), `interactive.headBgColor` / `headTextColor`,
