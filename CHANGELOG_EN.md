@@ -16,6 +16,9 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   files (`cordis.patch.yml`), private keys (`*.pem` / `*.key` / `~/.ssh`), `.env` / `.npmrc` and
   `$DSH_HOME/profiles/**` are refused regardless of the switch. Previously any readable path was
   allowed, so one prompt injection in a group could send those files into the chat (#34).
+- Under the merge concurrency strategy, messages merged into a survivor were still processed a second
+  time on their own, so one message got two replies. Non-survivors now explicitly skip the downstream
+  chain; messages released by the urgent path keep their previous behaviour (#35).
 
 ### Changed
 
