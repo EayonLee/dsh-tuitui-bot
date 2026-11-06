@@ -27,6 +27,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   hang that target's serial send chain forever, silently queueing every later reply and stalling
   deliverables and turn-end bookkeeping. The timeout only unblocks and warns; it does not retry, to
   avoid duplicating messages that did arrive (#37).
+- A failed send no longer drops the content silently: each chunk is retried twice with backoff, and
+  when it still fails the user gets a "N replies could not be sent" notice while the log records the
+  failed count and a preview. The buffer used to be cleared unconditionally in `finally`, so replies
+  vanished with only one error log line (#38).
 
 ### Changed
 

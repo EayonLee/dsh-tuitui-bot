@@ -39,6 +39,10 @@ export declare class OutboundBuffer {
     reset(): void;
     /** 发送所有累积文本：流式优先，降级静态 */
     flush(): Promise<void>;
+    /** 发一段，带有限重试；返回是否最终成功 */
+    private sendChunk;
+    /** 失败提示：发不出去也要让用户知道，而不是只留一行日志 */
+    private notifyFailure;
     /** 取消（异常/丢弃），中止流式并清空缓冲 */
     cancel(): void;
 }
