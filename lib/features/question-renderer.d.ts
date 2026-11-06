@@ -23,6 +23,13 @@ export declare function buildQuestionCard(question: UserQuestion, requireMention
 /** 答案的人类可读文案（卡片回写与日志共用） */
 export declare function formatAnswer(answer: UserQuestionAnswer): string;
 /**
+ * 构建已失效卡片（超时 / 被新问题取代）：删掉按钮，明确写「已失效」。
+ *
+ * 不重写卡片的话，超时那张卡片上的按钮一直可点，用户点下去只会得到
+ * 「没有待答问题」，甚至把答案错位到下一题（#42）。
+ */
+export declare function buildQuestionExpiredCard(question: UserQuestion, reason: 'timeout' | 'superseded' | 'aborted', theme?: Partial<CardTheme>): TuituiOutboundInteractiveMessage;
+/**
  * 构建已作答卡片：删掉按钮，把答案写回卡片。
  *
  * 推推没有"点击后自动置灰"的按钮状态，不重写卡片的话同一条卡片里的按钮

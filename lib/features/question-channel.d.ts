@@ -125,6 +125,8 @@ export declare class QuestionChannel {
      */
     private sendQuestion;
     private onTimeout;
+    /** 把待答卡片改写成「已失效」（无卡片 / 卡片能力关闭时静默跳过） */
+    private expireCard;
     /** 已作答卡片回写（同步路径用，失败不打扰用户） */
     private updateAnsweredCard;
     private updateAnsweredCardAsync;

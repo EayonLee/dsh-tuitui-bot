@@ -73,6 +73,13 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   memory, overwriting the fresh `/new` (#41).
 - Shutdown (`disposeAll`) now waits for in-flight openSession calls before clearing, so they cannot
   re-insert themselves afterwards and leave orphan sessions (#41).
+- After a question or approval timed out (or was cancelled) the card's buttons stayed clickable — a
+  click only produced "no pending question", and could even shift the answer into the next question.
+  The card is now rewritten to "timed out / no longer valid" and the buttons are explicitly dead (#42).
+- Fixed a hang when the abort landed while the card was being sent: the listener was registered after
+  `await sendQuestion` (same for approvals), so an abort during that window never fired and the turn
+  waited for the full timeout. The pending entry is now registered first and `signal.aborted` is
+  re-checked right after the listener is attached (#42).
 
 ### Breaking changes
 
