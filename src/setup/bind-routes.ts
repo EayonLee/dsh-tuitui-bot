@@ -177,6 +177,7 @@ function mentionPolicySchema(value: unknown): unknown {
  */
 const EDITABLE_CONFIG_KEYS = [
   'provider', 'model', 'preset', 'cwd',
+  'groupPrompt', 'directPrompt', 'postPrompt',
   'requireMention', 'requireMentionInPost',
   'textChunkLimit', 'streaming',
   'sessionIdleTimeout', 'maxQueue', 'processingTimeoutMs', 'askTimeoutMs', 'historyLimit', 'historyMode',
@@ -231,6 +232,9 @@ const EDITABLE_CONFIG_SCHEMAS: Record<EditableConfigKey, (value: unknown) => unk
   'access.postAllow': (v) => stringListSchema(v, 'access.postAllow'),
   'access.postBlock': (v) => stringListSchema(v, 'access.postBlock'),
   mentionPolicy: (v) => mentionPolicySchema(v),
+  'groupPrompt': (v) => promptSchema(v, 'groupPrompt'),
+  'directPrompt': (v) => promptSchema(v, 'directPrompt'),
+  'postPrompt': (v) => promptSchema(v, 'postPrompt'),
   'smartJudge.prompt': (v) => promptSchema(v, 'smartJudge.prompt'),
   'smartJudge.maxHistory': numberSchema('smartJudge.maxHistory', 0, 50),
   'smartJudge.cooldownMs': numberSchema('smartJudge.cooldownMs', 0, 60 * 60 * 1000),

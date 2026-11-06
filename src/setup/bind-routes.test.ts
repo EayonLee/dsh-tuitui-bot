@@ -392,12 +392,32 @@ describe('配置读写', () => {
     }
   });
 
-  it('POST 拒绝白名单以外的字段', async () => {
-    const h = harness();
-    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { groupPrompt: 'x' } }));
+  it('POST 接受三个额外提示词键（#46）', async () => {
+    const patches: Record<string, unknown>[] = [];
+    const h = harness({ onUpdateConfig: (patch) => { patches.push(patch); return true; } });
+
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { groupPrompt: '群里这么说' } }));
+
+    expect(res.statusCode).toBe(200);
+    expect(patches.at(-1)).toEqual({ groupPrompt: '群里这么说' });
+  });
+
+  it('提示词超过 8000 字符被拒绝，其它同批字段不会连坐落盘（#46）', async () => {
+    const h = harness({ onUpdateConfig: () => { throw new Error('不应落盘'); } });
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', {
+      body: { directPrompt: 'x'.repeat(8001), debug: true },
+    }));
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ ok: false, error: '不支持的字段: groupPrompt' });
+    expect((res.json() as { error: string }).error).toContain('过长');
+  });
+
+  it('POST 拒绝白名单以外的字段', async () => {
+    const h = harness();
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { body: { notAKey: 'x' } }));
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ ok: false, error: '不支持的字段: notAKey' });
   });
 
   it('PATCH 方法返回 405', async () => {
