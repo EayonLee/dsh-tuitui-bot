@@ -14,9 +14,9 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
 /** 单次下载体积上限：正式包 3MB 左右，50MB 足够挡住乱来 */
@@ -24,6 +24,35 @@ export const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 
 /** pnpm 安装超时：180 秒（走代理时也要够） */
 export const PNPM_TIMEOUT_MS = 180 * 1000;
+
+/**
+ * 更新包的持久缓存目录（相对 profile 根）。
+ *
+ * 自更新下载到 os.tmpdir() 的临时目录，装完就删；如果直接把 `file:<临时路径>`
+ * 写进 profile 的 package.json，依赖就会指向一个已经不存在的位置，之后这个
+ * profile 里任何 `pnpm install` / `dsh plugin add` 都会 ENOENT（#36）。
+ * 所以安装前把 tarball 落到 profile 内的稳定路径，只留当前版本这一份。
+ */
+export const UPDATE_CACHE_DIRNAME = '.dsh-tuitui-updates';
+
+/** 把下载好的 tarball 复制到 profile 内的稳定缓存，返回稳定路径 */
+export async function persistTarball(profileDir: string, downloadedPath: string): Promise<string> {
+  const cacheDir = join(profileDir, UPDATE_CACHE_DIRNAME);
+  await mkdir(cacheDir, { recursive: true });
+  const target = join(cacheDir, basename(downloadedPath));
+  await copyFile(downloadedPath, target);
+  // 旧版本 tgz 留在 profile 里只会占地方：只保留刚装这一份
+  try {
+    for (const entry of await readdir(cacheDir)) {
+      if (entry !== basename(target) && entry.endsWith('.tgz')) {
+        await rm(join(cacheDir, entry), { force: true }).catch(() => {});
+      }
+    }
+  } catch {
+    // 清理失败不影响安装
+  }
+  return target;
+}
 
 /** 已安装包的信息（磁盘真值） */
 export interface InstalledPackage {
@@ -530,7 +559,8 @@ export async function applyUpdate(options: {
       const verdict = checkCompatibility(manifest, hostVersion);
       if (!verdict.ok) throw new Error(verdict.message);
       compatNote = verdict.message;
-      spec = 'file:' + downloaded.path;
+      // 落到 profile 内的稳定路径：临时目录在 finally 里会被删掉（#36）
+      spec = 'file:' + await persistTarball(deps.profileDir, downloaded.path);
     }
     backup = await backupPackage(installed.dir, join(tempRoot, 'backup'));
     const run = await runPnpmAdd({

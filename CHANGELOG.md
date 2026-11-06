@@ -16,6 +16,9 @@
 - 并发合并（merge）策略下，被合并的非幸存消息在正文并入幸存者之后仍会被单独处理一遍，
   同一句话得到两条回复。现在非幸存消息显式 `skip('concurrency:merged')`，紧急插队释放的
   缓冲消息保持原行为（#35）。
+- 设置页一键更新把 `file:` 依赖指向 `/tmp` 下装完即删的临时 tarball，导致更新成功之后该
+  profile 里任何 `pnpm install` / `dsh plugin add` 都因 ENOENT 失败。现在先把 tarball 落到
+  profile 内的 `.dsh-tuitui-updates/`（只留当前版本），再以稳定路径安装（#36）。
 
 ### 变更
 
