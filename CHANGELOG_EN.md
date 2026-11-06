@@ -80,6 +80,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   `await sendQuestion` (same for approvals), so an abort during that window never fired and the turn
   waited for the full timeout. The pending entry is now registered first and `signal.aborted` is
   re-checked right after the listener is attached (#42).
+- The Settings page's extra prompts (`groupPrompt` / `directPrompt` / `postPrompt`) were missing from the
+  server-side editable whitelist, so saving rejected the whole batch with a 400 (including every other
+  field in that submit). They are now editable and validated like prompts: max 8000 characters, no
+  control characters (#46).
 
 ### Breaking changes
 
