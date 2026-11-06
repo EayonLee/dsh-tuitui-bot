@@ -80,6 +80,10 @@ npm view @eayonlee/dsh-tuitui-bot version           # 回读校验
 npm 与 Release 必须同版本、同内容：`scripts/pack.sh` 打出的 tarball 和 `npm publish` 的产物
 走同一份 `files` 白名单，谁先发都不会出现「npm 上是新的、Release 里没有 asset」这种撕裂。
 
+**第 4～6 步是同一次发版动作，要连着做完。** 打完 tag、建好 Release 就顺手 `npm publish`，
+不用再单独问一次；只发了 GitHub、忘了 npm，按「这次发版没做完」处理。反过来也一样：
+先发的 npm 也必须补上对应的 tag 与 Release。
+
 ### Release Notes 标准
 
 标题固定 `vX.Y.Z`。正文按这个骨架写，不要自由发挥：
