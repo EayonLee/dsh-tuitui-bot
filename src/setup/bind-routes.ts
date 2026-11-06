@@ -436,14 +436,30 @@ export function registerBindRoutes(
   return () => { for (const dispose of disposers) dispose(); };
 }
 
+/** 是否来自本机（与 about 路由同一套判据） */
+function loopback(req: IncomingMessage): boolean {
+  const socket = req.socket as { remoteAddress?: string } | undefined;
+  // 真实 HTTP 请求一定有 socket；合成请求（单测 / Desktop IPC 桥）没有网络来源，
+  // 按本机处理，否则这些通道会被误伤。
+  if (socket === undefined) return true;
+  const address = socket.remoteAddress ?? '';
+  const normalized = address.toLowerCase().replace(/^\[|\]$/g, '');
+  if (normalized === 'localhost' || normalized === '::1') return true;
+  if (normalized.startsWith('127.')) return true;
+  if (normalized.startsWith('::ffff:127.')) return true;
+  return false;
+}
+
 /**
- * 请求来源校验（最小 CSRF 防护）。
+ * 请求来源校验（CSRF + 来源网络双闸）。
  *
- * 带 Origin 的请求必须与 Host 同源；同源 fetch 与 Desktop IPC 桥
- * （后者会删除 origin 头）均放行。本路由数据不敏感且动作无害，
- * 该级别的防护足够。
+ * 1. 带 Origin 的请求必须与 Host 同源（同源 fetch / Desktop IPC 桥放行）；
+ * 2. **必须来自本机**：这些路由能改 appId/appSecret、能解绑、能写配置，交给
+ *    局域网里任何客户端都是提权。dsh 以 `--host 0.0.0.0` 启动或挂在反代后面时，
+ *    没有这一条等于把这些能力公开（#44）。需要远程管理请用 SSH 端口转发。
  */
 function trusted(req: IncomingMessage): boolean {
+  if (!loopback(req)) return false;
   const origin = req.headers.origin;
   if (origin === undefined) return true;
   try {

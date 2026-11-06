@@ -5,7 +5,7 @@
  * 文档保真（注释/其他条目）、合并语义（点号键只写叶子）、fail-closed、幂等、
  * 原子写（不留 .tmp）与解绑的强制写回。
  */
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -130,6 +130,31 @@ describe('persistCredentialsToProfile', () => {
     expect(warn).toEqual([]);
     expect(printed.join('\n')).toContain('TUITUI_BOT_APPID');
     expect(printed.join('\n')).toContain('app-env');
+    // stdout 会进 web.log / journal：secret 绝不能明文出现（#44）
+    expect(printed.join('\n')).not.toContain('s-env');
+  });
+
+  it('手动 YAML 引导同样不回显 secret（#44）', async () => {
+    const dir = await makeProfileDir();
+    const { log } = makeLogger();
+    // 让写盘真的失败（路径被目录占用）：才会走到「手动填 YAML」引导分支
+    await mkdir(join(dir, 'cordis.patch.yml'), { recursive: true });
+    const printed: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => { printed.push(args.join(' ')); };
+
+    try {
+      expect(persistCredentialsToProfile({ appId: 'app-yaml', appSecret: 'super-secret-value' }, dir, log)).toBe(false);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const all = printed.join('\n');
+    expect(all).toContain('cordis.patch.yml');
+    expect(all).toContain('app-yaml');
+    expect(all).not.toContain('super-secret-value');
+    expect(all).toContain('不在日志里回显');
+    expect(all).toContain('<上面输入的那串 AppSecret>');
   });
 
   it('顶层不是 YAML 数组时 fail-closed：拒绝写入且原文件逐字不变', async () => {
