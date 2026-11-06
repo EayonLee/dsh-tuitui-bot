@@ -55,6 +55,16 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - Text answers to pending questions/approvals are intercepted before the mention gate. In groups a bare
   "1" or "同意" usually does not @ the bot, so the gate skipped it and the answer never reached the
   channel until the turn timed out (#39).
+- Attachment downloads gained three guards: a declared `content-length` over `media.maxMB` aborts
+  immediately, the body is counted while streaming and cancelled the moment it exceeds the limit
+  (it used to `arrayBuffer()` the whole thing first), and 3xx redirects are followed manually with the
+  SSRF check re-run on **every** hop (previously only the first hop was checked, so a 302 to an intranet
+  host slipped through) (#40).
+- Turns truncated by the output limit (`max-tokens`) or interrupted no longer end silently: a short
+  notice is appended so a half answer is not mistaken for a complete one (#40).
+- Tool-call records are pruned per session at turn end. A `tool/result` is not guaranteed to arrive
+  (interrupted turn, crashed tool), and deleting only on result let the map grow without bound in a
+  long-running process (#40).
 
 ### Breaking changes
 

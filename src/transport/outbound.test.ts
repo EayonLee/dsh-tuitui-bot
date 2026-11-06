@@ -527,6 +527,28 @@ describe('OutboundRouter: deliverables/presented', () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 
+  it('max-tokens 结束时明确提示回答被截断（#40）', async () => {
+    const { outbound, bot } = setup();
+
+    outbound.routeSessionEvent(sessionRef, { type: 'turn/end', data: { reason: { kind: 'max-tokens' } } });
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(bot.sendMarkdown).toHaveBeenCalledWith(c2cTarget, expect.stringContaining('输出上限'));
+  });
+
+  it('正常结束不发任何提示（不打扰）', async () => {
+    const { outbound, bot } = setup();
+
+    outbound.routeSessionEvent(sessionRef, turnEnd);
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(bot.sendMarkdown).not.toHaveBeenCalled();
+  });
+
   it('未提供投递器时静默跳过（老环境降级）', async () => {
     const { outbound, bot } = setup();
 

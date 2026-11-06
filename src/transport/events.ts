@@ -173,6 +173,26 @@ export function extractTurnError(reason: TurnEndReason): { code: string; message
   };
 }
 
+/** 截断类结束原因：这些轮次里用户的回复是残缺的，必须说一声（#40） */
+const TRUNCATED_TURN_KINDS = new Set(['max-tokens', 'max_tokens', 'max-output-tokens', 'token-limit']);
+
+/**
+ * 从 turn/end reason 提取「该告诉用户一句」的非错误提示。
+ *
+ * 只有 error 会被 extractTurnError 接住，而 max-tokens 这类正常结束（kind 不是 error）
+ * 此前完全静默：用户看到半截回答，不知道是被截断了。
+ */
+export function describeTurnStop(reason: TurnEndReason): string | undefined {
+  const kind = reason.kind ?? '';
+  if (TRUNCATED_TURN_KINDS.has(kind)) {
+    return '⚠️ 本轮回答达到输出上限被截断，需要完整内容的话请让我「继续」。';
+  }
+  if (kind === 'interrupted' || kind === 'aborted' || kind === 'cancelled') {
+    return '⚠️ 本轮已被中断，回答可能不完整。';
+  }
+  return undefined;
+}
+
 // ── agent/assistant-stream 实时流式帧（宿主 v2+） ──
 
 /** 归一化后的流式增量（文本；空串代表新 attempt 开始） */

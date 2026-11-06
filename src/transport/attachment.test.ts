@@ -80,6 +80,63 @@ describe('downloadMediaAttachments', () => {
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining(`→ ${result.localPath}`));
   });
 
+  it('声明长度超限时直接放弃，不把大文件读进内存（#40）', async () => {
+    let pulledBytes = 0;
+    // 不用 Response：undici 对「流式 body + content-length」会做处理，这里要的是
+    // 「服务端明确报了超大长度」这一种响应形态
+    const huge = {
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(64 * 1024 * 1024) : null) },
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulledBytes += 1024;
+          controller.enqueue(new Uint8Array(1024));
+        },
+      }),
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(huge));
+
+    const results = await downloadMediaAttachments([att({ filename: 'big.png' })], media, logger);
+
+    expect(results).toEqual([]);
+    // 关键不是「一次都没读」，而是没有顺着 64MB 读下去
+    expect(pulledBytes).toBeLessThan(1024 * 1024);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('exceeds'));
+  });
+
+  it('服务端不报长度时也在流上截断（chunked，#40）', async () => {
+    let pulls = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(256 * 1024)); // 每次 256KB，maxMB=1 撑不了几轮
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(endless)));
+
+    const results = await downloadMediaAttachments([att({ filename: 'endless.png' })], media, logger);
+
+    expect(results).toEqual([]);
+    // 在超限那一轮就停手，不是读到天荒地老（1MB / 256KB = 5 轮 + 预取 1 轮）
+    expect(pulls).toBeLessThan(10);
+  });
+
+  it('跳转到内网地址时被拦截（每跳都验，不只首跳，#40）', async () => {
+    vi.mocked(dns.promises.resolve4).mockImplementation(async (hostname: string) => (
+      hostname === 'internal.example' ? ['127.0.0.1'] : ['8.8.8.8']
+    ));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(null, {
+      status: 302,
+      headers: { location: 'http://internal.example/secret' },
+    })));
+
+    const results = await downloadMediaAttachments([att({ filename: 'x.png' })], media, logger);
+
+    expect(results).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('SSRF'));
+  });
+
   it('富媒体未启用时直接返回空列表', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

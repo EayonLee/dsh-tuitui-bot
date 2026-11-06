@@ -186,7 +186,14 @@ async function assertSafeHostname(hostname: string): Promise<void> {
   }
 }
 
-/** 安全下载：仅 http(s) + 环回拦截 + 大小上限 + 超时，返回字节 Buffer（不落盘） */
+/**
+ * 安全下载：仅 http(s) + 环回拦截 + 大小上限 + 超时，返回字节 Buffer（不落盘）
+ *
+ * 两条防线缺一不可（#40）：
+ * 1. **先看声明长度**：`content-length` 超限直接放弃，不要先把几百 MB 读进内存；
+ * 2. **读到上限就断流**：服务端可以不报 length（chunked），所以在流上边读边数，
+ *    超过 maxBytes 立刻 cancel 掉响应体，而不是读完再判断。
+ */
 async function download(url: string, maxBytes: number): Promise<Buffer> {
   const parsed = new URL(normalizeUrl(url));
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -194,14 +201,57 @@ async function download(url: string, maxBytes: number): Promise<Buffer> {
   }
   await assertSafeHostname(parsed.hostname);
 
-  const resp = await fetch(parsed, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const resp = await fetch(parsed, {
+    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    // 手动跟 3xx：每一跳都要重新做 SSRF 校验，否则 http→内网 的跳转就绕过了第一道闸
+    redirect: 'manual',
+  });
 
-  const buf = Buffer.from(await resp.arrayBuffer());
-  if (buf.length > maxBytes) {
+  // 跳转：最多 5 跳，每跳都校验协议与解析结果
+  let current = resp;
+  let hops = 0;
+  while (current.status >= 300 && current.status < 400) {
+    const location = current.headers.get('location');
+    if (location === null || location === '') throw new Error(`HTTP ${current.status} without location`);
+    if (++hops > 5) throw new Error('Too many redirects');
+    const next = new URL(location, parsed);
+    if (next.protocol !== 'https:' && next.protocol !== 'http:') {
+      throw new Error(`Only http(s) allowed: ${next.protocol}`);
+    }
+    await assertSafeHostname(next.hostname);
+    current = await fetch(next, {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+      redirect: 'manual',
+    });
+  }
+
+  if (!current.ok) throw new Error(`HTTP ${current.status}`);
+  return readCapped(current, maxBytes);
+}
+
+/** 在流上按上限读取；超过上限立刻取消，避免把大文件整个读进内存 */
+async function readCapped(resp: Response, maxBytes: number): Promise<Buffer> {
+  const declared = Number(resp.headers.get('content-length') ?? '');
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await resp.body?.cancel().catch(() => undefined);
     throw new Error(`Download exceeds ${Math.floor(maxBytes / 1024 / 1024)}MB`);
   }
-  return buf;
+  if (resp.body === null) return Buffer.alloc(0);
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  const reader = resp.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error(`Download exceeds ${Math.floor(maxBytes / 1024 / 1024)}MB`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
