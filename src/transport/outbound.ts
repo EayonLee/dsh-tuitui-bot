@@ -21,6 +21,7 @@ import type { DeliverablesDelivererLike } from './deliverables.ts';
 import {
   parseEvent,
   extractTurnError,
+  describeTurnStop,
   type ChunkEvent,
   type MessageEvent,
   type ToolCallEvent,
@@ -61,6 +62,8 @@ export interface SessionLike {
 interface ToolCallRecord {
   name: string;
   args: string;
+  /** 归属会话：turn/end 时按会话清理，避免 tool/result 永不回来时无限增长（#40） */
+  sessionId: string;
 }
 
 /** 不展示给用户的轮次错误码（底层传输/网络错误，对用户无意义，且常被重试兜住） */
@@ -230,8 +233,25 @@ class OutboundRouter {
 
   /** 工具调用：文本不发送（避免刷屏，等待结果），但上报给推推原生步骤面板 */
   private onToolCall(record: SessionRecord, event: ToolCallEvent): void {
-    this.toolCalls.set(event.callId, { name: event.name, args: event.arguments });
+    this.toolCalls.set(event.callId, { name: event.name, args: event.arguments, sessionId: this.sessionIdOf(record) });
     this.reportTool(record, event.callId, event.name, toToolParams(event.arguments), true, true);
+  }
+
+  /** 会话 id：统一从 record 取，避免各处再拼一遍键 */
+  private sessionIdOf(record: SessionRecord): string {
+    return record.sessionId;
+  }
+
+  /**
+   * 清掉某个会话遗留的工具调用记录。
+   *
+   * tool/result 不保证一定到达（轮次被中断、工具进程崩溃），只靠 result 删除会让 Map
+   * 无限增长，长跑进程里就是内存泄漏（#40）。
+   */
+  private pruneToolCalls(sessionId: string): void {
+    for (const [callId, call] of this.toolCalls) {
+      if (call.sessionId === sessionId) this.toolCalls.delete(callId);
+    }
   }
 
   /** 工具结果：错误始终发送，成功结果按开关；步骤上报与文本展示互不影响 */
@@ -318,16 +338,21 @@ class OutboundRouter {
     const files = this.presentedFiles.get(sessionId) ?? [];
     this.presentedFiles.delete(sessionId);
     this.presentedCalls.delete(sessionId);
+    this.pruneToolCalls(sessionId);
     // assistant/message 已在轮内先行发送的文本可能仍在途：与 turn/end 自身的 flush 一起等待
     const pending = this.pendingText.get(sessionId) ?? Promise.resolve();
     this.pendingText.delete(sessionId);
 
     const failure = extractTurnError(event.reason);
+    const stopNotice = failure === undefined ? describeTurnStop(event.reason) : undefined;
     void (async () => {
       try {
         await Promise.all([flushTask, pending]);
         if (failure !== undefined && !SILENT_TURN_ERROR_CODES.has(failure.code)) {
           await this.send(record, `⚠️ 本轮异常结束\n\`${failure.code}\`: ${failure.message}`, 'sendTurnEndError');
+        } else if (stopNotice !== undefined) {
+          // 截断/中断也是「用户看到的信息不完整」，不能静默（#40）
+          await this.send(record, stopNotice, 'sendTurnStopNotice');
         }
         if (files.length > 0 && this.deliverer !== undefined) {
           await this.deliverer.deliver(record, files);
@@ -355,7 +380,7 @@ class OutboundRouter {
 }
 
 /** 用节流守卫包住 markdown 发送（openStream 原样透传） */
-function throttledSender(bot: OutboundSenderLike, limiter: ReplyLimiter): OutboundSenderLike {
+function throttledSender(bot: OutboundSenderLike, limiter: ReplyLimiter, logger: Logger): OutboundSenderLike {
   return {
     sendMarkdown: async (target, content, opts) => {
       const result = await limiter.run(
@@ -364,7 +389,13 @@ function throttledSender(bot: OutboundSenderLike, limiter: ReplyLimiter): Outbou
         // 不传 opts 时保持两参调用：下游适配器与测试都按"没有可选参数"判等
         () => (opts === undefined ? bot.sendMarkdown(target, content) : bot.sendMarkdown(target, content, opts)),
       );
-      // 命中同内容去重：本次不发，但对调用方等价于"已处理"
+      // 命中同内容去重：本次不发，但对调用方等价于"已处理"。
+      // 至少留一条日志，否则「回复凭空少了一段」永远查不出来（#40）
+      if (result === undefined) {
+        logger.debug(
+          `im-tuitui: 同内容回复被去重，未重复发送（${target.scope}:${target.targetId}，${content.length} 字）`,
+        );
+      }
       return result ?? {};
     },
     openStream: (target) => bot.openStream(target),
@@ -413,6 +444,7 @@ export function createOutboundHandler(
   const limited = throttledSender(
     bot,
     new ReplyLimiter({ logger: { warn: (message) => logger.warn(message) } }),
+    logger,
   );
   const router = new OutboundRouter(manager, limited, config, logger, toolsRegistry, deliverer, agentSteps);
   return {

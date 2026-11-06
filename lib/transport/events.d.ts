@@ -101,6 +101,13 @@ export declare function extractTurnError(reason: TurnEndReason): {
     code: string;
     message: string;
 } | undefined;
+/**
+ * 从 turn/end reason 提取「该告诉用户一句」的非错误提示。
+ *
+ * 只有 error 会被 extractTurnError 接住，而 max-tokens 这类正常结束（kind 不是 error）
+ * 此前完全静默：用户看到半截回答，不知道是被截断了。
+ */
+export declare function describeTurnStop(reason: TurnEndReason): string | undefined;
 /** 归一化后的流式增量（文本；空串代表新 attempt 开始） */
 export interface StreamFrameDelta {
     agentId: string;
