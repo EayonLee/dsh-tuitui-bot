@@ -146,7 +146,7 @@ describe('buildCommandList（斜杠命令注册表契约）', () => {
   });
 
   it('/model 带参数切换模型', async () => {
-    const setModelOverride = vi.fn(async () => {});
+    const setModelOverride = vi.fn(async () => ({ ok: true, appliesTo: 'active-session' }));
     const list = buildCommandList({ manager: makeManager({ setModelOverride }), config: makeConfig() });
     const sent: string[] = [];
     await findCommand(list, 'model').handler(makeCtx('/model deepseek-official/deepseek-v4-flash', sent));
@@ -155,6 +155,25 @@ describe('buildCommandList（斜杠命令注册表契约）', () => {
       model: 'deepseek-v4-flash',
     });
     expect(sent.join('\n')).toContain('已切换');
+  });
+
+  it('/model 在生成中拒绝切换并说明原因（#41）', async () => {
+    const setModelOverride = vi.fn(async () => ({ ok: false, reason: 'busy' }));
+    const list = buildCommandList({ manager: makeManager({ setModelOverride }), config: makeConfig() });
+    const sent: string[] = [];
+    await findCommand(list, 'model').handler(makeCtx('/model a/b', sent));
+
+    expect(setModelOverride).toHaveBeenCalled();
+    expect(sent.join('\n')).toContain('还在生成');
+  });
+
+  it('/model 没有活跃会话时说明下一条会话生效（#41）', async () => {
+    const setModelOverride = vi.fn(async () => ({ ok: true, appliesTo: 'next-session' }));
+    const list = buildCommandList({ manager: makeManager({ setModelOverride }), config: makeConfig() });
+    const sent: string[] = [];
+    await findCommand(list, 'model').handler(makeCtx('/model a/b', sent));
+
+    expect(sent.join('\n')).toContain('下一条新会话生效');
   });
 
   it('/model 在 allowlist 模式下拒绝名单外用户', async () => {

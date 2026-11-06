@@ -65,6 +65,14 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 - Tool-call records are pruned per session at turn end. A `tool/result` is not guaranteed to arrive
   (interrupted turn, crashed tool), and deleting only on result let the map grow without bound in a
   long-running process (#40).
+- `/model` no longer switches while a turn is generating: that fork disposed the running agent handle
+  and cut the answer off mid-flight. It now refuses with "wait or /stop first", and says "applies to the
+  next session" when there is no active session (#41).
+- Fixed the race between `/new` and an in-flight session open: when `/new` landed before resume/create
+  returned, the pending flow wrote the old sessionId back to prefs and put the stale record back into
+  memory, overwriting the fresh `/new` (#41).
+- Shutdown (`disposeAll`) now waits for in-flight openSession calls before clearing, so they cannot
+  re-insert themselves afterwards and leave orphan sessions (#41).
 
 ### Breaking changes
 

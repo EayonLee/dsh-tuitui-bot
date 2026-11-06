@@ -506,3 +506,64 @@ describe('推推适配 — sessionKey 三态与作用域 prompt 注入', () => {
     expect(assembled.sections).toEqual([]);
   });
 });
+
+describe('会话切换与并发的竞态（#41）', () => {
+  it('/new 在 resume 期间写入新 id：不再把旧会话塞回 sessions、也不覆盖 prefs', async () => {
+    const resumeGate = deferred<DshAgentHandle>();
+    const { registry } = createRegistry(() => resumeGate.promise);
+    const manager = createManagerWithCtx(registry, onDiskCtx(LEGACY_ID));
+
+    const opening = manager.getOrCreate('c2c', PEER, 'zhangsan', REPLY);
+    await Promise.resolve();
+
+    // 用户在 resume 还没回来时 /new
+    await manager.remove('c2c', PEER);
+    const freshId = persistedId();
+
+    // resume 成功回来（旧会话）→ 打开流程必须放弃这次结果并改用 prefs 的新 id
+    resumeGate.resolve(fakeHandle(LEGACY_ID));
+    const record = await opening;
+
+    expect(freshId).toBeDefined();
+    expect(record.sessionId).toBe(freshId);
+    expect(persistedId()).toBe(freshId);
+    expect(manager.findBySessionId(LEGACY_ID)).toBeUndefined();
+  });
+
+  it('disposeAll 会等在飞的 openSession 落地后再清理（避免野会话）', async () => {
+    const gate = deferred<DshAgentHandle>();
+    const { registry, handles } = createRegistry(() => gate.promise);
+    const manager = createManagerWithCtx(registry, onDiskCtx(LEGACY_ID));
+
+    const opening = manager.getOrCreate('c2c', PEER, 'zhangsan', REPLY);
+    await Promise.resolve();
+
+    let disposed = false;
+    const disposing = manager.disposeAll().then(() => { disposed = true; });
+    await Promise.resolve();
+    expect(disposed).toBe(false);
+
+    gate.resolve(fakeHandle(LEGACY_ID));
+    await opening.catch(() => undefined);
+    await disposing;
+
+    expect(disposed).toBe(true);
+    expect(handles.every((h) => vi.mocked(h.dispose).mock.calls.length > 0)).toBe(true);
+  });
+
+  it('生成中的轮次不允许 /model 切换（fork 会掐掉正在跑的回答）', async () => {
+    const { registry } = createRegistry(async ({ resumeSessionId }) => fakeHandle(resumeSessionId));
+    const manager = createManagerWithCtx(registry, onDiskCtx(LEGACY_ID));
+
+    const record = await manager.getOrCreate('c2c', PEER, 'zhangsan', REPLY);
+    (record.agent as { status: string }).status = 'running';
+
+    const outcome = await manager.setModelOverride('c2c', PEER, { provider: 'p', model: 'm2' });
+
+    expect(outcome).toEqual({ ok: false, reason: 'busy' });
+    expect(registry.create).not.toHaveBeenCalled();
+    // 这次切换没有落偏好，避免「用户以为切了其实没切」
+    expect(manager.getEffectiveModel('c2c', PEER)?.model).not.toBe('m2');
+  });
+});
+

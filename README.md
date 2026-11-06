@@ -135,7 +135,7 @@ dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
 | --- | --- |
 | `/new`（别名 `/reset` `/clear`） | 开始新会话（清空上下文） |
 | `/compact` | 压缩会话历史（摘要替换旧记录） |
-| `/model` | 查看或切换模型 |
+| `/model` | 查看或切换模型（真在生成时会拒绝并提示，避免打断当前回答） |
 | `/preset` | 查看或切换 agent preset（新会话生效） |
 | `/status` | 当前会话状态（会话 id、模型、preset、消息数） |
 | `/stop` | 中止当前生成 |

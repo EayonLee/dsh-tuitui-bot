@@ -5,5 +5,5 @@
  */
 export { SessionManager } from './session-manager.ts';
 export { IdleEvictor } from './idle-evictor.ts';
-export type { AgentSetup, SessionEventLike, DshAgent, DshAgentHandle, DshAgentRegistry, AgentPresetsLike, PresetComposition, PresetEntry, PresetSwitchOutcome, SessionRecord, SessionStatus, TokenUsageStats, QuestionChannelLike, ApprovalChannelLike, } from './types.ts';
+export type { AgentSetup, SessionEventLike, DshAgent, DshAgentHandle, DshAgentRegistry, AgentPresetsLike, PresetComposition, PresetEntry, PresetSwitchOutcome, ModelSwitchOutcome, SessionRecord, SessionStatus, TokenUsageStats, QuestionChannelLike, ApprovalChannelLike, } from './types.ts';
 //# sourceMappingURL=index.d.ts.map

@@ -113,6 +113,9 @@ dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot
 `/new` (`/reset`, `/clear`), `/compact`, `/model`, `/preset`, `/status`, `/stop`, `/bot-ping`,
 `/bot-version`, `/bot-help`, `/auth`.
 
+`/model` refuses to switch while a turn is actually generating (that fork would cut the in-flight
+answer off) and tells you to wait or `/stop` first.
+
 ### Tools
 
 | Tool | Description |
