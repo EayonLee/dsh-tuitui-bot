@@ -84,6 +84,10 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   server-side editable whitelist, so saving rejected the whole batch with a 400 (including every other
   field in that submit). They are now editable and validated like prompts: max 8000 characters, no
   control characters (#46).
+- The profile-directory fallback for `link:` installs (contributors running from source) hardcoded
+  `@qihoo/dsh-tuitui-bot`, so it never matched and the Settings page could be read but not saved
+  ("profile directory not found"). It now scans `node_modules/@*/dsh-tuitui-bot`, so a renamed scope
+  also resolves (#47).
 
 ### Breaking changes
 
