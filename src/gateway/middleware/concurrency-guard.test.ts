@@ -101,7 +101,8 @@ describe('concurrencyGuard', () => {
 
     // 合并后只跑一条：幸存者是批次里的第一条，正文是两句话拼起来的
     expect(calls).toEqual(['a-enter', 'a-exit', 'b:第二句\n第三句']);
-    expect(c.skipped).toBeUndefined();
+    // 非幸存者正文已并入 b，必须明确 skip：否则 bootstrap 会把 c 再处理一遍（#35）
+    expect(c.skipped).toBe('concurrency:merged');
   });
 
   it('merge：缓冲超过 maxQueue 时丢弃并 skip', async () => {

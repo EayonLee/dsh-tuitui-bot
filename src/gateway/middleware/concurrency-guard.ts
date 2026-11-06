@@ -59,6 +59,8 @@ interface MergeWaiter {
   ctx: MiddlewareContext;
   resolve: () => void;
   markSurvivor: () => void;
+  /** 紧急消息插队时被「放掉」：正文没有合并进任何人，必须自己跑完链 */
+  markReleased: () => void;
 }
 
 interface QueueEntry {
@@ -250,7 +252,11 @@ export function concurrencyGuard(options: ConcurrencyGuardOptions = {}): Middlew
         // 紧急消息（如 /stop）：把已缓冲的都放掉，自己立刻并行跑完剩余链
         if (options.urgentPredicate?.(ctx)) {
           log?.debug(`[concurrency:merge] 紧急消息插队: ${key}`);
-          for (const waiter of mergeWaiters) waiter.resolve();
+          // 缓冲内容已被丢弃（没有合并进任何人）→ 通知等待者自己跑完链，不能 skip
+          for (const waiter of mergeWaiters) {
+            waiter.markReleased();
+            waiter.resolve();
+          }
           mergeBuffer.length = 0;
           mergeWaiters.length = 0;
           await next();
@@ -272,6 +278,7 @@ export function concurrencyGuard(options: ConcurrencyGuardOptions = {}): Middlew
         // 挂起但不 stop：等批次被处理。幸存者继续 next()，其余返回即停链。
         mergeBuffer.push(ctx);
         let isSurvivor = false;
+        let wasReleased = false;
         await new Promise<void>((resolve) => {
           mergeWaiters.push({
             ctx,
@@ -279,10 +286,20 @@ export function concurrencyGuard(options: ConcurrencyGuardOptions = {}): Middlew
             markSurvivor: () => {
               isSurvivor = true;
             },
+            markReleased: () => {
+              wasReleased = true;
+            },
           });
         });
         if (isSurvivor) {
           await next();
+        } else if (wasReleased) {
+          // 紧急插队释放的缓冲消息：正文没并入任何人，保持原行为——
+          // 本链到此为止、由集成方单独处理，既不 skip 也不在这里跑下游
+        } else {
+          // 正文已经并入幸存者：这条必须明确退出链，否则 bootstrap 会把它
+          // 当成「走完链的消息」再单独处理一遍（#35：同一条消息回复两遍）
+          ctx.skip('concurrency:merged');
         }
         return;
       }
