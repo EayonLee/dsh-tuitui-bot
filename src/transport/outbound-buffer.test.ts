@@ -44,6 +44,66 @@ describe('OutboundBuffer', () => {
     vi.useRealTimers();
   });
 
+  it('单段发送失败会重试，成功后不再发失败提示（#38）', async () => {
+    const bot = createBot(() => null); // openStream 拿不到 msgid → 走静态发送
+    const send = bot.sendMarkdown as unknown as ReturnType<typeof vi.fn>;
+    send.mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce(undefined);
+    const logger = createLogger();
+    const buffer = new OutboundBuffer(createRecord(c2cTarget), bot, 4500, logger, true);
+
+    buffer.append('一段话');
+    const flushed = buffer.flush();
+    await vi.advanceTimersByTimeAsync(1000);
+    await flushed;
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(logger.warn).toHaveBeenCalled();
+    // 成功路径没有失败提示
+    expect(send.mock.calls.some((call) => String(call[1]).includes('没能发出去'))).toBe(false);
+  });
+
+  it('重试耗尽后告知用户，而不是只留一行日志（#38）', async () => {
+    const bot = createBot(() => null);
+    const send = bot.sendMarkdown as unknown as ReturnType<typeof vi.fn>;
+    send.mockRejectedValue(new Error('429 too many requests'));
+    const logger = createLogger();
+    const buffer = new OutboundBuffer(createRecord(c2cTarget), bot, 4500, logger, true);
+
+    buffer.append('一段话');
+    const flushed = buffer.flush();
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushed;
+
+    // 首次 + 2 次重试 = 3 次，最后一次是失败提示
+    expect(send).toHaveBeenCalledTimes(4);
+    expect(String(send.mock.calls[3]?.[1])).toContain('没能发出去');
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('1/1 段回复发送失败'));
+    expect(buffer.text).toBe('');
+  });
+
+  it('多段时只重试失败的那一段，已成功的不重发（#38）', async () => {
+    const bot = createBot(() => null);
+    const send = bot.sendMarkdown as unknown as ReturnType<typeof vi.fn>;
+    send
+      .mockResolvedValueOnce(undefined)      // 第一段成功
+      .mockRejectedValueOnce(new Error('x')) // 第二段失败
+      .mockResolvedValueOnce(undefined);     // 重试成功
+    const logger = createLogger();
+    // limit 很小，逼出多段
+    const buffer = new OutboundBuffer(createRecord(c2cTarget), bot, 10, logger, true);
+
+    buffer.append('第一段内容很长很长 第二段内容同样很长很长');
+    const flushed = buffer.flush();
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushed;
+
+    const sentTexts = send.mock.calls.map((call) => String(call[1]));
+    expect(sentTexts.some((text) => text.includes('没能发出去'))).toBe(false);
+    // 第一段只发了一次（没有因为第二段失败被重发）
+    const firstChunk = sentTexts[0];
+    expect(sentTexts.filter((text) => text === firstChunk)).toHaveLength(1);
+  });
+
   it('流式开启：append + flush → openStream + update + complete', async () => {
     const session = createSession();
     const bot = createBot(() => session);
