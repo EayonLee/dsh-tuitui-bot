@@ -4,6 +4,17 @@
 > lives only in the Chinese [CHANGELOG.md](./CHANGELOG.md) — the two files used to drift apart, and a
 > partial second copy is worse than one honest pointer.
 
+## Unreleased
+
+Accumulates changes that have not shipped yet. **PRs add entries here; do not touch the version
+number.** Maintainers turn this heading into a version + date and bump `package.json` at release
+time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
+
+### Docs
+
+- The upgrade command is now `add @eayonlee/dsh-tuitui-bot@latest`: when the profile already pins a
+  version, a bare `add` reinstalls that pinned version and only looks like an upgrade (PR #67).
+
 ## 0.1.33 (2026-11-07)
 
 Main theme: everything left from the 2026-11-06 full-repo audit is fixed (#34–#49), and the install

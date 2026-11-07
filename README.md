@@ -96,13 +96,16 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 `sudo systemctl restart dsh-web`，手动前台起的重跑 `dsh --profile <name>`：
 
 ```bash
-# 方式一：npm（不带版本号 = 最新）
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot
+# 方式一：npm（@latest = 最新；已装过就必须带，否则会留在原版本）
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@latest
 # 方式二：Release 直链（稳定文件名 = 最新）
 dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 
 dsh --profile <name>                # 重启让新版本加载
 ```
+
+> 升级要写成 `…@eayonlee/dsh-tuitui-bot@latest`：profile 里已经钉住具体版本号时，
+> 不带版本号的 `add` 等于「装回原来那个号」，不会升级。
 
 设置页「已绑定」那行右侧也能做这件事：有新版本时点「更新到 vX.Y.Z」就跑完上面两步
 （下载、校验、备份、安装）。宿主加载了 `@deepseek-ai/dsh-hmr` 时**不需要重启**——插件会就地

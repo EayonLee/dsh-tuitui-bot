@@ -190,7 +190,8 @@ chore: 脚本加可执行位
 
 对外只有两条路径，文档里不许写第三种：
 
-1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`（不写版本号 = `latest`）
+1. **npm**：首次 `add @eayonlee/dsh-tuitui-bot`（不写版本号 = latest）；升级要写
+   `add @eayonlee/dsh-tuitui-bot@latest`（profile 已钉住版本时，裸 `add` 不会升级）
 2. **Release 直链**：
    `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz`
 

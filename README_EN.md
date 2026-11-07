@@ -74,8 +74,8 @@ Upgrading means installing the new version through one of the same two channels 
 replaced in place), then restarting that profile:
 
 ```bash
-# a) npm (no version = latest)
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot
+# a) npm (@latest = latest; required once a version is pinned, otherwise you stay on it)
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@latest
 # b) GitHub release URL (stable asset name = latest)
 dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 

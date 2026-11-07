@@ -2,6 +2,16 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
+## 未发布（Unreleased）
+
+这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
+版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
+
+### 文档
+
+- 升级命令改写成 `add @eayonlee/dsh-tuitui-bot@latest`：profile 里已钉住具体版本号时，
+  不带版本号的 `add` 会装回原版本，看起来「升了但其实没升」（PR #67）。
+
 ## 0.1.33 (2026-11-07)
 
 本版主线：把 2026-11-06 全仓审计剩下的 P0/P1/P2 全部修完（#34–#49），并把安装文档里的
