@@ -88,11 +88,13 @@ interface ReleaseAsset {
     size?: number;
     digest?: string;
 }
+/** 稳定 asset 名：每次发版覆盖上传，`releases/latest/download/` 靠它永远指向最新版 */
+export declare const STABLE_ASSET_NAME = "dsh-tuitui-bot.tgz";
 /**
  * 从 Release 里挑正式包。
  *
- * 只认 `dsh-tuitui-bot-<版本>.tgz` 这一种命名：把「装什么」限制死，
- * 是自更新这类动作最基本的安全边界（绝不接受任意 URL）。
+ * 只认两种命名：`dsh-tuitui-bot-<版本>.tgz`（不可变）与稳定别名 `dsh-tuitui-bot.tgz`。
+ * 把「装什么」限制死，是自更新这类动作最基本的安全边界（绝不接受任意 URL）。
  */
 export declare function pickReleaseAsset(release: unknown, version: string): ReleaseAsset | null;
 /** 从 Release 响应里取 tag（去掉 v） */
