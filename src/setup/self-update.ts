@@ -240,11 +240,14 @@ interface ReleaseAsset {
   digest?: string;
 }
 
+/** 稳定 asset 名：每次发版覆盖上传，`releases/latest/download/` 靠它永远指向最新版 */
+export const STABLE_ASSET_NAME = 'dsh-tuitui-bot.tgz';
+
 /**
  * 从 Release 里挑正式包。
  *
- * 只认 `dsh-tuitui-bot-<版本>.tgz` 这一种命名：把「装什么」限制死，
- * 是自更新这类动作最基本的安全边界（绝不接受任意 URL）。
+ * 只认两种命名：`dsh-tuitui-bot-<版本>.tgz`（不可变）与稳定别名 `dsh-tuitui-bot.tgz`。
+ * 把「装什么」限制死，是自更新这类动作最基本的安全边界（绝不接受任意 URL）。
  */
 export function pickReleaseAsset(
   release: unknown,
@@ -253,12 +256,13 @@ export function pickReleaseAsset(
   if (typeof release !== 'object' || release === null) return null;
   const assets = (release as ReleasePayload).assets;
   if (!Array.isArray(assets)) return null;
-  const wanted = 'dsh-tuitui-bot-' + version + '.tgz';
+  const wanted = ['dsh-tuitui-bot-' + version + '.tgz', STABLE_ASSET_NAME];
   for (const item of assets) {
     if (typeof item !== 'object' || item === null) continue;
     const asset = item as Partial<ReleaseAsset>;
     if (typeof asset.name !== 'string' || typeof asset.browser_download_url !== 'string') continue;
-    if (asset.name !== wanted) continue;
+    // 先认带版本号的那份；发版时万一漏传，退回稳定别名，别让「一键更新」直接失效
+    if (!wanted.includes(asset.name)) continue;
     return {
       name: asset.name,
       browser_download_url: asset.browser_download_url,

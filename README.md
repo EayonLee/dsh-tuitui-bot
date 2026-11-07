@@ -42,19 +42,22 @@ dsh 的文本/工具/审批/问答/交付物 → 推推消息、原生交互卡�
 dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
 ```
 
-要固定版本就带上版本号：
+不带版本号 = registry 上的 `latest`，永远装到最新版。只有排障、复现旧问题时才固定版本
+（把 `<版本>` 换成你要的那个号，别照抄示例）：
 
 ```bash
-dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot@0.1.32
+dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot@<版本>
 ```
 
 **方式二 · GitHub Release 直链**
 
-把 `0.1.32` 换成 [最新 Release](https://github.com/EayonLee/dsh-tuitui-bot/releases/latest) 的版本号：
-
 ```bash
-dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v0.1.32/dsh-tuitui-bot-0.1.32.tgz
+dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 ```
+
+`dsh-tuitui-bot.tgz` 是每次发版都会覆盖上传的**稳定文件名**，配合 GitHub 的
+`releases/latest/download/` 永远解析到最新版——所以这条命令里没有版本号，也不会装成老版本。
+要固定版本就用带版本号的那份（`.../releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`）。
 
 内网、断网、或者 npm 抽风的时候用这条——它直接从 GitHub 取包，不经过 npm registry。
 
@@ -93,10 +96,10 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
 `sudo systemctl restart dsh-web`，手动前台起的重跑 `dsh --profile <name>`：
 
 ```bash
-# 方式一：npm
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<新版本>
-# 方式二：Release 直链
-dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<新版本>/dsh-tuitui-bot-<新版本>.tgz
+# 方式一：npm（不带版本号 = 最新）
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot
+# 方式二：Release 直链（稳定文件名 = 最新）
+dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 
 dsh --profile <name>                # 重启让新版本加载
 ```

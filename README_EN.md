@@ -33,13 +33,14 @@ The order is the behaviour contract.
 # 1. install — exactly two supported channels: the npm package, or the GitHub
 #    release tarball. Same version, same contents, pick either.
 #
-#    a) npm (recommended); pin a version by appending @<version>
+#    a) npm (recommended). No version = the registry's latest; pin one only when
+#       reproducing a bug: @eayonlee/dsh-tuitui-bot@<version>
 dsh plugin --profile tuitui add @eayonlee/dsh-tuitui-bot
 
 #    b) GitHub release URL — use this offline / behind a proxy.
-#       Replace 0.1.32 with the latest version from
-#       https://github.com/EayonLee/dsh-tuitui-bot/releases/latest
-dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v0.1.32/dsh-tuitui-bot-0.1.32.tgz
+#       dsh-tuitui-bot.tgz is a stable asset name that every release overwrites, so
+#       /releases/latest/download/ always resolves to the newest build; nothing to look up.
+dsh plugin --profile tuitui add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 
 # 2. configure credentials
 export TUITUI_BOT_APPID="your-app-id"
@@ -73,10 +74,10 @@ Upgrading means installing the new version through one of the same two channels 
 replaced in place), then restarting that profile:
 
 ```bash
-# a) npm
-dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@<new-version>
-# b) GitHub release URL
-dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<new-version>/dsh-tuitui-bot-<new-version>.tgz
+# a) npm (no version = latest)
+dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot
+# b) GitHub release URL (stable asset name = latest)
+dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz
 
 dsh --profile <name>                                      # restart to load the new build
 ```

@@ -502,6 +502,29 @@ describe('planUpdate · API 限流兜底', () => {
     expect(plan.label).toBe('GitHub Release（直链）');
     expect(plan.digest).toBeUndefined();
   });
+  it('漏传带版本号的 asset 时退回稳定别名，一键更新不失效', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tag_name: 'v0.1.33',
+        assets: [
+          {
+            name: 'dsh-tuitui-bot.tgz',
+            browser_download_url: 'https://example.invalid/dsh-tuitui-bot.tgz',
+          },
+        ],
+      }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    const plan = await planUpdate({ slug, channel: 'release', fetchImpl, latestVersion: '0.1.33' });
+    expect(plan.downloadUrl).toBe('https://example.invalid/dsh-tuitui-bot.tgz');
+  });
+
+  it('两种命名都没有时报错，不乱装别的 asset', () => {
+    const release = { assets: [{ name: 'source.zip', browser_download_url: 'https://example.invalid/s.zip' }] };
+    expect(pickReleaseAsset(release, '0.1.33')).toBeNull();
+  });
 
   it('API 正常但缺 asset 时仍然报错（不拿直链糊弄）', async () => {
     const fetchImpl: FetchLike = async () => ({

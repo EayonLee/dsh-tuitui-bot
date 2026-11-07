@@ -67,9 +67,10 @@ node scripts/verify-tools.mjs   # 校验 9 个工具是否真的注册进 dsh
 git tag v0.1.30 && git push origin v0.1.30
 
 # 5. 建 Release 并上传正式包
-./scripts/pack.sh /tmp/rel
+./scripts/pack.sh /tmp/rel     # 产出带版本号的包 + 稳定别名 dsh-tuitui-bot.tgz
 gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
-gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
+# 两个 asset 都要传：缺稳定别名，README 的 /releases/latest/download/ 直链就失效
+gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz /tmp/rel/dsh-tuitui-bot.tgz
 
 # 6. 发布到 npm（与 Release 同一个版本号，两条安装通道要同时发）
 npm whoami --registry=https://registry.npmjs.org   # 必须输出 eayonlee
@@ -115,11 +116,17 @@ npm 与 Release 必须同版本、同内容：`scripts/pack.sh` 打出的 tarbal
 
 对外**只有两条路径**，任何文档都不要写第三种：
 
-1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot[@<版本>]`
+1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`（不写版本号 = `latest`）
 2. **Release 直链**：
-   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`
+   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz`
 
 升级、卸载都用这两条（卸载按包名 `remove @eayonlee/dsh-tuitui-bot`）。
+
+**文档里不要出现具体版本号。** 用户会照抄命令，写死 `@0.1.32` 就是让人装成老版本。
+- npm 侧靠「不写版本号」拿 latest；
+- Release 侧靠**稳定 asset 名** `dsh-tuitui-bot.tgz`：每次发版都覆盖上传这一个文件，
+  `/releases/latest/download/dsh-tuitui-bot.tgz` 因此永远指向最新版；
+- 要固定版本时才写具体号，且一律用占位符 `<版本>` 说明「替换成你要的号」。
 
 npm 与 Release 同版本、同产物（同一份 `files` 白名单）。**不写**从源码目录安装、**不写**
 `github:EayonLee/dsh-tuitui-bot` 跟主干、不写一键脚本——这三样都已经被明确排除。

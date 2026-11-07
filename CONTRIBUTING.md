@@ -140,8 +140,12 @@ chore: 脚本加可执行位
    ```bash
    ./scripts/pack.sh /tmp/rel
    gh release create v0.1.30 --target main --title "v0.1.30" --generate-notes
-   gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz
+   # 两个都要传：带版本号的那份用于固定版本；dsh-tuitui-bot.tgz 是稳定别名，
+   # README 的 /releases/latest/download/dsh-tuitui-bot.tgz 靠它才对得上最新版
+   gh release upload v0.1.30 /tmp/rel/dsh-tuitui-bot-0.1.30.tgz /tmp/rel/dsh-tuitui-bot.tgz
    ```
+
+   漏传 `dsh-tuitui-bot.tgz`，README 里的直链就会 404 或停在上一版。
 
 7. 回填 Release 正文（`gh release edit v0.1.30 --notes-file notes.md`），按下节标准写。
 
@@ -186,9 +190,11 @@ chore: 脚本加可执行位
 
 对外只有两条路径，文档里不许写第三种：
 
-1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot[@<版本>]`
+1. **npm**：`dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot`（不写版本号 = `latest`）
 2. **Release 直链**：
-   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/download/v<版本>/dsh-tuitui-bot-<版本>.tgz`
+   `dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/releases/latest/download/dsh-tuitui-bot.tgz`
+
+文档里**不写具体版本号**——照抄写死的版本号会装成老版本。真要固定版本时用 `<版本>` 占位符说清楚。
 
 升级就是装新版本，卸载是 `dsh plugin --profile <name> remove @eayonlee/dsh-tuitui-bot`。
 不支持从源码目录装、不支持 `github:EayonLee/dsh-tuitui-bot` 跟主干。

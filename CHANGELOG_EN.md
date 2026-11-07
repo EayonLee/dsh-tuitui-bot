@@ -10,8 +10,18 @@ Accumulates changes that have not shipped yet. **PRs add entries here; do not to
 number.** Maintainers turn this heading into a version + date and bump `package.json` at release
 time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
 
+### Docs
+
+- Install docs no longer hardcode a version: npm is always `add @eayonlee/dsh-tuitui-bot`
+  (no version = latest), and the release URL now uses the stable asset name
+  `.../releases/latest/download/dsh-tuitui-bot.tgz`. Copying a command that pins `@0.1.32` is how
+  people end up installing an old build, so no document carries a concrete version any more (only
+  a `<version>` placeholder when pinning is the point). `scripts/pack.sh` now emits the stable alias
+  too, releases upload both assets, and the AGENTS / CONTRIBUTING release steps follow suit.
 ### Fixed
 
+- The one-click update failed outright when a release was missing its versioned asset; it now falls
+  back to the stable alias `dsh-tuitui-bot.tgz` and still accepts only those two file names (#64).
 - The attachment path allowlist is now on by default (`sendFile.restrictPaths: true`), and credential
   files (`cordis.patch.yml`), private keys (`*.pem` / `*.key` / `~/.ssh`), `.env` / `.npmrc` and
   `$DSH_HOME/profiles/**` are refused regardless of the switch. Previously any readable path was

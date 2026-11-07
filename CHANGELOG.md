@@ -7,8 +7,17 @@
 这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
 版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
 
+### 文档
+
+- 安装文档不再写死版本号：npm 一律 `add @eayonlee/dsh-tuitui-bot`（不写号 = 最新），
+  Release 直链改走稳定文件名 `.../releases/latest/download/dsh-tuitui-bot.tgz`。照抄写死的
+  `@0.1.32` 这类命令是「装成老版本」的主要来源，现在文档里不再出现具体版本号（固定版本才用
+  `<版本>` 占位符说明）。`scripts/pack.sh` 同步产出稳定别名，发版时两个 asset 一起上传，
+  AGENTS / CONTRIBUTING 的发版流程已按此对齐。
 ### 修复
 
+- 一键更新在 Release 漏传带版本号的 asset 时会直接失败；现在退回稳定别名
+  `dsh-tuitui-bot.tgz` 继续装，仍然只认这两种合法文件名（#64）。
 - 附件发送的路径白名单默认收紧为开启（`sendFile.restrictPaths: true`），并且凭据文件
   （`cordis.patch.yml`）、私钥（`*.pem` / `*.key` / `~/.ssh`）、`.env` / `.npmrc` 以及
   `$DSH_HOME/profiles/**` 无论开关如何都拒绝发送。此前默认放开任意路径，群聊里的一次诱导
