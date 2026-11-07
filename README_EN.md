@@ -31,7 +31,8 @@ The order is the behaviour contract.
 
 ```bash
 # 1. install — exactly two supported channels: the npm package, or the GitHub
-#    release tarball. Same version, same contents, pick either.
+#    release tarball. Same version, same bytes (guaranteed from 0.1.33 on; the v0.1.32
+#    release asset was re-uploaded from the npm build), pick either.
 #
 #    a) npm (recommended). No version = the registry's latest; pin one only when
 #       reproducing a bug: @eayonlee/dsh-tuitui-bot@<version>
