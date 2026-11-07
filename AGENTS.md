@@ -122,6 +122,9 @@ npm 与 Release 必须同版本、同内容：`scripts/pack.sh` 打出的 tarbal
 
 升级、卸载都用这两条（卸载按包名 `remove @eayonlee/dsh-tuitui-bot`）。
 
+**升级要带 `@latest`。** profile 里已钉住具体版本号时，不带版本号的 `add` 等于「装回原版本」，
+不是升级；只有首次安装才可以省。
+
 **文档里不要出现具体版本号。** 用户会照抄命令，写死 `@0.1.32` 就是让人装成老版本。
 - npm 侧靠「不写版本号」拿 latest；
 - Release 侧靠**稳定 asset 名** `dsh-tuitui-bot.tgz`：每次发版都覆盖上传这一个文件，
