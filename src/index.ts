@@ -17,6 +17,7 @@ import {
   registerAboutPanel,
   registerBoundCredentialRoutes,
 } from './setup/index.ts';
+import { notifyUpdateOnStartup } from './setup/startup-version.ts';
 import { withFileLog } from './shared/index.ts';
 import type { Logger } from './types.ts';
 
@@ -92,4 +93,12 @@ export async function apply(ctx: Context, config: ImTuituiConfig): Promise<void>
   const resolvedConfig: ImTuituiConfig = { ...config, appId, appSecret };
 
   await bootstrapGateway(ctx, agents, resolvedConfig, logger);
+
+  // 启动顺手查一次新版本：只打日志、不阻塞、不自动更新（失败静默）
+  void notifyUpdateOnStartup({
+    channel: resolvedConfig.selfUpdate.channel,
+    logger,
+  }).catch(() => {
+    // notifyUpdateOnStartup 内部已兜底，这里只是不把 rejection 漏给宿主
+  });
 }

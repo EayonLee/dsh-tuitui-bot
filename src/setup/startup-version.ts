@@ -1,0 +1,68 @@
+/**
+ * 启动时的一次版本提示：查到一个更新的版本就 info 一行，查不到就静默。
+ *
+ * 为什么放在启动而不是只留给设置页：大部分人开完机器人就不再打开设置页，
+ * 「有新版可升」这件事只能靠日志被动发现。这里**只打日志、不自动更新**，
+ * 也不阻塞启动（调用方 fire-and-forget）。
+ *
+ * 网络失败、API 限流、atom 也挂了 —— 一律静默：更新提示失败不该影响渠道本身。
+ */
+import { REPO_SLUG } from '../shared/about-protocol.ts';
+import type { Logger } from '../types.ts';
+import { readInstalledPackage } from './self-update.ts';
+import { checkLatest, isNewer, type FetchLike } from './version-check.ts';
+
+/** 与设置页同一个 fetch 收窄口径 */
+const defaultFetch: FetchLike = async (url, init) => await fetch(url, init as RequestInit);
+
+export interface StartupUpdateNoticeOptions {
+  /** 更新通道（跟 selfUpdate.channel 一致） */
+  channel: 'release' | 'main';
+  logger: Logger;
+  fetchImpl?: FetchLike;
+  /** 当前版本来源（单测注入）；默认读安装包的 package.json */
+  readVersion?: () => Promise<string>;
+}
+
+export interface StartupUpdateNotice {
+  current: string;
+  latest: string;
+  /** 打给用户看的那一行（没有更新时为 null） */
+  message: string | null;
+}
+
+/**
+ * 查一次新版本并（有更新时）打一行 info。
+ *
+ * 返回结构化结果方便单测断言；内部已经吞掉所有异常，不会 reject。
+ */
+export async function notifyUpdateOnStartup(
+  options: StartupUpdateNoticeOptions,
+): Promise<StartupUpdateNotice | null> {
+  const { logger, channel } = options;
+  const fetchImpl = options.fetchImpl ?? defaultFetch;
+  const readVersion = options.readVersion
+    ?? (async () => (await readInstalledPackage()).version);
+  try {
+    const current = await readVersion();
+    const lookup = await checkLatest({ slug: REPO_SLUG, channel, fetchImpl });
+    const latest = lookup.latest;
+    if (latest === null) {
+      // 查不到（限流 / 断网）：没有可比对的东西，静默收工
+      logger.debug(`im-tuitui: 版本检查没拿到结果（当前 ${current}）`);
+      return null;
+    }
+    if (!isNewer(latest, current)) {
+      logger.debug(`im-tuitui: 版本检查完成（当前 ${current}，最新 ${latest}）`);
+      return { current, latest, message: null };
+    }
+    const message = `im-tuitui: 有新版本 ${latest}（当前 ${current}）——升级用 `
+      + `dsh plugin --profile <name> add @eayonlee/dsh-tuitui-bot@latest，装完重启`;
+    logger.info(message);
+    return { current, latest, message };
+  } catch (err) {
+    // 任何异常都只是「没提示成」，不影响渠道启动
+    logger.debug(`im-tuitui: 启动版本检查失败: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
