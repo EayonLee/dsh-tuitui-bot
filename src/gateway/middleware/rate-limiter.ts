@@ -49,37 +49,68 @@ export const DEFAULT_RATE_LIMITS = {
   global: { max: 600, windowMs: 60_000 },
 } as const satisfies Record<RateLimitTierName, RateLimitTier>;
 
-/** 滑动窗口计数器：只保留窗口内的时间戳 */
-class SlidingWindow {
+/** 滑动窗口计数器：只保留窗口内的时间戳（导出仅为单测直接验证桶回收） */
+export class SlidingWindow {
   private readonly buckets = new Map<string, number[]>();
   private readonly max: number;
   private readonly windowMs: number;
   private readonly now: () => number;
 
-  constructor(tier: RateLimitTier, now: () => number) {
+  /**
+   * 键数量上限：超过就全表扫一遍，清掉已经过期的空桶。
+   *
+   * 键是 senderId / groupId / post 频道，正常量级受组织规模约束；但如果某天遇到
+   * 大量一次性群或爬虫式 sender，光靠「下次 check 时顺手清」是清不掉的——
+   * 那些键再也不来，空桶就永久占着内存（#48）。
+   */
+  private readonly maxKeys: number;
+
+  constructor(tier: RateLimitTier, now: () => number, maxKeys = 4096) {
     this.max = tier.max;
     this.windowMs = tier.windowMs;
     this.now = now;
+    this.maxKeys = maxKeys;
+  }
+
+  /** 当前占用中的键数量（单测断言桶回收用） */
+  get size(): number {
+    return this.buckets.size;
   }
 
   /** 允许则记一次并返回 true；超限返回 false（不记次） */
   check(key: string): boolean {
     const now = this.now();
-    let hits = this.buckets.get(key);
-    if (!hits) {
-      hits = [];
-      this.buckets.set(key, hits);
-    }
+    if (this.buckets.size > this.maxKeys) this.sweep(now);
 
-    // 淘汰窗口外的记录；数组按时间递增，撞到第一条未过期的即可收工
-    while (hits.length > 0 && now - (hits[0] as number) > this.windowMs) {
-      hits.shift();
-    }
+    const hits = this.prune(key, now);
 
     if (hits.length >= this.max) return false;
 
     hits.push(now);
+    this.buckets.set(key, hits);
     return true;
+  }
+
+  /**
+   * 取该键窗口内的命中记录，并顺手删掉空桶。
+   *
+   * 返回的数组可能是原来那个（同一次 check 里追加后重新 set 回去），
+   * 但空桶会立刻从 Map 里删除——「发完就不再来」的键不再永久留一个空数组（#48）。
+   */
+  private prune(key: string, now: number): number[] {
+    const hits = this.buckets.get(key);
+    if (hits === undefined) return [];
+    // 数组按时间递增，撞到第一条未过期的即可收工
+    while (hits.length > 0 && now - (hits[0] as number) > this.windowMs) {
+      hits.shift();
+    }
+    if (hits.length === 0) this.buckets.delete(key);
+    return hits;
+  }
+
+  /** 全表清理：删掉已经完全没有命中的桶（键数超上限时才跑） */
+  private sweep(now: number): void {
+    for (const key of [...this.buckets.keys()]) this.prune(key, now);
   }
 }
 

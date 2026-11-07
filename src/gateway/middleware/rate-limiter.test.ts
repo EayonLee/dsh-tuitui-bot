@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rateLimiter } from './rate-limiter.ts';
+import { rateLimiter, SlidingWindow } from './rate-limiter.ts';
 import type { RateLimitTierName } from './rate-limiter.ts';
 import { makeCtx, makeMessage, runMiddleware } from './test-utils.ts';
 
@@ -99,5 +99,35 @@ describe('rateLimiter', () => {
       const ctx = makeCtx(makeMessage({ messageId: 'n' + i }));
       expect((await runMiddleware(limiter, ctx)).reachedNext).toBe(true);
     }
+  });
+});
+
+describe('SlidingWindow 桶回收（#48）', () => {
+  it('键数超上限时全表清理过期桶，不再无限积累', () => {
+    let now = 0;
+    const w = new SlidingWindow({ max: 5, windowMs: 1_000 }, () => now, 1);
+    w.check('a');
+    w.check('b');
+    expect(w.size).toBe(2);
+
+    now = 5_000; // 两条都过期
+    w.check('c');
+
+    // 清理后只剩当前这条；旧实现会把 a/b 的空桶一直留着
+    expect(w.size).toBe(1);
+    expect(w.check('c')).toBe(true);
+  });
+
+  it('窗口内的记录不因清理丢失，额度照常生效', () => {
+    let now = 0;
+    const w = new SlidingWindow({ max: 2, windowMs: 1_000 }, () => now, 1);
+    expect(w.check('a')).toBe(true);
+    now = 10;
+    expect(w.check('a')).toBe(true);
+    expect(w.check('a')).toBe(false); // 两条都在窗口内
+    now = 900;
+    expect(w.check('a')).toBe(false);
+    now = 1_011; // 第一条过期，名额回来一个
+    expect(w.check('a')).toBe(true);
   });
 });

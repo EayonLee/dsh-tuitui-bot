@@ -46,7 +46,9 @@ export function receiptReactions(options: ReceiptReactionOptions = {}): Middlewa
       return;
     }
     const kind = ctx.message.kind;
-    const allowed = kind === 'c2c' || (kind === 'group' && inGroup);
+    // 帖子（post）也是「有人 @ 了机器人等回答」，和群聊同一套开关；
+    // 原来只放行 c2c/group，post 永远没有回执，和上面注释的意图不符（#48）
+    const allowed = kind === 'c2c' || ((kind === 'group' || kind === 'post') && inGroup);
     const msgId = ctx.replyTarget.msgId;
     if (!allowed || !msgId || (predicate !== undefined && !predicate(ctx))) {
       await next();

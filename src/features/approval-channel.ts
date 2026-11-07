@@ -70,6 +70,8 @@ export interface ApprovalSessionRecordLike {
   sessionKey: string;
   scope: ChatScope;
   replyTarget: ReplyTarget;
+  /** 触发这一轮的用户（uid）；单聊等于对端，群聊是发起人 */
+  senderId?: string;
 }
 
 export interface ApprovalChannelManagerLike {
@@ -96,6 +98,8 @@ export interface ApprovalChannelConfigLike {
     headTextColor?: string;
     /** 审批等待上限（毫秒，0/缺省 = 不限） */
     approvalTimeoutMs?: number;
+    /** 审批只认发起人（缺省 = 开） */
+    approvalRequesterOnly?: boolean;
   };
 }
 
@@ -128,7 +132,17 @@ interface PendingApproval {
   onAbort?: () => void;
   /** 等待上限计时器（超时按 cancelled 结算，避免会话永久悬挂） */
   timer?: ReturnType<typeof setTimeout>;
+  /** 发起人 uid：approvalRequesterOnly 生效时只有这个人能批（#49） */
+  requesterId?: string;
 }
+
+/** 点击/作答者身份（按钮回调带 scope+targetId，文本作答只有账号字段） */
+type ClickerIdentity = {
+  scope?: ChatScope;
+  targetId?: string;
+  account?: string;
+  uid?: string;
+};
 
 const COMMAND_CLIP = 500;
 
@@ -258,6 +272,14 @@ export class ApprovalChannel {
       return false;
     }
 
+    if (clicker && !this.isRequester(entry, clicker)) {
+      this.logger.warn(
+        `im-tuitui: approval text answer rejected (not the requester): user=${clicker.account ?? clicker.uid ?? '(missing)'} key=${record.sessionKey}`,
+      );
+      void this.notifyNotRequester(entry, clicker);
+      return true;
+    }
+
     this.pending.delete(record.sessionKey);
     this.removeAbort(entry);
     const resolution: ApprovalResolution = decision === 'allow' ? 'allowed-once' : 'rejected';
@@ -315,6 +337,15 @@ export class ApprovalChannel {
       return false;
     }
 
+    // 审批是授权动作，不是投票：群里其他人点「允许」不能替发起人授权（#49）
+    if (!this.isRequester(entry, click)) {
+      this.logger.warn(
+        `im-tuitui: approval button rejected (not the requester): user=${click.account ?? click.uid ?? '(missing)'} key=${sessionKey}`,
+      );
+      await this.notifyNotRequester(entry, click);
+      return true;
+    }
+
     this.pending.delete(sessionKey);
     this.clearTimer(entry);
     this.removeAbort(entry);
@@ -337,6 +368,44 @@ export class ApprovalChannel {
       this.logger.warn(`im-tuitui: approval nonce matched an entry of another peer: key=${entry.record.sessionKey}`);
     }
     return undefined;
+  }
+
+  /** 是否启用「审批只认发起人」（缺省开） */
+  private requesterOnly(): boolean {
+    return this.config.interactive?.approvalRequesterOnly !== false;
+  }
+
+  /**
+   * 决策者是否就是发起人（#49）。
+   *
+   * - 开关关掉 → 一律放行（老行为：群里任何人可批）；
+   * - 发起人未知（历史数据 / 单聊未带 senderId）→ 退回「对端一致」判定，
+   *   单聊本来就是只有对端一个人；
+   * - 否则必须 uid 或账号与发起人一致。
+   */
+  private isRequester(entry: PendingApproval, clicker: ClickerIdentity): boolean {
+    if (!this.requesterOnly()) return true;
+    const requester = entry.requesterId;
+    if (requester === undefined || requester === '') {
+      // 发起人未知：退回对端一致判定；连对端都判不了（历史卡片）就按老行为放行，
+      // 别把审批彻底卡死
+      if (clicker.scope === undefined || clicker.targetId === undefined) return true;
+      return this.isSamePeer(entry, clicker as Pick<InteractiveActionEvent, 'scope' | 'targetId' | 'account' | 'uid'>);
+    }
+    return requester === clicker.uid || requester === clicker.account || requester === clicker.targetId;
+  }
+
+  /** 告诉点错的人一句（不结算、不消耗 pending） */
+  private async notifyNotRequester(entry: PendingApproval, clicker: ClickerIdentity): Promise<void> {
+    const who = clicker.account ?? clicker.uid ?? '当前账号';
+    try {
+      await this.sender.sendMarkdown(
+        entry.record.replyTarget,
+        `⚠️ ${who}：这条审批是发起人触发的，需要由发起人本人点允许/拒绝。`,
+      );
+    } catch {
+      // 提示发不出去不影响「拒绝结算」这件事本身
+    }
   }
 
   /** 点击者是否就是该 pending 审批所属会话的对端 */
@@ -374,6 +443,7 @@ export class ApprovalChannel {
         resolve,
         nonce,
         ...(cardMsgId ? { cardMsgId } : {}),
+        ...(record.senderId ? { requesterId: record.senderId } : {}),
       };
       // 先入表再挂 abort：onAbort 用 pending 做归属判断，晚入表会被自己挡掉（#42）
       this.pending.set(key, entry);

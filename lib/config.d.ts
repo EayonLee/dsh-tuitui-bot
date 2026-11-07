@@ -94,6 +94,13 @@ export interface InteractiveConfig {
      * 依赖审批的工具调用会一直挂着，整个会话跟着卡死。
      */
     approvalTimeoutMs: number;
+    /**
+     * 审批只认发起人（默认 true）。
+     *
+     * 审批是「授权动作」，不是投票：群聊里别人点「允许」就等于替你授权执行工具。
+     * 关掉后回到「群里任何人可批」（老行为），适合小团队共用一个机器人。
+     */
+    approvalRequesterOnly: boolean;
 }
 /** Agent 执行步骤上报配置（client.agent → 推推客户端原生展示） */
 export interface AgentStepsConfig {

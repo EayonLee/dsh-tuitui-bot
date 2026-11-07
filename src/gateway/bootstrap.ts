@@ -39,10 +39,13 @@ import { settleReceipt } from '../features/receipt-registry.ts';
 import { describeGroupEvent, recordGroupEvent } from '../tuitui/group-events.ts';
 import { createTuituiClient, normalizeEvent, TuituiSenderImpl, describeApiError, DEFAULT_SHORTCUTS, syncShortcutCommands, createAgentStepReporter, toSdkTarget } from '../tuitui/index.ts';
 import { setupMiddlewares } from './middleware-setup.ts';
+// 与内核同一份上下文构造：曾经这里另有一份「skip 最后原因覆盖」的实现，
+// 和内核的「首个原因生效」不一致，排查「被谁拦下」时会指到不同层（#48）
+import { createMiddlewareContext } from './middleware/kernel.ts';
 import { getScopePeer, PLUGIN_HOME } from '../shared/index.ts';
 import { join } from 'node:path';
 import type { ImTuituiConfig } from '../config.ts';
-import type { InboundMessage, Logger, MiddlewareContext, ReplyTarget, TuituiSender } from '../types.ts';
+import type { InboundMessage, Logger, ReplyTarget, TuituiSender } from '../types.ts';
 
 /**
  * 交互回调分发载荷。
@@ -78,27 +81,6 @@ export function buildReplyTarget(message: InboundMessage): ReplyTarget {
   // 单聊：优先域账号（可编辑/撤回），无域账号才退化到 uid
   const targetId = message.senderAccount || message.senderId;
   return { scope: 'c2c', targetId, msgId: message.messageId };
-}
-
-/** 构造中间件上下文（skip 语义：中断后续中间件与入站处理） */
-function createMiddlewareContext(
-  message: InboundMessage,
-  replyTarget: ReplyTarget,
-  bot: TuituiSender,
-): MiddlewareContext {
-  let skipped: string | undefined;
-  return {
-    message,
-    state: {},
-    replyTarget,
-    bot,
-    skip(reason: string): void {
-      skipped = reason;
-    },
-    get skipped(): string | undefined {
-      return skipped;
-    },
-  };
 }
 
 /** 交互按钮路由：按卡片 value 的 `t` 判别字段分发 */
@@ -323,7 +305,7 @@ export async function bootstrapGateway(
     // 记录最近 msgId，供无上下文的出站发送（文件发送显式 target、主动推送等）引用回复
     cacheMsgId(replyTarget.scope, replyTarget.targetId, message.messageId);
 
-    const mwCtx = createMiddlewareContext(message, replyTarget, sender);
+    const mwCtx = createMiddlewareContext({ message, replyTarget, bot: sender });
     try {
       await kernel.dispatch(mwCtx);
     } catch (error) {

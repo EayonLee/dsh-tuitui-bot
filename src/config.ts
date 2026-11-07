@@ -104,6 +104,13 @@ export interface InteractiveConfig {
    * 依赖审批的工具调用会一直挂着，整个会话跟着卡死。
    */
   approvalTimeoutMs: number;
+  /**
+   * 审批只认发起人（默认 true）。
+   *
+   * 审批是「授权动作」，不是投票：群聊里别人点「允许」就等于替你授权执行工具。
+   * 关掉后回到「群里任何人可批」（老行为），适合小团队共用一个机器人。
+   */
+  approvalRequesterOnly: boolean;
 }
 
 /** Agent 执行步骤上报配置（client.agent → 推推客户端原生展示） */
@@ -353,8 +360,17 @@ export const ConfigSchema: Schema<ImTuituiConfig> = Schema.object({
     approvalTimeoutMs: Schema.number()
       .default(300000)
       .description('审批卡片等待上限（毫秒，0 = 不限）。超时按 cancelled 结算，避免会话永久悬挂'),
+    approvalRequesterOnly: Schema.boolean()
+      .default(true)
+      .description('审批只认发起人：群聊里其他人点「允许/拒绝」不算数（默认开；关掉则群里任何成员都能批）'),
   })
-    .default({ enabled: true, headBgColor: '#1F6FEB', headTextColor: '#FFFFFF', approvalTimeoutMs: 300000 })
+    .default({
+      enabled: true,
+      headBgColor: '#1F6FEB',
+      headTextColor: '#FFFFFF',
+      approvalTimeoutMs: 300000,
+      approvalRequesterOnly: true,
+    })
     .description('交互卡片配置'),
   agentSteps: Schema.object({
     enabled: Schema.boolean().default(false).description('是否上报模型/工具调用中间步骤（默认关闭）'),
