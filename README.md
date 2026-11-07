@@ -83,6 +83,10 @@ dsh --profile tuitui            # 启动 agent + 推推长连接
   - `always`：群里每条消息都回（只建议专用小群）。
 - 团队频道：在频道里发帖并 `@机器人`（或回复机器人的帖子）
 
+群聊里**谁能批审批**：默认只有触发这次审批的人能点「允许 / 拒绝」（审批是授权动作，
+不该由别人代点）；要退回到「群里谁都能批」，把 `interactive.approvalRequesterOnly` 设为 `false`。
+提问（`ask_user_question`）相反，群里任何人都可以作答，先答的那条算数。
+
 ### 升级与卸载
 
 升级就是用上面那两种方式之一装新版本（profile 原地替换），然后重启——部署成服务的用
@@ -319,7 +323,9 @@ dsh 设置 → **推推机器人**，所有常用配置都在这里，保存后�
 | 配置 | 默认值 | 说明 |
 | --- | --- | --- |
 | `interactive.enabled` | `true` | 用交互卡片做审批/提问（关闭后走编号文本应答） |
+| `interactive.approvalTimeoutMs` | `300000` | 审批卡片等待上限（0 = 不限）；超时按取消结算并把卡片改成「已作废」 |
 | `interactive.headBgColor` / `headTextColor` | `#1F6FEB` / `#FFFFFF` | 卡片头部配色 |
+| `interactive.approvalRequesterOnly` | `true` | 审批只认发起人（群里别人点「允许」不算数）；关掉则群里任何人都能批 |
 | `agentSteps.enabled` | `false` | 上报模型/工具步骤给推推客户端原生展示（默认关） |
 | `agentSteps.includeToolPayload` | `false` | 是否上报工具参数/结果原文 |
 | `agentSteps.maxResultChars` | `800` | 工具结果截断长度 |

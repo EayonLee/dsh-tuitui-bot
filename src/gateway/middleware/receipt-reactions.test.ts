@@ -79,3 +79,19 @@ describe('receiptReactions 中间件', () => {
     expect(result.reachedNext).toBe(true);
   });
 });
+
+  it('帖子也给回执（#48）', async () => {
+    resetReceipts();
+    const { calls, bot } = recorder();
+    const ctx = makeCtx(makeMessage({ kind: 'post', eventType: 'post_chat', messageId: 'post-1' }), bot);
+    await runMiddleware(receiptReactions({ ack: '👀', done: '✅' }), ctx);
+    expect(calls).toEqual(['+👀']);
+  });
+
+  it('帖子也受 inGroup 开关约束（#48）', async () => {
+    resetReceipts();
+    const { calls, bot } = recorder();
+    const ctx = makeCtx(makeMessage({ kind: 'post', eventType: 'post_chat', messageId: 'post-2' }), bot);
+    await runMiddleware(receiptReactions({ inGroup: false }), ctx);
+    expect(calls).toEqual([]);
+  });

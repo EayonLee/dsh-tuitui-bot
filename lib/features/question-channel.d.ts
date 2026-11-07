@@ -12,6 +12,12 @@
  *
  * 传输层：交互卡片 + interactive_action；点完按钮要 modifyInteractive 把卡片
  * 改成"已回答"，因为平台不会自动把按钮置灰。
+ * ## 谁能作答（#49 的口径）
+ *
+ * 提问按「群里谁都能答」处理，这是刻意的：ask_user_question 在群里就是一次投票 /
+ * 征求意见，谁愿意答都可以，答案是**一条**（先到先得），不是每人都要答。
+ * 审批不同——审批是授权动作，默认只认发起人（见 approval-channel 的
+ * approvalRequesterOnly 开关）。
  */
 import type { TuituiOutboundInteractiveMessage } from '@qihoo/tuitui-bot-sdk';
 import type { ChatScope, InboundMessage, Logger, MiddlewareContext, ReplyTarget, SendResult, TuituiSender } from '../types.ts';

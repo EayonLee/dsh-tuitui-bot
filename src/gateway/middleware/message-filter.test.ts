@@ -19,6 +19,22 @@ describe('messageFilter', () => {
     expect(ctx.skipped).toBeUndefined();
   });
 
+  it('发送者就是机器人自己时也丢掉（平台没打 user_is_bot 的兜底，#45）', async () => {
+    const filter = messageFilter({ selfIds: ['app-42'] });
+
+    const byAccount = makeCtx(makeMessage({ senderAccount: 'app-42', messageId: 'm-a' }));
+    expect((await runMiddleware(filter, byAccount)).reachedNext).toBe(false);
+    expect(byAccount.skipped).toBe('self-echo');
+
+    const byUid = makeCtx(makeMessage({ senderId: 'app-42', senderAccount: 'zhangsan', messageId: 'm-b' }));
+    expect((await runMiddleware(filter, byUid)).reachedNext).toBe(false);
+  });
+
+  it('普通用户不受 selfIds 影响', async () => {
+    const filter = messageFilter({ selfIds: ['app-42'] });
+    const ctx = makeCtx(makeMessage({ senderAccount: 'zhangsan', senderId: 'uid-1', messageId: 'm-c' }));
+    expect((await runMiddleware(filter, ctx)).reachedNext).toBe(true);
+  });
   it('窗口内同一 msgid 只处理一次', async () => {
     let now = 1_000;
     const filter = messageFilter({ dedup: { windowMs: 5_000, now: () => now } });

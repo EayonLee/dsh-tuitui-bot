@@ -155,7 +155,9 @@ export function setupMiddlewares(options: MiddlewareSetupOptions): MiddlewareKer
   kernel.use(errorHandler(logger));
 
   // 2. 消息过滤：bot 回声 + 消息去重
-  kernel.use(messageFilter({ skipSelfEcho: false }));
+  // 自回声必须拦住：c2c 没有 @ 门控，一旦平台把自己的消息推回来就是自问自答死循环。
+  // 判据两层（fromBot / 发送者==自己），结论见 message-filter.ts 顶部注释（#45）。
+  kernel.use(messageFilter({ skipSelfEcho: true, selfIds: [config.appId] }));
 
   // 3. 访问控制（空名单 = 拒绝所有人，fail-closed）
   kernel.use(accessPolicy({

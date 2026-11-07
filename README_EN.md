@@ -256,9 +256,19 @@ machine: those routes can replace credentials or unbind the bot, so besides the 
 source address must be loopback. Opening the web UI from another host via `--host 0.0.0.0` or a reverse
 proxy returns 403 — use `ssh -L 3080:127.0.0.1:3080` and operate from the local browser.
 
+### Who may approve or answer
+
+Approvals are authorisation, not a poll: by default only the person who triggered the approval can click
+allow / deny (`interactive.approvalRequesterOnly: true`). Set it to `false` to go back to "anyone in the group
+can approve". Questions (`ask_user_question`) work the other way around — in a group any member may answer, and
+the first answer wins.
+
 ### Tuitui-native switches
 
 `interactive.enabled` (cards for approval/questions), `interactive.headBgColor` / `headTextColor`,
+`interactive.approvalTimeoutMs` (0 = unlimited) and `interactive.approvalRequesterOnly` (default on: only the
+person who triggered the approval can allow/deny it — a group member cannot authorise a tool run on their behalf;
+questions stay collaborative, anyone in the group may answer once),
 `agentSteps.enabled` (off by default) / `includeToolPayload` / `maxResultChars`, and `apiBaseUrl` / `websocketBaseUrl`
 for private deployments (also `TUITUI_BOT_API_BASE` / `TUITUI_BOT_WS_BASE`).
 

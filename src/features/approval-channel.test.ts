@@ -113,20 +113,21 @@ function buttonValueOf(sent: SentCard[], d: 'allow' | 'deny'): unknown {
  */
 function makeInteraction(
   value: unknown,
-  peer: { user?: string; group?: string; account?: string },
+  peer: { user?: string; group?: string; account?: string; uid?: string },
 ): InboundMessage {
   const account = peer.account ?? peer.user ?? '';
+  const uid = peer.uid ?? 'uid-1';
   const raw = {
     event: 'interactive_action',
     cid: 'evt-1',
-    uid: 'uid-1',
+    uid,
     user_account: account,
     user_name: 'tester',
     timestamp: '2026-01-01T00:00:00Z',
     ...(peer.group ? { group_id: peer.group } : {}),
     data: {
       msgid: 'card-1',
-      user: { account, uid: 'uid-1' },
+      user: { account, uid },
       conversation: { type: peer.group ? 'group' : 'single', targeted: peer.group ?? account },
       action: [{ text: 'click', value }],
     },
@@ -134,7 +135,7 @@ function makeInteraction(
   return {
     eventType: 'interactive_action',
     kind: peer.group ? 'group' : 'c2c',
-    senderId: 'uid-1',
+    senderId: uid,
     senderAccount: account,
     senderName: 'tester',
     content: '',
@@ -259,6 +260,94 @@ describe('ApprovalChannel.install', () => {
     await expect(p).resolves.toBe('allowed-once');
   });
 
+  it('群聊里非发起人点审批不结算，发起人点才生效（#49）', async () => {
+    const sent: SentCard[] = [];
+    const record: ApprovalSessionRecordLike = {
+      ...makeRecord(sessionKey('group', 'group-1'), 'group'),
+      senderId: 'uid-owner',
+    };
+    const ch = new ApprovalChannel(
+      createManager({
+        findBySessionId: (id) => (id === 'sess-a' ? record : undefined),
+        getSessionRecord: (scope, peerId) => (scope === 'group' && peerId === 'group-1' ? record : undefined),
+      }),
+      createSender(sent),
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    // 先取按钮值：后面点了「不是发起人」，会多出一条提示文本，卡片就不再是最后一条
+    const allowValue = buttonValueOf(sent, 'allow');
+
+    // 别人点「允许」：被告知要找发起人，审批依然挂着
+    const stranger = await ch.handleInteraction(payload(
+      makeInteraction(allowValue, { group: 'group-1', account: 'other-user', uid: 'uid-other' }),
+    ));
+    expect(stranger).toBe(true);
+    await sleep(10);
+    expect(sent.some((s) => (s.text ?? '').includes('发起人'))).toBe(true);
+
+    // 发起人点「允许」：生效
+    expect(await ch.handleInteraction(payload(
+      makeInteraction(allowValue, { group: 'group-1', account: 'owner-user', uid: 'uid-owner' }),
+    ))).toBe(true);
+    await expect(p).resolves.toBe('allowed-once');
+  });
+
+  it('关掉 approvalRequesterOnly 后群里任何人可批（#49）', async () => {
+    const sent: SentCard[] = [];
+    const record: ApprovalSessionRecordLike = {
+      ...makeRecord(sessionKey('group', 'group-1'), 'group'),
+      senderId: 'uid-owner',
+    };
+    const ch = new ApprovalChannel(
+      createManager({
+        findBySessionId: (id) => (id === 'sess-a' ? record : undefined),
+        getSessionRecord: (scope, peerId) => (scope === 'group' && peerId === 'group-1' ? record : undefined),
+      }),
+      createSender(sent),
+      makeConfig('open', [], { approvalRequesterOnly: false }),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    expect(await ch.handleInteraction(payload(
+      makeInteraction(buttonValueOf(sent, 'allow'), { group: 'group-1', account: 'other-user', uid: 'uid-other' }),
+    ))).toBe(true);
+    await expect(p).resolves.toBe('allowed-once');
+  });
+
+  it('文本作答同样只认发起人（#49）', async () => {
+    const sent: SentCard[] = [];
+    const record: ApprovalSessionRecordLike = {
+      ...makeRecord(sessionKey('c2c', 'peer-a')),
+      senderId: 'uid-owner',
+    };
+    const ch = new ApprovalChannel(
+      createManager({
+        findBySessionId: (id) => (id === 'sess-a' ? record : undefined),
+        getSessionRecord: () => record,
+      }),
+      createSender(sent),
+      makeConfig(),
+      createLogger(),
+    );
+    const { handler } = installAndCapture(ch);
+    const p = handler(makeRequest({ id: 'sess-a' }), () => Promise.resolve('unavailable' as ApprovalOutcome));
+    await sleep(20);
+
+    expect(ch.tryAnswer('c2c', 'peer-a', '1', { account: 'other-user', uid: 'uid-other' })).toBe(true);
+    await sleep(10);
+    expect(sent.some((s) => (s.text ?? '').includes('发起人'))).toBe(true);
+
+    expect(ch.tryAnswer('c2c', 'peer-a', '1', { account: 'owner-user', uid: 'uid-owner' })).toBe(true);
+    await expect(p).resolves.toBe('allowed-once');
+  });
   it('recovers the gated command from the session log', async () => {
     const sent: SentCard[] = [];
     const ch = new ApprovalChannel(

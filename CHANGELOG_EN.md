@@ -88,6 +88,20 @@ time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
   `@qihoo/dsh-tuitui-bot`, so it never matched and the Settings page could be read but not saved
   ("profile directory not found"). It now scans `node_modules/@*/dsh-tuitui-bot`, so a renamed scope
   also resolves (#47).
+- Self-echo filtering is back on: the chain explicitly passed
+  `skipSelfEcho: false` while c2c has no mention gate, so any echoed message from the bot itself
+  would start a self-reply loop. It is now enabled by default, plus an identity fallback that drops
+  messages whose sender **is** the bot's own appId; a hit logs at info level (it should never happen —
+  if it does, echoing is real) (#45).
+- Approvals accept only the requester now: another group member clicking allow no longer authorises the
+  tool run for someone else — they get "the requester has to decide" and the pending approval stays
+  (`interactive.approvalRequesterOnly`, on by default; turn it off for the old "anyone may approve"
+  behaviour). Questions remain collaborative: any group member may answer, first answer wins (#49).
+- Gateway housekeeping: rate-limit buckets are dropped once empty and periodically swept when the key
+  count grows (no more empty arrays for senders that never come back); the quote LRU no longer evicts an
+  extra entry when overwriting an existing key; team posts get the "working on it" receipt too; the
+  duplicate middleware-context implementation in bootstrap (last-reason-wins skip) is gone in favour of
+  the kernel's first-reason-wins semantics (#48).
 
 ### Breaking changes
 

@@ -50,6 +50,8 @@ export interface ApprovalSessionRecordLike {
     sessionKey: string;
     scope: ChatScope;
     replyTarget: ReplyTarget;
+    /** 触发这一轮的用户（uid）；单聊等于对端，群聊是发起人 */
+    senderId?: string;
 }
 export interface ApprovalChannelManagerLike {
     findBySessionId(sessionId: string): ApprovalSessionRecordLike | undefined;
@@ -73,6 +75,8 @@ export interface ApprovalChannelConfigLike {
         headTextColor?: string;
         /** 审批等待上限（毫秒，0/缺省 = 不限） */
         approvalTimeoutMs?: number;
+        /** 审批只认发起人（缺省 = 开） */
+        approvalRequesterOnly?: boolean;
     };
 }
 /** approval/request waterfall 的 answerer handler */
@@ -134,6 +138,19 @@ export declare class ApprovalChannel {
      * 兜底匹配必须自己再核一次点击者，否则等于绕过了会话隔离。
      */
     private findByNonceForClicker;
+    /** 是否启用「审批只认发起人」（缺省开） */
+    private requesterOnly;
+    /**
+     * 决策者是否就是发起人（#49）。
+     *
+     * - 开关关掉 → 一律放行（老行为：群里任何人可批）；
+     * - 发起人未知（历史数据 / 单聊未带 senderId）→ 退回「对端一致」判定，
+     *   单聊本来就是只有对端一个人；
+     * - 否则必须 uid 或账号与发起人一致。
+     */
+    private isRequester;
+    /** 告诉点错的人一句（不结算、不消耗 pending） */
+    private notifyNotRequester;
     /** 点击者是否就是该 pending 审批所属会话的对端 */
     private isSamePeer;
     /** 走推推通道：发审批卡片 + 挂起 Promise，等待用户决策 */
