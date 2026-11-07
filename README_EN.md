@@ -83,6 +83,9 @@ dsh plugin --profile <name> add https://github.com/EayonLee/dsh-tuitui-bot/relea
 dsh --profile <name>                                      # restart to load the new build
 ```
 
+The startup log also mentions it: when a newer release exists you get one line
+("有新版本 vX.Y.Z (current vA.B.C)") — informational only, nothing is installed automatically.
+
 `dsh --profile <name> --dump-config | grep -A3 im-tuitui` confirms the plugin row is in the combined tree.
 
 Uninstalling is the same for both channels — remove by package name:

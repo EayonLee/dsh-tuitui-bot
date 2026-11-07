@@ -2,15 +2,27 @@
 
 本项目（`@eayonlee/dsh-tuitui-bot`）是 360 推推 IM 的 dsh 渠道插件，版本号独立演进。
 
-## 未发布（Unreleased）
+## 0.1.34 (2026-11-07)
 
-这里累积还没发版的改动。**提 PR 往这里加，不要改版本号**；维护者发版时把标题换成
-版本号 + 日期，并同步 `package.json`（流程见 [CONTRIBUTING §8](./CONTRIBUTING.md)）。
+这版只有体验与自检还债：启动时提示新版本、自检脚本不再要求手工 export 凭据、文档口径收尾。
+
+### 新增
+
+- 启动时查一次新版本：有更新就在日志里打一行「有新版本 vX.Y.Z（当前 vA.B.C）」并附升级命令，
+  **只提示、不自动安装**；断网 / 限流 / 查不到一律静默，不影响渠道启动（PR #69）。
+
+### 变更
+
+- `npm run verify` 不再强制手工 export 凭据：环境变量 / `.env` → `--profile <name>` →
+  自动扫 `~/.dsh/profiles/*`，只打印凭据来源、不回显密钥（PR #69）。
 
 ### 文档
 
 - 升级命令改写成 `add @eayonlee/dsh-tuitui-bot@latest`：profile 里已钉住具体版本号时，
   不带版本号的 `add` 会装回原版本，看起来「升了但其实没升」（PR #67）。
+- README 中英补上「从 0.1.33 起 npm 与 Release 字节一致，v0.1.32 附件已按 npm 产物重传」；
+  AGENTS 的反例不再写具体版本号（PR #68）。
+- AGENTS 常用命令补上 `npm run verify -- --profile <name>` 的真实用法（PR #69）。
 
 ## 0.1.33 (2026-11-07)
 

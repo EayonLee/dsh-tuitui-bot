@@ -32,7 +32,7 @@ npm ci                # 依赖
 npm run typecheck     # 服务端 + 客户端双端类型检查（提交前必跑）
 npm test              # 全量单测
 npm run build         # 构建 lib/（会被提交进仓库）
-npm run verify        # 启动接线自检：不用 dsh CLI / LLM Key
+npm run verify -- --profile <name>   # 启动接线自检（凭据：env/.env → --profile → 自动扫 ~/.dsh/profiles/*）
 npm run smoke:live    # 真实凭据冒烟（会真的发消息）
 node scripts/verify-tools.mjs   # 校验 9 个工具是否真的注册进 dsh
 ```

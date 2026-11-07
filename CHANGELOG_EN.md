@@ -4,16 +4,32 @@
 > lives only in the Chinese [CHANGELOG.md](./CHANGELOG.md) — the two files used to drift apart, and a
 > partial second copy is worse than one honest pointer.
 
-## Unreleased
+## 0.1.34 (2026-11-07)
 
-Accumulates changes that have not shipped yet. **PRs add entries here; do not touch the version
-number.** Maintainers turn this heading into a version + date and bump `package.json` at release
-time (see [CONTRIBUTING §8](./CONTRIBUTING.md)).
+Experience and self-check only: a startup hint for new versions, no more manual credential exports
+for the wiring self-check, and doc clean-up.
+
+### Added
+
+- One version check at startup: when a newer release exists it logs a single line
+  ("有新版本 vX.Y.Z (current vA.B.C)") plus the upgrade command — **informational only, nothing is
+  installed automatically**. Offline / rate-limited / unknown versions stay silent and never affect
+  channel startup (PR #69).
+
+### Changed
+
+- `npm run verify` no longer requires manually exported credentials: environment / `.env` →
+  `--profile <name>` → an automatic scan of `~/.dsh/profiles/*`. It prints where the credentials came
+  from, never the values (PR #69).
 
 ### Docs
 
 - The upgrade command is now `add @eayonlee/dsh-tuitui-bot@latest`: when the profile already pins a
   version, a bare `add` reinstalls that pinned version and only looks like an upgrade (PR #67).
+- Both READMEs now state that npm and the release asset are byte-identical from 0.1.33 on, and that
+  the v0.1.32 asset was re-uploaded from the npm build; the AGENTS counter-example no longer spells
+  out a concrete version (PR #68).
+- AGENTS lists the real `npm run verify -- --profile <name>` usage (PR #69).
 
 ## 0.1.33 (2026-11-07)
 
