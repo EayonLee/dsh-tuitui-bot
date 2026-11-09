@@ -65,6 +65,8 @@ export interface BindRoutesOptions {
     currentConfig?: () => ImTuituiConfig;
     /** 配置写入（默认：最小合并写入 profile patch） */
     onUpdateConfig?: (patch: Record<string, unknown>) => boolean;
+    /** Harness owner admission; absent only in embedded hosts without Connection. */
+    authorizeRequest?: (req: IncomingMessage) => 401 | 403 | undefined;
 }
 /**
  * 注册绑定路由（状态查询 / 校验 / 手动凭据 / 解绑 / 配置读写）。

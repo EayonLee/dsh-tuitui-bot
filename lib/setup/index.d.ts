@@ -1,20 +1,3 @@
-/**
- * 凭据绑定编排 — setup/ 模块入口
- *
- * apply() 检测到凭据缺失时调用 ensureCredentials：
- * 1. 创建 BindingService（单例接管，HMR 双 fiber 安全）
- * 2. Web 宿主（dsh web / Desktop）注册端内绑定页路由
- *    —— 经 ctx.inject(['webServer'], ...) 可选注入：服务未就绪时插件
- *       照常加载（CLI profile），就绪/替换时自动（再）注册路由
- * 3. 按宿主形态挂呈现策略（终端打印绑定向导；Desktop 无可见终端，由端内页面承载）
- * 4. 生命周期与 ctx fiber 绑定（dispose 时终止状态机、注销路由）
- *
- * 凭据已配置的 fiber 调用 registerBoundCredentialRoutes 注册常驻路由
- * （bound 状态回显 + 手动编辑/更换 + 配置编辑），与绑定流程共用持久化路径。
- *
- * 推推无扫码：ensureCredentials 不做「等待扫码结果」的挂起 Promise——
- * 向导打印完即 resolve null，凭据由用户手填后经 persist 落盘。
- */
 import type { Context } from '@deepseek-ai/cordis';
 import type { ImTuituiConfig } from '../config.ts';
 import type { Logger } from '../types.ts';

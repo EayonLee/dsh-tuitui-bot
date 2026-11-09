@@ -92,6 +92,8 @@ export interface BindRoutesOptions {
   currentConfig?: () => ImTuituiConfig;
   /** 配置写入（默认：最小合并写入 profile patch） */
   onUpdateConfig?: (patch: Record<string, unknown>) => boolean;
+  /** Harness owner admission; absent only in embedded hosts without Connection. */
+  authorizeRequest?: (req: IncomingMessage) => 401 | 403 | undefined;
 }
 
 /** 访问模式三值（与 config.ts 的 AccessControlConfig 一致） */
@@ -405,36 +407,53 @@ export function registerBindRoutes(
   };
   const handleManualSubmit = options.onManualCredentials ?? defaultManual;
 
+  const protectedRoute = (handler: WebRoute['handler']): WebRoute['handler'] => (req, res) => {
+    if (options.authorizeRequest !== undefined) {
+      const rejection = options.authorizeRequest(req);
+      if (rejection !== undefined) {
+        sendJson(res, rejection, { error: rejection === 401 ? 'unauthorized' : 'forbidden' });
+        return;
+      }
+    } else if (!loopback(req)) {
+      sendJson(res, 403, { error: 'forbidden' });
+      return;
+    }
+    if (!sameOrigin(req)) {
+      sendJson(res, 403, { error: 'forbidden' });
+      return;
+    }
+    return handler(req, res);
+  };
   const disposers = [
     webServer.register({
       kind: 'exact',
       path: BIND_STATE_PATH,
-      handler: (req, res) => { handleState(req, res, service, options); },
+      handler: protectedRoute((req, res) => { handleState(req, res, service, options); }),
     }),
     webServer.register({
       kind: 'exact',
       path: BIND_VERIFY_PATH,
-      handler: (req, res) => handleVerifyRequest(req, res, handleVerify),
+      handler: protectedRoute((req, res) => handleVerifyRequest(req, res, handleVerify)),
     }),
     webServer.register({
       kind: 'exact',
       path: BIND_MANUAL_PATH,
-      handler: (req, res) => handleManual(req, res, handleManualSubmit),
+      handler: protectedRoute((req, res) => handleManual(req, res, handleManualSubmit)),
     }),
     webServer.register({
       kind: 'exact',
       path: BIND_UNBIND_PATH,
-      handler: (req, res) => handleUnbind(req, res, options),
+      handler: protectedRoute((req, res) => handleUnbind(req, res, options)),
     }),
     webServer.register({
       kind: 'exact',
       path: BIND_CONFIG_PATH,
-      handler: (req, res) => handleConfig(req, res, options),
+      handler: protectedRoute((req, res) => handleConfig(req, res, options)),
     }),
     webServer.register({
       kind: 'exact',
       path: TEST_MODEL_PATH,
-      handler: (req, res) => handleTestModel(req, res, options),
+      handler: protectedRoute((req, res) => handleTestModel(req, res, options)),
     }),
   ];
   logger.info(`im-tuitui: 端内绑定页已就绪: ${BIND_STATE_PATH}`);
@@ -455,16 +474,8 @@ function loopback(req: IncomingMessage): boolean {
   return false;
 }
 
-/**
- * 请求来源校验（CSRF + 来源网络双闸）。
- *
- * 1. 带 Origin 的请求必须与 Host 同源（同源 fetch / Desktop IPC 桥放行）；
- * 2. **必须来自本机**：这些路由能改 appId/appSecret、能解绑、能写配置，交给
- *    局域网里任何客户端都是提权。dsh 以 `--host 0.0.0.0` 启动或挂在反代后面时，
- *    没有这一条等于把这些能力公开（#44）。需要远程管理请用 SSH 端口转发。
- */
-function trusted(req: IncomingMessage): boolean {
-  if (!loopback(req)) return false;
+/** Keep the Origin check for hosts without Harness Connection too. */
+function sameOrigin(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
   if (origin === undefined) return true;
   try {
@@ -489,10 +500,6 @@ function handleState(
   service: BindingService | null,
   options: BindRoutesOptions,
 ): void {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;
@@ -554,10 +561,6 @@ async function handleVerifyRequest(
   res: ServerResponse,
   verify: (credentials: SetupCredentials) => Promise<VerifyOutcome>,
 ): Promise<void> {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;
@@ -591,10 +594,6 @@ async function handleManual(
   res: ServerResponse,
   submit: (credentials: SetupCredentials) => Promise<ManualSubmitResult>,
 ): Promise<void> {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;
@@ -628,10 +627,6 @@ async function handleManual(
  * 假成功后静默失败。
  */
 function handleUnbind(req: IncomingMessage, res: ServerResponse, options: BindRoutesOptions): void {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;
@@ -678,10 +673,6 @@ function handleUnbind(req: IncomingMessage, res: ServerResponse, options: BindRo
  * - POST：白名单 + 逐键 Schema 校验 → 最小写入 profile patch → HMR 重载
  */
 async function handleConfig(req: IncomingMessage, res: ServerResponse, options: BindRoutesOptions): Promise<void> {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'GET' && req.method !== 'POST') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;
@@ -773,10 +764,6 @@ async function handleTestModel(
   res: ServerResponse,
   options: BindRoutesOptions,
 ): Promise<void> {
-  if (!trusted(req)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method not allowed' });
     return;

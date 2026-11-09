@@ -12,7 +12,7 @@
  * 未改业务代码。
  */
 import { Readable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BIND_CONFIG_PATH,
   BIND_MANUAL_PATH,
@@ -69,6 +69,7 @@ interface ReqOptions {
   host?: string;
   /** 伪造来源地址（默认为本机；null 表示没有 socket） */
   remoteAddress?: string | null;
+  cookie?: string;
 }
 
 function makeReq(method: string, options: ReqOptions = {}): Parameters<WebRoute['handler']>[0] {
@@ -82,6 +83,7 @@ function makeReq(method: string, options: ReqOptions = {}): Parameters<WebRoute[
     headers: {
       host: options.host ?? '127.0.0.1:3080',
       ...(options.origin !== undefined ? { origin: options.origin } : {}),
+      ...(options.cookie !== undefined ? { cookie: options.cookie } : {}),
     },
     ...(remoteAddress === null ? {} : { socket: { remoteAddress } }),
   }) as unknown as Parameters<WebRoute['handler']>[0];
@@ -137,6 +139,46 @@ describe('registerBindRoutes 路由注册', () => {
 });
 
 describe('GET /bind 状态查询', () => {
+  it('认证的内网 owner 可以读取状态和配置，未认证及跨站请求被拒', async () => {
+    const h = harness({
+      authorizeRequest: (req) => req.headers.cookie === 'owner=valid' ? undefined : 401,
+    });
+    for (const path of [BIND_STATE_PATH, BIND_CONFIG_PATH]) {
+      const remote = { remoteAddress: '192.0.2.20', host: '192.0.2.10:3080', origin: 'http://192.0.2.10:3080' };
+      expect((await h.call(path, makeReq('GET', remote))).statusCode).toBe(401);
+      expect((await h.call(path, makeReq('GET', { ...remote, cookie: 'owner=valid' }))).statusCode).toBe(200);
+      expect((await h.call(path, makeReq('GET', { ...remote, cookie: 'owner=valid', origin: 'http://evil.example' }))).statusCode).toBe(403);
+    }
+  });
+
+  it('所有绑定与配置接口在无会话时拒绝请求', async () => {
+    const h = harness({ authorizeRequest: () => 401 });
+    const remote = { remoteAddress: '192.0.2.20', host: '192.0.2.10:3080' };
+    for (const path of [BIND_STATE_PATH, BIND_CONFIG_PATH, BIND_MANUAL_PATH, BIND_VERIFY_PATH, BIND_UNBIND_PATH, TEST_MODEL_PATH]) {
+      const method = path === BIND_STATE_PATH || path === BIND_CONFIG_PATH ? 'GET' : 'POST';
+      const res = await h.call(path, makeReq(method, { ...remote, body: {} }));
+      expect(res.statusCode, path).toBe(401);
+    }
+  });
+
+  it('认证的内网 owner 可以更改配置', async () => {
+    const update = vi.fn(() => true);
+    const h = harness({ authorizeRequest: () => undefined, onUpdateConfig: update });
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', {
+      remoteAddress: '192.0.2.20', host: '192.0.2.10:3080', origin: 'http://192.0.2.10:3080', body: { model: 'test' },
+    }));
+    expect(res.statusCode).toBe(200);
+    expect(update).toHaveBeenCalledWith({ model: 'test' });
+  });
+
+  it('非 owner 的内网请求无法修改配置', async () => {
+    const update = vi.fn(() => true);
+    const h = harness({ authorizeRequest: () => 403, onUpdateConfig: update });
+    const res = await h.call(BIND_CONFIG_PATH, makeReq('POST', { remoteAddress: '192.168.1.50', body: { model: 'test' } }));
+    expect(res.statusCode).toBe(403);
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('已绑定时回显 appId 与机器人信息，响应不含 appSecret', async () => {
     const h = harness({
       boundState: () => ({ phase: 'bound', appId: 'app-1', botName: '推推小助手', botAccount: 'bot@corp' }),
