@@ -4,13 +4,13 @@
 > lives only in the Chinese [CHANGELOG.md](./CHANGELOG.md) — the two files used to drift apart, and a
 > partial second copy is worse than one honest pointer.
 
-## Unreleased
+## 0.1.35 (2026-11-09)
 
 ### Fixed
 
 - Binding state and settings returned 403 from a signed-in remote dsh Web browser. These routes now
   use dsh Connection owner-session admission; unauthenticated and cross-origin requests are still
-  rejected, and self-update stays local-only (#70).
+  rejected, and self-update stays local-only (#70 / PR #71).
 - Hosts without dsh Connection (embedded / minimal hosts) no longer lose the whole settings panel:
   the management routes fall back to the loopback-only rule instead of not mounting at all, which
   turned the panel into a 404 (PR #72).
