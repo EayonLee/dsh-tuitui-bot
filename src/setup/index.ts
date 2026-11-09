@@ -15,6 +15,7 @@
  * 推推无扫码：ensureCredentials 不做「等待扫码结果」的挂起 Promise——
  * 向导打印完即 resolve null，凭据由用户手填后经 persist 落盘。
  */
+import type { IncomingMessage } from 'node:http';
 import type { Context } from '@deepseek-ai/cordis';
 import type { ImTuituiConfig } from '../config.ts';
 import type { BindStateWire, BotInfoWire } from '../shared/bind-protocol.ts';
@@ -69,6 +70,32 @@ function withWebServer(
   });
 }
 
+interface OwnerConnectionLike {
+  admit(request: IncomingMessage):
+    | { peer: { principal: { kind: string } } }
+    | { rejection: 401 | 403 };
+}
+
+function withBindRoutes(
+  ctx: Context,
+  register: (webServer: WebServerLike, authorizeRequest: (req: IncomingMessage) => 401 | 403 | undefined) => () => void,
+): void {
+  const inject = (ctx as unknown as Partial<WebServerContextLike>).inject;
+  if (typeof inject !== 'function') return;
+  inject.call(ctx, ['webServer', 'connection'], (scoped) => {
+    const services = scoped as unknown as { webServer?: WebServerLike; connection?: OwnerConnectionLike };
+    if (services.webServer === undefined || services.connection === undefined) return;
+    const connection = services.connection;
+    const disposeRoutes = register(services.webServer, (req) => {
+      const result = connection.admit(req);
+      if ('rejection' in result) return result.rejection;
+      return result.peer.principal.kind === 'owner' ? undefined : 403;
+    });
+    (scoped as unknown as { effect(fn: () => (() => void), name?: string): void })
+      .effect(() => disposeRoutes, 'im-tuitui.bind-routes');
+  });
+}
+
 /**
  * 执行绑定编排，返回凭据就绪的 Promise；推推没有可等待的扫码任务，
  * 因此总是 resolve null（凭据由端内页面手填并写入 profile 后经 HMR 生效）。
@@ -106,7 +133,8 @@ export async function ensureCredentials(
   }
 
   // 端内绑定页路由：校验与保存都回到本服务，端内页面只读投影相位
-  withWebServer(ctx, (webServer) => registerBindRoutes(webServer, service, logger, {
+  withBindRoutes(ctx, (webServer, authorizeRequest) => registerBindRoutes(webServer, service, logger, {
+    authorizeRequest,
     onManualCredentials: (credentials) => service.submitCredentials(credentials),
     onVerify: (credentials) => service.verifyOnly(credentials),
     currentConfig: () => config,
@@ -175,7 +203,8 @@ export function registerBoundCredentialRoutes(
       logger.warn(`im-tuitui: property.info 回显失败（绑定页将只显示 appId）: ${describeApiError(error)}`);
     });
 
-  withWebServer(ctx, (webServer) => registerBindRoutes(webServer, null, logger, {
+  withBindRoutes(ctx, (webServer, authorizeRequest) => registerBindRoutes(webServer, null, logger, {
+    authorizeRequest,
     boundState: () => {
       const state: Extract<BindStateWire, { phase: 'bound' }> = {
         phase: 'bound',

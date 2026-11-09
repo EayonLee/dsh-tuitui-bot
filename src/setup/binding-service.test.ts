@@ -348,6 +348,7 @@ describe('ensureCredentials 编排', () => {
     const disposed: string[] = [];
 
     const scoped = {
+      connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
       webServer: {
         register(route: { path: string; kind: string; handler: unknown }) {
           routes.push(route);
@@ -359,7 +360,7 @@ describe('ensureCredentials 编排', () => {
     const ctx = {
       effect(fn: () => unknown, name?: string) { effects.push({ fn, name }); },
       inject(deps: readonly string[], callback: (scoped: unknown) => void) {
-        expect(deps).toEqual(['webServer']);
+        expect(deps).toEqual(['webServer', 'connection']);
         callback(scoped);
         return undefined;
       },
