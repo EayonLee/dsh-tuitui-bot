@@ -347,8 +347,10 @@ describe('ensureCredentials 编排', () => {
     const routes: Array<{ path: string; kind: string }> = [];
     const disposed: string[] = [];
 
+    const ownerConnection = { admit: () => ({ peer: { principal: { kind: 'owner' } } }) };
     const scoped = {
-      connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+      // Connection 由 connectionOf 惰性读取（不写进 inject 依赖）
+      get(name: string) { return name === 'connection' ? ownerConnection : undefined; },
       webServer: {
         register(route: { path: string; kind: string; handler: unknown }) {
           routes.push(route);
@@ -360,7 +362,7 @@ describe('ensureCredentials 编排', () => {
     const ctx = {
       effect(fn: () => unknown, name?: string) { effects.push({ fn, name }); },
       inject(deps: readonly string[], callback: (scoped: unknown) => void) {
-        expect(deps).toEqual(['webServer', 'connection']);
+        expect(deps).toEqual(['webServer']);
         callback(scoped);
         return undefined;
       },
@@ -390,6 +392,34 @@ describe('ensureCredentials 编排', () => {
     // 绑定 effect 的回调：fiber dispose 时终止状态机（不抛错即成立）
     const disposeBinding = effects[0]?.fn() as () => void;
     expect(() => { disposeBinding(); }).not.toThrow();
+  });
+
+  it('宿主没有 connection 服务时仍挂管理路由，退回「仅本机回环」规则', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const routes: Array<{ path: string }> = [];
+    const scoped = {
+      get() { return undefined; }, // 没有 connection：拿不到准入门槛
+      webServer: {
+        register(route: { path: string }) { routes.push(route); return () => {}; },
+      },
+      effect() {},
+    };
+    const ctx = {
+      effect() {},
+      inject(_deps: readonly string[], callback: (scoped: unknown) => void) { callback(scoped); },
+    };
+
+    await ensureCredentials(ctx as never, { logger, config });
+
+    // 关键：不是「不挂载」（那样设置页 404），而是挂载后由 bind-routes 用回环规则把关
+    expect(routes.map((route) => route.path).sort()).toEqual([
+      BIND_CONFIG_PATH,
+      TEST_MODEL_PATH,
+      BIND_MANUAL_PATH,
+      BIND_STATE_PATH,
+      BIND_UNBIND_PATH,
+      BIND_VERIFY_PATH,
+    ].sort());
   });
 
   it('极简宿主没有 ctx.inject 时跳过端内路由，但绑定流程照常启动', async () => {

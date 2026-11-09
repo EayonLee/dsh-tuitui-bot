@@ -10,7 +10,10 @@
 
 - Binding state and settings returned 403 from a signed-in remote dsh Web browser. These routes now
   use dsh Connection owner-session admission; unauthenticated and cross-origin requests are still
-  rejected, hosts without Connection do not mount these routes, and self-update stays local-only (#70).
+  rejected, and self-update stays local-only (#70).
+- Hosts without dsh Connection (embedded / minimal hosts) no longer lose the whole settings panel:
+  the management routes fall back to the loopback-only rule instead of not mounting at all, which
+  turned the panel into a 404 (PR #72).
 
 ## 0.1.34 (2026-11-07)
 

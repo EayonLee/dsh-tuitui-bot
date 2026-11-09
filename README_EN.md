@@ -259,7 +259,7 @@ settings page only shows whether one is stored.
 Binding-state and settings routes (including bind / unbind / config / test-model) require an authenticated
 owner session through dsh Web and retain same-origin checks. A remote browser must sign in through the
 dsh launch URL first: missing authentication returns 401; cross-origin or non-owner requests return 403.
-Hosts without dsh Connection do not mount these management routes. These routes can change credentials; use
+Hosts without dsh Connection (embedded / minimal hosts) fall back to the loopback-only rule. These routes can change credentials; use
 HTTPS or an SSH tunnel to protect the launch token and session cookie in transit.
 
 ### Who may approve or answer
