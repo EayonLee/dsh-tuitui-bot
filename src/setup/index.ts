@@ -76,21 +76,42 @@ interface OwnerConnectionLike {
     | { rejection: 401 | 403 };
 }
 
+function isOwnerConnection(candidate: unknown): candidate is OwnerConnectionLike {
+  return typeof (candidate as Partial<OwnerConnectionLike> | null | undefined)?.admit === 'function';
+}
+
+/** 取宿主的 Connection 服务（惰性读 ctx.get）：拿不到就当这个宿主没有准入门槛 */
+function connectionOf(scope: Context): OwnerConnectionLike | undefined {
+  const get = (scope as unknown as { get?: (name: string) => unknown }).get;
+  if (typeof get !== 'function') return undefined;
+  const candidate = get.call(scope, 'connection');
+  return isOwnerConnection(candidate) ? candidate : undefined;
+}
+
 function withBindRoutes(
   ctx: Context,
-  register: (webServer: WebServerLike, authorizeRequest: (req: IncomingMessage) => 401 | 403 | undefined) => () => void,
+  register: (
+    webServer: WebServerLike,
+    authorizeRequest?: (req: IncomingMessage) => 401 | 403 | undefined,
+  ) => () => void,
 ): void {
   const inject = (ctx as unknown as Partial<WebServerContextLike>).inject;
-  if (typeof inject !== 'function') return;
-  inject.call(ctx, ['webServer', 'connection'], (scoped) => {
-    const services = scoped as unknown as { webServer?: WebServerLike; connection?: OwnerConnectionLike };
-    if (services.webServer === undefined || services.connection === undefined) return;
-    const connection = services.connection;
-    const disposeRoutes = register(services.webServer, (req) => {
-      const result = connection.admit(req);
-      if ('rejection' in result) return result.rejection;
-      return result.peer.principal.kind === 'owner' ? undefined : 403;
-    });
+  if (typeof inject !== 'function') return; // 极简宿主（单测/嵌入）没有 inject：跳过端内路由
+  inject.call(ctx, ['webServer'], (scoped) => {
+    const webServer = (scoped as unknown as { webServer?: WebServerLike }).webServer;
+    if (webServer === undefined || typeof webServer.register !== 'function') return;
+    const connection = connectionOf(scoped as unknown as Context);
+    // 没有 Connection 的宿主（嵌入 / 极简宿主）退回「仅本机回环」的旧规则：
+    // 那是 #44 的底线，不能因为拿不到准入门槛就把管理路由整个摘掉——
+    // 摘掉之后设置页是 404，比 403 更难排查，也不是用户要的「只许本机」。
+    const authorizeRequest = connection === undefined
+      ? undefined
+      : (req: IncomingMessage): 401 | 403 | undefined => {
+        const result = connection.admit(req);
+        if ('rejection' in result) return result.rejection;
+        return result.peer.principal.kind === 'owner' ? undefined : 403;
+      };
+    const disposeRoutes = register(webServer, authorizeRequest);
     (scoped as unknown as { effect(fn: () => (() => void), name?: string): void })
       .effect(() => disposeRoutes, 'im-tuitui.bind-routes');
   });
